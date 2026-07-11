@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ (RMIS)</title>
+  <meta name="description" content="Raw Material Inspection System - ระบบจัดการใบแจ้งตรวจสอบห้องปฏิบัติการ สำหรับบริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด">
+  <link rel="stylesheet" href="style_v2.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0284c7">
+  <link rel="icon" href="icons/icon-192.png">
+  
+  <!-- Supabase, SheetJS (XLSX), html2pdf.js CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================================
+       APP SHELL: SIDEBAR AND MAIN WRAPPER (Visible after logging in)
+       ========================================================================= -->
+  <div id="app-shell" style="display: none;">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon"><img src="icons/icon-192.png" alt="RMIS Logo" style="height:24px; vertical-align:middle;"/></div>
+        <div class="brand-info">
+          <h1>RMIS</h1>
+        </div>
+      </div>
+      
+      <div class="sidebar-user">
+        <div class="user-display-name" id="sidebar-user-name">Loading...</div>
+        <div class="user-role-badge" id="sidebar-user-role">Requester</div>
+      </div>
+      
+      <ul class="sidebar-menu">
+        <li class="menu-item active" id="nav-dashboard">
+          <a href="#" onclick="App.navigate('dashboard'); return false;">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            แดชบอร์ด
+          </a>
+        </li>
+        <li class="menu-item" id="nav-requests">
+          <a href="#" onclick="App.navigate('requests'); return false;">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            รายการใบแจ้งตรวจสอบ
+          </a>
+        </li>
+        <li class="menu-item" id="nav-drafts" style="display:none;">
+          <a href="#" onclick="App.navigate('drafts'); return false;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            แบบร่าง (Draft)
+            <span class="badge pending" id="sidebar-draft-count" style="display:none; margin-left: 8px;">0</span>
+          </a>
+        </li>
+        <li class="menu-item" id="nav-history">
+          <a href="#" onclick="App.navigate('history'); return false;">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            ประวัติวัตถุดิบย้อนหลัง
+          </a>
+        </li>
+
+        <li class="menu-item" id="nav-daily-report" style="display:none;">
+          <a href="#" onclick="App.navigate('daily-report'); return false;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            รายงานประจำวัน
+          </a>
+        </li>
+
+        <li class="menu-item" id="nav-settings">
+          <a href="#" onclick="App.openSettingsModal(); return false;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            การตั้งค่า
+          </a>
+        </li>
+      </ul>
+      
+      <div class="sidebar-footer">
+
+        <button class="btn-logout" onclick="App.logout()" style="margin-top: 10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          ออกจากระบบ
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <div class="main-wrapper">
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="mobile-menu-toggle" onclick="App.toggleSidebar()">
+            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <h2 id="topbar-title" style="font-size: 18px; font-weight: 600;">ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ</h2>
+        </div>
+        <div class="navbar-right">
+          <!-- Connection Status Indicator -->
+          <div id="conn-status-badge" style="font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#10b981;"></span>
+            <span>Local Database Mode</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dynamic Screen Views -->
+      <main class="view-container">
+        
+        <!-- 1. DASHBOARD VIEW -->
+        <section id="view-dashboard" class="page-view">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">แดชบอร์ดสรุปข้อมูล</h1>
+            <button class="btn btn-primary" onclick="App.navigate('request-create')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              สร้างใบแจ้งตรวจสอบ
+            </button>
+          </div>
+          
+          <div class="dashboard-grid">
+            <div class="stat-card all">
+              <div class="stat-info">
+                <h3>ใบแจ้งตรวจสอบทั้งหมด</h3>
+                <p id="stat-total">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+            </div>
+            <div class="stat-card pending">
+              <div class="stat-info">
+                <h3>รอดำเนินการ (Pending)</h3>
+                <p id="stat-pending">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+            </div>
+            <div class="stat-card in-process">
+              <div class="stat-info">
+                <h3>อยู่ระหว่างตรวจสอบ (In Process)</h3>
+                <p id="stat-in-progress">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+              </div>
+            </div>
+            <div class="stat-card complete">
+              <div class="stat-info">
+                <h3>ตรวจสอบเสร็จสิ้น (Complete)</h3>
+                <p id="stat-completed">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              </div>
+            </div>
+            <div class="stat-card rejected">
+              <div class="stat-info">
+                <h3>ถูกปฏิเสธ (Rejected)</h3>
+                <p id="stat-rejected">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              </div>
+            </div>
+            <div class="stat-card pending" id="stat-card-draft" style="display:none;">
+              <div class="stat-info">
+                <h3>แบบร่าง (Draft)</h3>
+                <p id="stat-drafts">0</p>
+              </div>
+              <div class="stat-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-sections">
+            <!-- Recent Requests List -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">รายการใบแจ้งล่าสุด</h3>
+                <a href="#" onclick="App.navigate('requests'); return false;" style="font-size: 13px; font-weight: 500;">ดูทั้งหมด &rarr;</a>
+              </div>
+              <div class="card-body" style="padding:0;">
+                <div class="table-responsive" style="border:none; box-shadow:none;">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>เลขที่ใบแจ้ง</th>
+                        <th>วันที่ / เวลา</th>
+                        <th>ลูกค้า</th>
+                        <th>วัตถุดิบ</th>
+                        <th>สถานะ</th>
+                        <th class="actions-column">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dashboard-recent-tbody">
+                      <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">ไม่มีข้อมูลรายการล่าสุด</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+          </div>
+        </section>
+
+        <!-- 2. REQUESTS LIST VIEW -->
+        <section id="view-requests" class="page-view" style="display: none; height: calc(100vh - 80px); flex-direction: column;">
+          <div class="flex justify-between align-center mb-10" style="flex-shrink: 0; margin-top: -10px;">
+            <h1 style="font-size: 20px; font-weight: 700;">รายการใบแจ้งตรวจสอบ</h1>
+            <div class="flex gap-10">
+              <button class="btn btn-secondary btn-sm" onclick="App.openFilterModal()" style="border-color:var(--primary-color); color:var(--primary-color);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                ค้นหา / กรองข้อมูล
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-admin-export" style="display: none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportRequestsExcel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                ส่งออก Excel / CSV
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-create-request" onclick="App.navigate('request-create')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                สร้างใบแจ้งตรวจสอบ
+              </button>
+            </div>
+          </div>
+
+          <div id="requests-split-layout" style="display: flex; flex-direction: column; gap: 0; flex: 1; overflow: hidden;">
+            <!-- Top Pane -->
+            <div id="requests-master-pane" class="card" style="margin-bottom: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px;">
+              <div class="table-responsive" style="flex: 1; overflow-y: auto;">
+                <table class="table">
+                  <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                    <tr>
+                      <th>เลขที่ใบแจ้ง</th>
+                      <th>วันที่ / เวลา</th>
+                      <th>ลูกค้า</th>
+                      <th>วัตถุดิบ</th>
+                      <th>ผู้แจ้ง</th>
+                      <th>สถานะ</th>
+                      <th class="actions-column">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="requests-list-tbody">
+                    <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Resizer Handle -->
+            <div id="pane-resizer" style="height: 8px; cursor: ns-resize; display: flex; justify-content: center; align-items: center; background-color: transparent; flex-shrink: 0; display: none;">
+              <div style="width: 40px; height: 4px; background-color: #cbd5e1; border-radius: 2px;"></div>
+            </div>
+
+            <!-- Bottom Pane -->
+            <div id="requests-detail-pane" class="card" style="margin-bottom: 0; flex: 1; display: none; flex-direction: column; overflow: hidden; padding-top: 10px;">
+              <div style="padding: 0 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <!-- Style matched to table headers (var(--text-muted), 600 weight, 14px typically) -->
+                <h1 style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin: 0; text-transform: uppercase;">รายละเอียดใบแจ้งตรวจสอบ</h1>
+                <div class="flex gap-10">
+                  <button id="btn-detail-print" class="btn btn-secondary btn-sm" style="display:none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportPDF()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    พิมพ์รายงาน A4 (PDF)
+                  </button>
+                  <button class="btn btn-primary btn-sm" id="btn-detail-edit" style="display:none;" onclick="App.editCurrentRequest()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    แก้ไขข้อมูลใบแจ้ง
+                  </button>
+                  <button class="btn btn-logout btn-sm" id="btn-detail-delete" style="display:none; width:auto; border-radius:var(--radius-sm);" onclick="App.deleteCurrentRequest()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    ลบข้อมูล
+                  </button>
+                  <!-- Lab Approve/Reject Buttons -->
+                  <button class="btn btn-sm" id="btn-detail-approve" style="display:none; background-color:#16a34a; color:white; border:none;" onclick="App.approveRequest()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Approve
+                  </button>
+                  <button class="btn btn-sm" id="btn-detail-reject" style="display:none; background-color:#dc2626; color:white; border:none;" onclick="App.rejectRequest()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    Reject
+                  </button>
+                </div>
+              </div>
+
+              <!-- Scrollable content area -->
+              <div style="flex: 1; overflow-y: auto; padding: 0 24px 24px 24px;">
+                <!-- Hidden old duplicate header fields just to prevent JS errors -->
+                <div class="detail-meta-grid" style="display:none;">
+                  <span id="detail-no"></span><span id="detail-datetime"></span><span id="detail-customer"></span><span id="detail-po-number"></span><span id="detail-requester"></span><span id="detail-status-badge"></span>
+                </div>
+
+                <!-- Transport Info -->
+                <div class="section-title" style="margin-top:0;">ข้อมูลการขนส่ง</div>
+                <div class="detail-meta-grid" style="background-color:white; margin-bottom: 20px;">
+                  <div class="meta-item"><label>ทะเบียนรถ</label><span id="detail-car-plate">ไม่ระบุ</span></div>
+                  <div class="meta-item"><label>หมายเลขซีล (Seal No.)</label><span id="detail-seal-no">ไม่ระบุ</span></div>
+                  <div class="meta-item"><label>หมายเลขตู้คอนเทนเนอร์</label><span id="detail-container-no">ไม่ระบุ</span></div>
+                </div>
+
+                <!-- Product items details -->
+                <div class="table-responsive mb-20" style="overflow: visible;">
+                  <table class="table">
+                    <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                      <tr>
+                        <th>ชื่อสินค้า</th>
+                        <th>Batch Number</th>
+                        <th>Quantity (จำนวน)</th>
+                        <th>RM No.</th>
+                        <th>ผลการทดสอบ</th>
+                        <th style="text-align:center;">สติกเกอร์</th>
+                      </tr>
+                    </thead>
+                    <tbody id="detail-items-tbody">
+                      <!-- Loaded dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Notes and Comments -->
+                <div class="grid-2 mt-20">
+                  <div class="print-block" style="border: 1px solid var(--border-color); padding: 15px; border-radius: var(--radius-sm);">
+                    <div class="meta-item">
+                      <label>หมายเหตุ</label>
+                      <span id="detail-notes" style="white-space: pre-wrap; font-size:14px; margin-top:8px;">ไม่มีหมายเหตุ</span>
+                    </div>
+                  </div>
+                  <div class="print-block" style="border: 1px solid var(--border-color); padding: 15px; border-radius: var(--radius-sm); background-color:#f8fafc;">
+                    <div class="meta-item">
+                      <label style="color:var(--primary-color);">ความคิดเห็นจากห้องปฏิบัติการ (Lab Comments)</label>
+                      <span id="detail-lab-comments" style="white-space: pre-wrap; font-size:14px; margin-top:8px; font-weight:500;">ไม่มีความคิดเห็นจากห้องปฏิบัติการ</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Document Approval Card -->
+                <div id="detail-approval-card" class="card mt-20" style="display:none; border:2px solid var(--border-color);">
+                  <div class="card-header" style="background-color:#f8fafc; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0; font-size:16px; color:#1e293b;"><i class="fas fa-file-signature"></i> Document Approval</h3>
+                    <div id="approval-status-badge" class="badge pending">Waiting for Approval</div>
+                  </div>
+                  <div class="card-body">
+                    <!-- Not Approved State -->
+                    <div id="approval-pending-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 0;">
+                      <p style="color:var(--text-muted); margin-bottom:15px;">เอกสารนี้ยังไม่ได้รับการอนุมัติ</p>
+                      <button id="btn-approve-doc" class="btn btn-primary" onclick="App.approveRequest()" style="padding:10px 24px; font-weight:600;"><i class="fas fa-check-circle"></i> Approve Document</button>
+                      <div id="approval-validation-msg" style="color:#ef4444; font-size:13px; margin-top:10px; display:none;">
+                        ไม่สามารถอนุมัติได้ เนื่องจากข้อมูลการตรวจสอบยังไม่สมบูรณ์
+                      </div>
+                    </div>
+
+                    <!-- Approved State -->
+                    <div id="approval-done-state" style="display:none; align-items:center; gap:20px;">
+                      <div style="flex:1; border-right:1px solid var(--border-color); padding-right:20px;">
+                        <div class="meta-item mb-10"><label>Approved By</label><span id="approval-name-display" style="font-weight:600; font-size:15px;">-</span></div>
+                        <div class="meta-item mb-10"><label>Role</label><span id="approval-role-display">-</span></div>
+                        <div class="meta-item"><label>Approved Date</label><span id="approval-date-display">-</span></div>
+                        <div id="reopen-action-container" style="margin-top:20px; display:none;">
+                          <button class="btn btn-danger btn-sm" onclick="App.reopenRequest()"><i class="fas fa-undo"></i> Reopen Document</button>
+                        </div>
+                      </div>
+                      <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+                        <p style="margin:0 0 10px 0; font-size:13px; font-weight:600; color:var(--text-muted);">Signature Preview</p>
+                        <div style="width:200px; height:80px; border:1px dashed #cbd5e1; border-radius:4px; display:flex; align-items:center; justify-content:center; background:#fff;">
+                          <img id="approval-signature-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:none;" />
+                          <span id="approval-no-sig-text" style="color:#94a3b8; font-size:12px;">No signature</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2.5 DRAFTS LIST VIEW -->
+        <section id="view-drafts" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">รายการแบบร่าง (Drafts)</h1>
+            <button class="btn btn-primary" onclick="App.navigate('request-create')" id="btn-draft-create">+ สร้างใบแจ้งใหม่</button>
+          </div>
+          <div class="card p-20">
+            <div class="filters-container">
+              <form id="draft-filters-form" class="grid-4" style="gap: 15px; display: grid;" onsubmit="event.preventDefault(); App.clearDraftFilters();">
+                <div class="form-group"><label>ลูกค้า (Customer Name)</label><input type="text" id="draft-filter-customer" placeholder="ค้นหาชื่อลูกค้า..."></div>
+                <div class="form-group"><label>วัตถุดิบ (Product Name)</label><input type="text" id="draft-filter-product" placeholder="ค้นหาชื่อวัตถุดิบ..."></div>
+                <div class="form-group"><label>Batch Number</label><input type="text" id="draft-filter-batch" placeholder="ค้นหา Batch..."></div>
+                <div class="form-group"><label>PO Number</label><input type="text" id="draft-filter-po" placeholder="ค้นหา PO..."></div>
+                <div class="form-group" style="grid-column: span 4; display: flex; gap: 10px; justify-content: flex-end;">
+                  <button type="button" class="btn btn-secondary" onclick="App.clearDraftFilters()">ล้างตัวกรอง</button>
+                  <button type="submit" class="btn btn-primary" onclick="App.clearDraftFilters()">ค้นหา</button>
+                </div>
+              </form>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>วันที่สร้าง</th>
+                    <th>แก้ไขล่าสุด</th>
+                    <th>ลูกค้า</th>
+                    <th>PO Number</th>
+                    <th>วัตถุดิบ</th>
+                    <th>ผู้สร้าง</th>
+                    <th class="actions-column">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="drafts-list-tbody">
+                  <tr><td colspan="7" style="text-align:center; color:var(--text-muted);">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. CREATE / EDIT REQUEST FORM VIEW -->
+        <section id="view-request-form" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 id="request-form-title" style="font-size: 24px; font-weight: 700;">สร้างใบแจ้งตรวจสอบ</h1>
+            <button class="btn btn-secondary" onclick="App.navigate('requests')">ย้อนกลับ</button>
+          </div>
+
+          <form id="request-main-form" onsubmit="App.handleRequestFormSubmit(event)">
+            <input type="hidden" id="form-request-id">
+            
+            <div class="card">
+              <div class="card-body">
+                <!-- Section 1: General Info -->
+                <div class="section-title" style="margin-top:0;">ข้อมูลทั่วไป</div>
+                
+                <!-- Admin specific block for request number editing -->
+                <div class="grid-3 mb-20" id="form-admin-no-edit" style="display:none; background: #e0f2fe; padding: 15px; border-radius: var(--radius-sm); border: 1px dashed var(--primary-color);">
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="form-request-no">เลขที่ใบแจ้ง (Request No) <span style="color:red;">*</span></label>
+                    <input type="number" id="form-request-no" min="1">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="form-request-year">ปี ค.ศ. (Request Year) <span style="color:red;">*</span></label>
+                    <input type="number" id="form-request-year" min="2000">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="form-request-date">วันที่แจ้ง</label>
+                    <input type="date" id="form-request-date">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0;">
+                    <label for="form-request-time">เวลาที่แจ้ง</label>
+                    <input type="time" id="form-request-time">
+                  </div>
+                  <div class="form-group" style="margin-bottom:0; display:flex; align-items:flex-end;">
+                    <span style="font-size:11px; color:var(--text-muted); line-height:1.4;">* เฉพาะผู้ดูแลระบบที่แก้ไขเลขที่ใบแจ้งได้ โดยระบบจะตรวจสอบไม่ให้ซ้ำปีเดียวกัน</span>
+                  </div>
+                </div>
+
+                <div class="grid-3">
+                  <div class="form-group">
+                    <label for="form-customer">ชื่อลูกค้า <span style="color:red;">*</span></label>
+                    <input type="text" id="form-customer" required placeholder="เช่น บริษัท เอ็ม พี ลูบริแคนท์ จำกัด">
+                  </div>
+                  <div class="form-group">
+                    <label for="form-po-number">PO Number (ไม่บังคับ)</label>
+                    <input type="text" id="form-po-number" placeholder="เช่น PO-2026-001">
+                  </div>
+                  <div class="form-group" id="form-requester-display-group">
+                    <label>ผู้แจ้ง</label>
+                    <input type="text" id="form-requester-display" readonly style="background-color:#e2e8f0; cursor:not-allowed;">
+                  </div>
+                </div>
+
+                <!-- Section 2: Product Items (Dynamic Table) -->
+                <div class="flex justify-between align-center" style="margin-top: 24px; margin-bottom: 6px;">
+                  <div class="section-title" style="margin:0; border:none; padding:0;">รายการสินค้าในใบแจ้ง</div>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-add-item" style="border-color:var(--primary-color); color:var(--primary-color);" onclick="App.addFormItemRow()">+ เพิ่มรายการสินค้า</button>
+                </div>
+                
+                <div class="table-responsive" style="margin-bottom:20px;">
+                  <table class="item-table">
+                    <thead>
+                      <tr>
+                        <th style="width:30%;">ชื่อสินค้า <span style="color:red;">*</span></th>
+                        <th style="width:25%;">Batch Number <span style="color:red;">*</span></th>
+                        <th style="width:20%;">Quantity <span style="color:red;">*</span></th>
+                        <th style="width:15%;" class="admin-lab-field">RM No.</th>
+                        <th style="width:15%;" class="admin-lab-field">ผลทดสอบ</th>
+                        <th style="width:8%; text-align:center;">ลบ</th>
+                      </tr>
+                    </thead>
+                    <tbody id="form-items-tbody">
+                      <!-- Rows added dynamically by script -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Section 3: Logistics Info -->
+                <div class="section-title">ข้อมูลการขนส่ง</div>
+                <div class="grid-3">
+                  <div class="form-group">
+                    <label for="form-car-plate">ทะเบียนรถ</label>
+                    <input type="text" id="form-car-plate" placeholder="เช่น 70-1234 ระยอง">
+                  </div>
+                  <div class="form-group">
+                    <label for="form-seal-no">หมายเลขซีล (Seal No.)</label>
+                    <input type="text" id="form-seal-no" placeholder="เช่น SL-0092">
+                  </div>
+                  <div class="form-group">
+                    <label for="form-container-no">หมายเลขตู้คอนเทนเนอร์</label>
+                    <input type="text" id="form-container-no" placeholder="เช่น MSKU-998811">
+                  </div>
+                </div>
+
+                <!-- Section 4: Notes and Lab Comments -->
+                <div class="section-title">ข้อมูลบันทึกและข้อเสนอแนะ</div>
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label for="form-notes">หมายเหตุ</label>
+                    <textarea id="form-notes" rows="3" placeholder="ระบุหมายเหตุการจัดส่ง วัตถุประสงค์ หรืออื่นๆ..."></textarea>
+                  </div>
+                  <div class="form-group admin-lab-field">
+                    <label for="form-lab-comments">ความคิดเห็นจากห้องปฏิบัติการ (Lab Comments)</label>
+                    <textarea id="form-lab-comments" rows="3" placeholder="ลงความคิดเห็น ผลการวิเคราะห์ หรือสาเหตุการตกเกณฑ์..."></textarea>
+                  </div>
+                </div>
+
+                <!-- Lab-only: Share with Base Oil + Status Selection -->
+                <div class="admin-lab-field" id="form-base-oil-section" style="margin-top:16px; display:none;">
+                  <div style="background:#fffbeb; border:1px solid #fef3c7; padding:12px 16px; border-radius:var(--radius-sm); display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="form-need-base-oil" style="width:18px; height:18px; accent-color:#f59e0b;">
+                    <label for="form-need-base-oil" style="margin:0; font-weight:600; color:#b45309; cursor:pointer;">แชร์ให้ Base Oil เห็นใบงานนี้</label>
+                  </div>
+                </div>
+
+                <!-- Lab/Admin: Manual Status Selection -->
+                <div class="admin-lab-field" id="form-status-section" style="margin-top:16px; display:none;">
+                  <div style="background:#e0f2fe; border:1px solid #bae6fd; padding:12px 16px; border-radius:var(--radius-sm);">
+                    <div class="form-group" style="margin-bottom:0;">
+                      <label for="form-status" style="color:#0369a1; font-weight:600;">สถานะใบแจ้ง (Status)</label>
+                      <select id="form-status">
+                        <option value="Draft" style="display:none;">Draft – แบบร่าง</option>
+                        <option value="Pending">Pending – รอดำเนินการ</option>
+                        <option value="In Process">In Process – กำลังตรวจสอบ</option>
+                        <option value="Complete">Complete – ตรวจสอบแล้ว</option>
+                        <option value="Approved">Approved – อนุมัติเอกสารแล้ว</option>
+                        <option value="Rejected">Rejected – ยกเลิก</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card-footer" style="padding:20px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="App.navigate('requests')">ยกเลิก</button>
+                <button type="button" id="btn-save-draft" class="btn btn-secondary" onclick="App.saveDraft()">Save Draft</button>
+                <button type="submit" id="btn-submit-request" class="btn btn-primary">Submit Request</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- DETAIL VIEW HAS BEEN MOVED TO BOTTOM PANE -->
+
+        <!-- 5. MATERIAL HISTORY VIEW (ADMIN/LAB ONLY) -->
+        <section id="view-history" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">ระบบค้นหาประวัติวัตถุดิบย้อนหลัง (Material Audit)</h1>
+          </div>
+
+          <!-- History filters -->
+          <div class="search-filter-bar">
+            <form id="history-filter-form" onsubmit="App.handleHistoryFilter(event)">
+              <div class="filter-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-product">ชื่อสินค้า</label>
+                  <input type="text" id="hist-product" placeholder="เช่น AW 68...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-batch">Batch Number</label>
+                  <input type="text" id="hist-batch" placeholder="ค้นหาเลข Batch...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-rm">RM No.</label>
+                  <input type="text" id="hist-rm" placeholder="ค้นหา RM No...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-request-no">เลขที่ใบแจ้ง</label>
+                  <input type="text" id="hist-request-no" placeholder="ค้นหาเลขใบแจ้ง...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-result">ผลการทดสอบ</label>
+                  <select id="hist-result">
+                    <option value="">ทั้งหมด</option>
+                    <option value="In Process">In Process</option>
+                    <option value="Pass">Pass</option>
+                    <option value="Fail">Fail</option>
+                    <option value="Hold">Hold</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-start-date">ตั้งแต่วันที่</label>
+                  <input type="date" id="hist-start-date">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="hist-end-date">ถึงวันที่</label>
+                  <input type="date" id="hist-end-date">
+                </div>
+              </div>
+              <div class="filter-actions">
+                <button type="button" class="btn btn-secondary" onclick="App.clearHistoryFilters()">ล้างตัวกรอง</button>
+                <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">ค้นหา</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- History list table -->
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>เลขที่ใบแจ้ง</th>
+                  <th>วันที่ / เวลา</th>
+                  <th>ชื่อสินค้า</th>
+                  <th>Batch Number</th>
+                  <th>RM No.</th>
+                  <th>ผลการทดสอบ</th>
+                  <th>ผู้แจ้ง</th>
+                  <th>สถานะใบแจ้ง</th>
+                  <th>ดูรายละเอียด</th>
+                </tr>
+              </thead>
+              <tbody id="history-list-tbody">
+                <tr><td colspan="9" style="text-align:center; color:var(--text-muted);">กรุณาระบุเกณฑ์ในการค้นหาประวัติวัตถุดิบ</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 6. LAB SIGNATURES MANAGER VIEW (ADMIN ONLY) -->
+        <section id="view-signatures" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">จัดการลายเซ็นเจ้าหน้าที่ Lab</h1>
+          </div>
+          
+          <div class="card">
+            <div class="card-body">
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">อัปโหลดลายเซ็นสำหรับเจ้าหน้าที่ Lab แต่ละคน เพื่อใช้ในการอนุมัติใบแจ้งตรวจสอบ ลายเซ็นจะถูกบันทึกเป็น Snapshot เมื่อ Lab กด Approve</p>
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>ชื่อเจ้าหน้าที่ Lab</th>
+                      <th>ลายเซ็นปัจจุบัน</th>
+                      <th style="text-align:center;">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="signatures-list-tbody">
+                    <tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดข้อมูล...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. USER MANAGER VIEW (ADMIN ONLY) -->
+        <section id="view-users" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">จัดการบัญชีผู้ใช้งาน</h1>
+            <button class="btn btn-primary" onclick="App.openCreateUserModal()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="16" y1="11" x2="22" y2="11"></line></svg>
+              เพิ่มผู้ใช้งานใหม่
+            </button>
+          </div>
+
+          <!-- Users Table -->
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ชื่อผู้ใช้ (Username)</th>
+                  <th>ชื่อแสดงในระบบ (Display Name)</th>
+                  <th>สิทธิ์การเข้าใช้งาน (Role)</th>
+                  <th>วันที่สร้าง</th>
+                  <th style="text-align:center;">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="users-list-tbody">
+                <tr><td colspan="5" style="text-align:center; color:var(--text-muted);">กำลังโหลดข้อมูลผู้ใช้งาน...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 6. DAILY REPORT VIEW (ADMIN/LAB ONLY) -->
+        <section id="view-daily-report" class="page-view" style="display: none; height: calc(100vh - 80px); flex-direction: column;">
+          <div class="flex justify-between align-center mb-20" style="flex-shrink: 0;">
+            <h1 style="font-size: 24px; font-weight: 700;">รายงานประจำวัน (Daily Laboratory Report)</h1>
+          </div>
+          
+          <div class="card" style="padding: 24px;">
+            <div style="max-width: 400px;">
+              <div class="form-group">
+                <label for="daily-report-date">เลือกวันที่ออกรายงาน</label>
+                <input type="date" id="daily-report-date" class="form-control" style="margin-bottom: 20px;">
+              </div>
+              <button class="btn btn-primary" onclick="App.generateDailyReportPDF()" style="width: 100%; justify-content: center;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                สร้างรายงาน PDF
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- PRINT TEMPLATE FOR DAILY REPORT REMOVED FROM HERE -->
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       1. LOGIN PAGE VIEW (Visible initially)
+       ========================================================================= -->
+  <div class="login-container" id="login-screen">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo" style="background: transparent; box-shadow: none; border-radius: 0; width: auto; height: 120px; margin-bottom: 20px;">
+          <img src="icons/icon-192.png" alt="RMIS Logo" style="max-height: 100%; object-fit: contain;">
+        </div>
+        <h2>ระบบจัดการใบแจ้งตรวจสอบห้องปฏิบัติการ</h2>
+        <p>Raw Material Inspection System (RMIS)</p>
+      </div>
+
+      <form id="login-form" onsubmit="App.handleLogin(event)">
+        <div class="form-group">
+          <label for="login-username">ชื่อผู้ใช้งาน (Username)</label>
+          <input type="text" id="login-username" required placeholder="กรอกชื่อผู้ใช้...">
+        </div>
+        <div class="form-group">
+          <label for="login-password">รหัสผ่าน (Password)</label>
+          <input type="password" id="login-password" required placeholder="กรอกรหัสผ่าน...">
+        </div>
+        <div id="login-error-msg" style="color:var(--text-danger); font-size:13px; margin-bottom:15px; display:none; text-align:center; font-weight:500;">
+          ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง
+        </div>
+        <button type="submit" class="btn btn-primary">เข้าสู่ระบบ</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: DATABASE SETTINGS CONFIG
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-config">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">ตั้งค่าการเชื่อมต่อ Supabase Cloud</h3>
+        <button class="btn-close" onclick="App.closeConfigModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="config-db-mode" value="supabase">
+        <div id="supabase-config-fields">
+          <div class="form-group">
+            <label for="config-sb-url">Supabase Project URL <span style="color:red;">*</span></label>
+            <input type="text" id="config-sb-url" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co" required>
+          </div>
+          <div class="form-group">
+            <label for="config-sb-key">Supabase Anon Key <span style="color:red;">*</span></label>
+            <input type="password" id="config-sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+          </div>
+          <div style="background-color: #fffbeb; border:1px solid #fef3c7; color:#b45309; padding:12px; border-radius:var(--radius-sm); font-size:12px; line-height:1.4;">
+            <strong>ข้อแนะนำ:</strong> ระบบนี้ทำงานบนฐานข้อมูล Supabase Cloud เท่านั้น กรุณากรอก URL และ Anon Key เพื่อเข้าใช้งาน
+          </div>
+          
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;" />
+          <h4 style="margin-bottom: 12px; font-weight: 600; color: var(--text-color);">การตั้งค่าระบบ (System Settings)</h4>
+          <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
+            <label for="config-sound-enabled" style="margin-bottom: 0;">เปิดเสียงแจ้งเตือนระบบ</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input type="checkbox" id="config-sound-enabled" checked style="width: auto; transform: scale(1.2);">
+              <button type="button" class="btn btn-secondary" onclick="App.testNotificationSound()" style="padding: 6px 12px; font-size: 12px;">🔊 ทดสอบเสียง</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeConfigModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="App.saveDatabaseConfig()" style="width:auto; padding:10px 24px;">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: BATCH HISTORY TRACE TIMELINE
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-batch-trace">
+    <div class="modal-container" style="max-width: 800px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="batch-trace-title">ประวัติการตรวจสอบของ Batch: B-XXXX</h3>
+        <button class="btn-close" onclick="App.closeBatchTraceModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top:10px;">
+        <div style="margin-bottom:15px; font-size:13px; color:var(--text-muted);">
+          แสดงรายการใบแจ้งตรวจสอบทั้งหมดที่มีความเกี่ยวข้องกับ Batch ผลิตภัณฑ์นี้ เรียงตามวันทีตรวจสอบย้อนหลัง
+        </div>
+        <div class="table-responsive">
+          <table class="table" style="font-size:13px;">
+            <thead>
+              <tr>
+                <th>เลขที่ใบแจ้ง</th>
+                <th>วันที่ตรวจ</th>
+                <th>ชื่อสินค้า</th>
+                <th>RM No.</th>
+                <th>ผลทดสอบ</th>
+                <th>ผู้แจ้ง</th>
+                <th>สถานะใบแจ้ง</th>
+                <th>ลิงก์ใบแจ้ง</th>
+              </tr>
+            </thead>
+            <tbody id="batch-trace-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeBatchTraceModal()">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: CREATE USER ACCOUNT (ADMIN ONLY)
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-create-user">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title">เพิ่มผู้ใช้งานระบบคนใหม่</h3>
+        <button class="btn-close" onclick="App.closeCreateUserModal()">&times;</button>
+      </div>
+      <form id="create-user-form" onsubmit="App.handleCreateUserSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="user-username">ชื่อผู้ใช้งาน (Username) <span style="color:red;">*</span></label>
+            <input type="text" id="user-username" required placeholder="เช่น john_doe (ภาษาอังกฤษ ตัวเลข ตัวคั่น เท่านั้น)">
+          </div>
+          <div class="form-group">
+            <label for="user-display-name">ชื่อที่จะแสดงในระบบ (Display Name) <span style="color:red;">*</span></label>
+            <input type="text" id="user-display-name" required placeholder="เช่น จอห์น ผู้แจ้ง หรือ สมคิด แอดมิน">
+          </div>
+          <div class="form-group">
+            <label for="user-dept">แผนก (Department) <span style="color:red;">*</span></label>
+            <input type="text" id="user-dept" required placeholder="เช่น ฝ่ายผลิต, คลังสินค้า">
+          </div>
+          <div class="form-group">
+            <label for="user-password">รหัสผ่าน (Password) <span style="color:red;">*</span></label>
+            <input type="password" id="user-password" required placeholder="ขั้นต่ำ 6 อักขระ">
+          </div>
+          <div class="form-group">
+            <label for="user-role">ระดับสิทธิ์ (Role)</label>
+            <select id="user-role" required>
+              <option value="requester">ผู้แจ้ง (Requester)</option>
+              <option value="lab">ห้องปฏิบัติการ (Lab)</option>
+              <option value="base_oil">Base Oil</option>
+              <option value="admin">ผู้ดูแลระบบ (Admin)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="App.closeCreateUserModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">สร้างผู้ใช้</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: CHANGE USER PASSWORD (ADMIN ONLY)
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-change-password">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" id="change-pwd-title">เปลี่ยนรหัสผ่านสำหรับผู้ใช้: xxxxx</h3>
+        <button class="btn-close" onclick="App.closeChangePasswordModal()">&times;</button>
+      </div>
+      <form id="change-password-form" onsubmit="App.handleChangePasswordSubmit(event)">
+        <input type="hidden" id="change-pwd-userid">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="change-pwd-new">รหัสผ่านใหม่ (New Password) <span style="color:red;">*</span></label>
+            <input type="password" id="change-pwd-new" required placeholder="อย่างน้อย 6 อักขระ">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="App.closeChangePasswordModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">บันทึกรหัสผ่านใหม่</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: UPLOAD SIGNATURE
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-upload-signature">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" id="sig-upload-title">อัปโหลดลายเซ็น</h3>
+        <button class="btn-close" onclick="App.closeSignatureModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="sig-upload-userid">
+        <div class="form-group">
+          <label>เลือกไฟล์ลายเซ็น (PNG/JPG)</label>
+          <input type="file" id="sig-upload-file" accept="image/png,image/jpeg" style="padding:8px;">
+        </div>
+        <div id="sig-preview" style="text-align:center; margin-top:10px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="App.closeSignatureModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="App.uploadSignature()" style="width:auto; padding:10px 24px;">บันทึกลายเซ็น</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       TOAST NOTIFICATIONS CONTAINER
+       ========================================================================= -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- =========================================================================
+       PRINT TEMPLATE FOR DAILY REPORT
+       ========================================================================= -->
+  <div id="daily-report-print-template" style="display: none; padding: 0;" class="a4-print-layout">
+    <div class="print-header" style="text-align:center; margin-bottom: 20px;">
+      <h3 style="margin:0 0 10px 0; font-size:18px; font-weight:600;">รายงานการตรวจสอบวัตถุดิบประจำวัน</h3>
+      <p style="margin:0; font-size:14px; font-weight:500;" id="print-daily-date-range">ประจำวันที่: -</p>
+    </div>
+    
+    <table class="table" style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background-color:#f1f5f9;">
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:5%;">ลำดับ</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:15%;">เลขที่ใบแจ้ง</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:10%;">วันที่รับเข้า</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:15%;">Supplier</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:20%;">Product</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:15%;">Batch</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left; width:10%;">Qty</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:10%;">Result</th>
+        </tr>
+      </thead>
+      <tbody id="print-daily-tbody">
+        <!-- Rendered via JS -->
+      </tbody>
+    </table>
+    
+    <div style="margin-top:30px; font-size:12px; display:flex; justify-content:space-between; color:#64748b;">
+      <div id="print-daily-timestamp">วันที่พิมพ์: -</div>
+      <div id="print-daily-by">ผู้พิมพ์: -</div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       A4 PRINT LAYOUT TEMPLATE (Used by html2pdf.js for PDF export)
+       ========================================================================= -->
+  <div id="a4-print-template" class="a4-print-layout">
+    <div class="print-header">
+      <div class="print-title" style="text-align:left;">
+        <h2 style="margin:0; font-size:18px; font-weight:700;">ใบรายงานผลการตรวจสอบห้องปฏิบัติการ</h2>
+        <p style="margin:0; font-size:14px; font-weight:500; color:#555;">บริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด</p>
+      </div>
+    </div>
+
+    <div class="print-meta-grid">
+      <div>
+        <p><strong>เลขที่ใบแจ้งตรวจสอบ (Request No.):</strong> <span id="print-no"></span></p>
+        <p><strong>ชื่อลูกค้า (Customer):</strong> <span id="print-customer"></span></p>
+        <p><strong>PO Number:</strong> <span id="print-po-number"></span></p>
+      </div>
+      <div style="text-align: right;">
+        <p><strong>วันที่แจ้งตรวจสอบ (Date):</strong> <span id="print-date"></span></p>
+        <p><strong>เวลาที่แจ้ง (Time):</strong> <span id="print-time"></span></p>
+      </div>
+    </div>
+
+    <!-- Transport Block -->
+    <div class="print-block" style="margin-bottom: 20px; font-size: 11px;">
+      <div class="print-block-title">ข้อมูลการขนส่ง (Transportation Details)</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+        <p><strong>ทะเบียนรถ:</strong> <span id="print-car-plate"></span></p>
+        <p><strong>หมายเลขซีล (Seal No.):</strong> <span id="print-seal-no"></span></p>
+        <p><strong>หมายเลขตู้คอนเทนเนอร์:</strong> <span id="print-container-no"></span></p>
+      </div>
+    </div>
+
+    <!-- Product Table -->
+    <div class="print-block-title">รายการตรวจวิเคราะห์และผลการทดสอบ (Product Testing Details)</div>
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th style="width:5%;">ลำดับ</th>
+          <th style="width:35%;">ชื่อสินค้า (Product Name)</th>
+          <th style="width:20%;">Batch Number</th>
+          <th style="width:15%;">Quantity (จำนวน)</th>
+          <th style="width:13%;">RM No.</th>
+          <th style="width:12%;">ผลทดสอบ</th>
+        </tr>
+      </thead>
+      <tbody id="print-items-tbody">
+        <!-- Rows populated dynamically -->
+      </tbody>
+    </table>
+
+    <!-- Comments and Notes -->
+    <div class="print-extra-grid">
+      <div class="print-block">
+        <div class="print-block-title">หมายเหตุ (Remarks)</div>
+        <p id="print-notes" style="min-height: 25px; white-space: pre-wrap; margin:0;"></p>
+      </div>
+      <div class="print-block" style="background-color:#fafafa;">
+        <div class="print-block-title">ความคิดเห็นจากห้องปฏิบัติการ (Laboratory Comments)</div>
+        <p id="print-lab-comments" style="min-height: 25px; white-space: pre-wrap; margin:0; font-weight:500;"></p>
+      </div>
+    </div>
+
+    <!-- Signatures Panel -->
+    <div class="print-signatures">
+      <div>
+        <p style="margin-bottom:10px;"><strong>ผู้แจ้งตรวจสอบ (Requester)</strong></p>
+        <div class="signature-box"></div>
+        <p id="print-requester" style="margin-top:5px; font-size:11px; font-weight:600;"></p>
+      </div>
+      <div>
+        <p style="margin-bottom:10px;"><strong>ผู้อนุมัติผลการตรวจสอบ (Approved By)</strong></p>
+        <div class="signature-box" id="print-signature-img-box" style="display:flex; align-items:center; justify-content:center; position:relative;">
+          <span id="print-waiting-approval" style="color:#ef4444; font-weight:600; font-size:14px; opacity:0.6;">Waiting for Approval</span>
+          <!-- Signature image inserted here dynamically -->
+        </div>
+        <p id="print-approved-name" style="margin-top:5px; font-size:11px; font-weight:600;"></p>
+        <p id="print-approved-date" style="margin-top:2px; font-size:10px; color:#555;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticker Preview Modal -->
+  <div id="modal-sticker-preview" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2>Preview สติกเกอร์วัตถุดิบ</h2>
+        <button class="btn-close" onclick="App.closeStickerModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="sticker-preview-container" style="display: flex; justify-content: center; margin-bottom: 20px;">
+          <!-- Sticker content injected here -->
+        </div>
+        <div class="form-group">
+          <label for="sticker-copies">จำนวนสำเนา (Copies):</label>
+          <input type="number" id="sticker-copies" value="1" min="1" max="100" class="form-control" style="width: 100%;">
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-secondary" onclick="App.closeStickerModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="App.confirmPrintSticker()">🖨 พิมพ์</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="modal-settings" class="modal-overlay">
+    <div class="modal-container" style="max-width:520px;">
+      <div class="modal-header">
+        <h2>⚙️ การตั้งค่า (Settings)</h2>
+        <button class="btn-close" onclick="App.closeSettingsModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:8px 0;">
+        <ul style="list-style:none;margin:0;padding:0;">
+          <li>
+            <button onclick="App.openChangeOwnPasswordModal()" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:22px;width:32px;text-align:center;">&#128274;</span>
+              <div>
+                <div style="font-weight:600;">เปลี่ยนรหัสผ่าน</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">อัปเดตรหัสผ่านสำหรับบัญชีของคุณ</div>
+              </div>
+              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </li>
+          <li id="setting-nav-users" style="display:none;">
+            <button onclick="App.navigate('users'); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:22px;width:32px;text-align:center;">👥</span>
+              <div>
+                <div style="font-weight:600;">จัดการผู้ใช้งาน</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">เพิ่ม ลบ แก้ไข บัญชีผู้ใช้งานระบบ</div>
+              </div>
+              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </li>
+          <li id="setting-nav-signatures" style="display:none;">
+            <button onclick="App.navigate('signatures'); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:22px;width:32px;text-align:center;">✍️</span>
+              <div>
+                <div style="font-weight:600;">จัดการลายเซ็น Lab</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">อัปโหลดและจัดการลายเซ็นอิเล็กทรอนิกส์</div>
+              </div>
+              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </li>
+          <li id="setting-btn-system" style="display:none;">
+            <button onclick="App.openConfigModal(); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:22px;width:32px;text-align:center;">⚙️</span>
+              <div>
+                <div style="font-weight:600;">ตั้งค่าระบบ</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">การเชื่อมต่อฐานข้อมูลและตั้งค่าขั้นสูง</div>
+              </div>
+              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </li>
+          <!-- Future settings items can be added here -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Filter Modal -->
+  <div id="modal-search-filters" class="modal-overlay">
+    <div class="modal-container" style="max-width:800px;">
+      <div class="modal-header">
+        <h2>🔍 ค้นหา / กรองข้อมูล</h2>
+        <button class="btn-close" onclick="App.closeFilterModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="filter-form" onsubmit="App.handleFilterSubmit(event)">
+          <div class="filter-grid">
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-no">เลขที่ใบแจ้ง</label>
+              <input type="text" id="filter-no" placeholder="เช่น 1, 2">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-customer">ชื่อลูกค้า</label>
+              <input type="text" id="filter-customer" placeholder="ค้นหาลูกค้า...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-product">ชื่อสินค้า</label>
+              <input type="text" id="filter-product" placeholder="เช่น AW 68...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-batch">Batch Number</label>
+              <input type="text" id="filter-batch" placeholder="ค้นหาเลข Batch...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-po">PO Number</label>
+              <input type="text" id="filter-po" placeholder="ค้นหา PO Number...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-rm">RM No.</label>
+              <input type="text" id="filter-rm" placeholder="ค้นหา RM No...">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-status">สถานะ</label>
+              <select id="filter-status">
+                <option value="">ทั้งหมด</option>
+                <option value="Pending">Pending</option>
+                <option value="In Process">In Process</option>
+                <option value="Complete">Complete</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-start-date">ตั้งแต่วันที่</label>
+              <input type="date" id="filter-start-date">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-end-date">ถึงวันที่</label>
+              <input type="date" id="filter-end-date">
+            </div>
+          </div>
+          <div class="filter-actions mt-20" style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="App.clearFilters()">ล้างตัวกรอง</button>
+            <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">ค้นหา</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Own Password Modal -->
+  <div id="modal-change-own-password" class="modal-overlay">
+    <div class="modal-container" style="max-width:440px;">
+      <div class="modal-header">
+        <h2>&#128274; เปลี่ยนรหัสผ่าน</h2>
+        <button class="btn-close" onclick="App.closeChangeOwnPasswordModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="change-own-password-form" onsubmit="App.handleChangeOwnPasswordSubmit(event)">
+          <!-- current password -->
+          <div class="form-group" style="margin-bottom:16px;">
+            <label for="own-pwd-current" style="display:block;margin-bottom:6px;font-weight:600;">รหัสผ่านปัจจุบัน</label>
+            <div style="position:relative;">
+              <input type="password" id="own-pwd-current" class="form-control" placeholder="กรอกรหัสผ่านปัจจุบัน" required autocomplete="current-password" style="width:100%;padding-right:44px;">
+              <button type="button" tabindex="-1" onclick="App.togglePwdVisibility('own-pwd-current', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;">&#128065;</button>
+            </div>
+          </div>
+          <!-- new password -->
+          <div class="form-group" style="margin-bottom:16px;">
+            <label for="own-pwd-new" style="display:block;margin-bottom:6px;font-weight:600;">รหัสผ่านใหม่</label>
+            <div style="position:relative;">
+              <input type="password" id="own-pwd-new" class="form-control" placeholder="อย่างน้อย 4 ตัวอักษร" required minlength="4" autocomplete="new-password" style="width:100%;padding-right:44px;">
+              <button type="button" tabindex="-1" onclick="App.togglePwdVisibility('own-pwd-new', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;">&#128065;</button>
+            </div>
+          </div>
+          <!-- confirm new password -->
+          <div class="form-group" style="margin-bottom:20px;">
+            <label for="own-pwd-confirm" style="display:block;margin-bottom:6px;font-weight:600;">ยืนยันรหัสผ่านใหม่</label>
+            <div style="position:relative;">
+              <input type="password" id="own-pwd-confirm" class="form-control" placeholder="ทำซ้ำรหัสผ่านใหม่" required autocomplete="new-password" style="width:100%;padding-right:44px;">
+              <button type="button" tabindex="-1" onclick="App.togglePwdVisibility('own-pwd-confirm', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;">&#128065;</button>
+            </div>
+          </div>
+          <!-- error message -->
+          <div id="own-pwd-error" style="display:none;background:#fee2e2;color:#991b1b;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:14px;"></div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="App.closeChangeOwnPasswordModal()">ยกเลิก</button>
+            <button type="submit" id="own-pwd-submit-btn" class="btn btn-primary">💾 บันทึกรหัสผ่านใหม่</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Modules -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(reg => console.log('Service Worker registered', reg))
+          .catch(err => console.error('Service Worker registration failed', err));
+      });
+    }
+  </script>
+  <script src="config.js?v=16"></script>
+  <script src="dbService.js?v=16"></script>
+  <script src="app_v4.js"></script>
+</body>
+</html>
