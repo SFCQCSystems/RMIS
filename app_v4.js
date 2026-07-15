@@ -364,6 +364,7 @@ const App = (function () {
   }
 
   function toggleSidebar() {
+    document.body.classList.toggle('sidebar-collapsed');
     const sidebar = document.getElementById('sidebar');
     if (sidebar) sidebar.classList.toggle('open');
   }

@@ -115,11 +115,14 @@ a:hover {
   flex-direction: column;
   position: fixed;
   top: 0;
-  bottom: 0;
   left: 0;
-  z-index: 100;
-  transition: var(--transition-normal);
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
+  bottom: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+}
+
+.sidebar.sidebar-collapsed {
+  transform: translateX(-260px);
 }
 
 .sidebar-brand {
@@ -252,7 +255,10 @@ a:hover {
   flex-direction: column;
   min-height: 100vh;
   width: calc(100% - 260px);
+  background-color: var(--bg-color);
+  transition: margin-left 0.3s ease, width 0.3s ease;
 }
+
 
 .top-navbar {
   height: 70px;
@@ -274,11 +280,12 @@ a:hover {
 }
 
 .mobile-menu-toggle {
-  display: none;
+  display: block;
   background: none;
   border: none;
   color: var(--text-main);
   cursor: pointer;
+  padding: 4px;
 }
 
 .navbar-right {
@@ -1098,6 +1105,16 @@ a:hover {
 
   .mobile-menu-toggle {
     display: block;
+  }
+}
+
+/* Collapsed Sidebar on Desktop */
+@media (min-width: 769px) {
+  body.sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+  }
+  body.sidebar-collapsed .main-wrapper {
+    margin-left: 0;
   }
 }
 
