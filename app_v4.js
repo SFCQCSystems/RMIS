@@ -66,6 +66,9 @@ const App = (function () {
     // 3. Setup Split Layout Resizer
     setupSplitResizer();
 
+    // 4. Setup Resizable Columns
+    initResizableColumns();
+
     // 3. Attempt auto-login with existing session
     try {
       const user = await window.DB.getCurrentUser();
@@ -930,6 +933,7 @@ const App = (function () {
     const qty = item.quantity || '';
     const rm = item.rm_no || '';
     const result = item.test_result || 'In Process';
+    const comment = item.item_comment || '';
 
     const isEditMode = state.currentRequestId !== null;
     const statusSelect = document.getElementById('form-status');
@@ -958,6 +962,9 @@ const App = (function () {
           <option value="Fail" ${result === 'Fail' ? 'selected' : ''}>Fail</option>
           <option value="Hold" ${result === 'Hold' ? 'selected' : ''}>Hold</option>
         </select>
+      </td>
+      <td class="admin-lab-field" style="display:${isAdminOrLab ? 'table-cell' : 'none'};">
+        <input type="text" class="item-form-comment" placeholder="หมายเหตุ" value="${escapeHtml(comment)}" ${isRequester ? 'disabled readonly' : ''}>
       </td>
       <td style="text-align:center;">
         ${showDelete ? `
@@ -1011,9 +1018,11 @@ const App = (function () {
       const idVal = row.querySelector('.item-form-id').value;
       const rmInput = row.querySelector('.item-form-rm');
       const resultSelect = row.querySelector('.item-form-result');
+      const commentInput = row.querySelector('.item-form-comment');
 
       const pRm = rmInput ? rmInput.value.trim() : '';
       const pResult = resultSelect ? resultSelect.value : 'In Process';
+      const pComment = commentInput ? commentInput.value.trim() : '';
 
       if (!pName || !pBatch || !pQty) {
         showToast('กรุณากรอกข้อมูลสินค้าให้ครบถ้วนในทุกแถว', 'warning');
@@ -1027,7 +1036,8 @@ const App = (function () {
         batch_number: pBatch,
         quantity: pQty,
         rm_no: pRm,
-        test_result: pResult
+        test_result: pResult,
+        item_comment: pComment
       });
     }
 
@@ -1273,6 +1283,7 @@ const App = (function () {
           <td>${displayRm ? `<code>${escapeHtml(displayRm)}</code>` : ''}</td>
           <td>${displayRes ? `<span class="badge ${resClass}">${displayRes}</span>` : ''}</td>
           <td style="text-align:center;">${stickerBtnHtml}</td>
+          <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(item.item_comment || '')}</td>
         `;
         itemsTbody.appendChild(tr);
       });
@@ -1469,7 +1480,7 @@ const App = (function () {
     document.getElementById('hist-start-date').value = state.historyFilters.startDate;
     document.getElementById('hist-end-date').value = state.historyFilters.endDate;
 
-    listBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดประวัติวัตถุดิบ...</td></tr>`;
+    listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดประวัติวัตถุดิบ...</td></tr>`;
 
     try {
       const history = await window.DB.getMaterialHistory(state.historyFilters);
@@ -1477,7 +1488,7 @@ const App = (function () {
       listBody.innerHTML = '';
 
       if (history.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบประวัติการส่งทดสอบของชิ้นงาน/วัตถุดิบนี้</td></tr>`;
+        listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบประวัติการส่งทดสอบของชิ้นงาน/วัตถุดิบนี้</td></tr>`;
         return;
       }
 
@@ -1525,6 +1536,7 @@ const App = (function () {
           </td>
           <td style="white-space: nowrap;">${h.rm_no ? `<code>${escapeHtml(h.rm_no)}</code>` : '<em style="color:var(--text-muted);">ว่าง</em>'}</td>
           <td style="white-space: nowrap;"><span class="badge ${resClass}">${h.test_result}</span></td>
+          <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(h.item_comment || '')}</td>
           <td style="white-space: nowrap;">${escapeHtml(h.requester_name)}</td>
           <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status}</span></td>
           <td style="display: flex; justify-content: center; align-items: center; gap: 8px; white-space: nowrap;">
@@ -1538,7 +1550,7 @@ const App = (function () {
       });
     } catch (e) {
       console.error(e);
-      listBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-danger); padding:30px;">เกิดข้อผิดพลาดในการโหลดประวัติวัตถุดิบ: ${e.message}</td></tr>`;
+      listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-danger); padding:30px;">เกิดข้อผิดพลาดในการโหลดประวัติวัตถุดิบ: ${e.message}</td></tr>`;
     }
   }
 
@@ -2808,7 +2820,78 @@ const App = (function () {
     closeStickerModal();
   }
 
+  /* =========================================================================
+     RESIZABLE COLUMNS & TOOLTIPS (Global Logic)
+     ========================================================================= */
+  function initResizableColumns() {
+    if (window.innerWidth <= 768) return; // Disable on mobile
+
+    const tables = document.querySelectorAll('.table, .item-table');
+    tables.forEach(table => {
+      const ths = table.querySelectorAll('th');
+      ths.forEach(th => {
+        if (th.querySelector('.resizer')) return; // Already initialized
+        
+        const resizer = document.createElement('div');
+        resizer.classList.add('resizer');
+        th.appendChild(resizer);
+
+        let startX, startWidth;
+
+        resizer.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Before resizing, freeze all columns to their current auto-calculated widths
+          const allThs = table.querySelectorAll('th');
+          allThs.forEach(t => {
+            if (!t.style.width) {
+              t.style.width = t.offsetWidth + 'px';
+            }
+          });
+          
+          table.style.tableLayout = 'fixed';
+          table.style.width = 'max-content';
+          table.style.minWidth = '100%';
+
+          startX = e.pageX;
+          startWidth = th.offsetWidth;
+          resizer.classList.add('resizing');
+          
+          function onMouseMove(moveEvent) {
+            const newWidth = startWidth + (moveEvent.pageX - startX);
+            if (newWidth > 30) {
+              th.style.width = newWidth + 'px';
+            }
+          }
+
+          function onMouseUp() {
+            resizer.classList.remove('resizing');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+          }
+
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+      });
+    });
+  }
+
+  // Auto Tooltips for truncated text
+  document.body.addEventListener('mouseover', function(e) {
+    const target = e.target;
+    if (target.tagName === 'TD' || target.tagName === 'TH') {
+      if (target.offsetWidth < target.scrollWidth) {
+        if (!target.hasAttribute('title')) {
+          target.setAttribute('title', target.innerText.trim());
+        }
+      }
+    }
+  });
+
   return {
+    initResizableColumns,
     navigate,
     toggleSidebar,
     handleLogin,
