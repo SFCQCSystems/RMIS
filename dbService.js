@@ -259,6 +259,7 @@
         quantity: item.quantity,
         rm_no: item.rm_no || '',
         test_result: item.test_result || 'In Process',
+        item_comment: item.item_comment || '',
         created_at: now.toISOString()
       }));
 
@@ -932,7 +933,8 @@
         batch_number: item.batch_number,
         quantity: item.quantity,
         rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process'
+        test_result: item.test_result || 'In Process',
+        item_comment: item.item_comment || ''
       }));
 
       const { data: newItems, error: itemsErr } = await client
@@ -995,7 +997,8 @@
         batch_number: item.batch_number,
         quantity: item.quantity,
         rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process'
+        test_result: item.test_result || 'In Process',
+        item_comment: item.item_comment || ''
       }));
 
       // Determine which existing IDs should be kept
@@ -1034,7 +1037,8 @@
         batch_number: item.batch_number,
         quantity: item.quantity,
         rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process'
+        test_result: item.test_result || 'In Process',
+        item_comment: item.item_comment || ''
       }));
 
       const keepIds = itemsData.filter(i => i.id).map(i => i.id);
@@ -1087,7 +1091,8 @@
         batch_number: item.batch_number,
         quantity: item.quantity,
         rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process'
+        test_result: item.test_result || 'In Process',
+        item_comment: item.item_comment || ''
       }));
 
       const keepIds = itemsData.filter(i => i.id).map(i => i.id);
