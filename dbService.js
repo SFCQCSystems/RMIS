@@ -477,6 +477,21 @@
       return { ...requests[reqIndex], items: preparedItems };
     },
 
+    async bulkImportRequests(newRequests, newItems) {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+      if (currentUser.role !== 'admin') throw new Error('Unauthorized');
+      
+      let requests = JSON.parse(localStorage.getItem(LOCAL_REQUESTS_KEY) || '[]');
+      let items = JSON.parse(localStorage.getItem(LOCAL_ITEMS_KEY) || '[]');
+      
+      requests.push(...newRequests);
+      items.push(...newItems);
+      
+      localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(requests));
+      localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(items));
+    },
+
     async deleteRequest(id) {
       const currentUser = await this.getCurrentUser();
       if (!currentUser) throw new Error('Unauthenticated');
@@ -1131,6 +1146,26 @@
       return this.getRequestDetail(id);
     },
 
+    async bulkImportRequests(newRequests, newItems) {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+      if (currentUser.role !== 'admin') throw new Error('Unauthorized');
+
+      if (newRequests.length > 0) {
+        const { error: reqErr } = await client.from('requests').insert(newRequests);
+        if (reqErr) throw new Error('Failed to import requests: ' + reqErr.message);
+      }
+      if (newItems.length > 0) {
+        const chunkSize = 1000;
+        for (let i = 0; i < newItems.length; i += chunkSize) {
+          const chunk = newItems.slice(i, i + chunkSize);
+          const { error: itemErr } = await client.from('request_items').insert(chunk);
+          if (itemErr) throw new Error('Failed to import request items: ' + itemErr.message);
+        }
+      }
+    },
+
     async deleteRequest(id) {
       const client = getSupabaseClient();
       const { error } = await client
@@ -1494,6 +1529,7 @@
     async updateRequest(id, requestData, itemsData) { return this.getService().updateRequest(id, requestData, itemsData); },
     async updateDraft(id, requestData, itemsData) { return this.getService().updateDraft(id, requestData, itemsData); },
     async submitDraft(id, requestData, itemsData) { return this.getService().submitDraft(id, requestData, itemsData); },
+    async bulkImportRequests(requests, items) { return this.getService().bulkImportRequests(requests, items); },
     async deleteRequest(id) { return this.getService().deleteRequest(id); },
     async getMaterialHistory(filters) { return this.getService().getMaterialHistory(filters); },
     async getBatchHistory(batchNumber) { return this.getService().getBatchHistory(batchNumber); },

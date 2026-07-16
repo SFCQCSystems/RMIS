@@ -212,6 +212,11 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 ค้นหา / กรองข้อมูล
               </button>
+              <button class="btn btn-secondary btn-sm admin-field" id="btn-admin-import" style="display: none; border-color:#10b981; color:#10b981;" onclick="document.getElementById('file-import-excel').click()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                นำเข้าข้อมูลย้อนหลัง
+              </button>
+              <input type="file" id="file-import-excel" accept=".xlsx, .xls" style="display: none;" onchange="App.handleImportExcel(event)">
               <button class="btn btn-secondary btn-sm" id="btn-admin-export" style="display: none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportRequestsExcel()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 ส่งออก Excel / CSV

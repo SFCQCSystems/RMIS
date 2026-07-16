@@ -478,6 +478,8 @@ const App = (function () {
 
     // List export buttons
     if (exportBtn) exportBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
+    const importBtn = document.getElementById('btn-admin-import');
+    if (importBtn) importBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
     
     // Kick off async background update for drafts
     updateDraftCountsInBackground();
@@ -1926,6 +1928,162 @@ const App = (function () {
   }
 
   // --- EXPORT TO EXCEL & CSV ---
+  async function handleImportExcel(event) {
+    if (state.currentUser.role !== 'admin') {
+      showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถนำเข้าข้อมูลได้', 'error');
+      return;
+    }
+
+    const file = event.target.files[0];
+    if (!file) return;
+
+    showToast('กำลังนำเข้าข้อมูล กรุณารอสักครู่...', 'info');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const rawData = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (!rawData || rawData.length === 0) {
+          throw new Error('ไม่พบข้อมูลในไฟล์ Excel');
+        }
+
+        const requestsToImport = [];
+        const itemsToImport = [];
+        const requestGroups = {};
+
+        // Fetch users to map Requester Name to ID
+        const allUsers = await window.DB.getUsers();
+        const userMap = {};
+        if (allUsers) {
+          allUsers.forEach(u => {
+            if (u.display_name) userMap[u.display_name.trim().toLowerCase()] = u.id;
+          });
+        }
+
+        // Group by Request Ref
+        rawData.forEach(row => {
+          const reqRef = String(row['Request Ref'] || '').trim();
+          if (!reqRef) return; 
+
+          if (!requestGroups[reqRef]) {
+            let parsedYear = parseInt(row['Request Year']);
+            if (isNaN(parsedYear)) parsedYear = new Date().getFullYear();
+            
+            // Function to convert excel time fraction to HH:MM:SS
+            const parseExcelTime = (time) => {
+              if (typeof time === 'number') {
+                let totalSeconds = Math.round(time * 86400);
+                let hours = Math.floor(totalSeconds / 3600);
+                let minutes = Math.floor((totalSeconds % 3600) / 60);
+                let seconds = totalSeconds % 60;
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+              }
+              return String(time).trim();
+            };
+
+            const parseExcelDate = (date) => {
+              if (typeof date === 'number') {
+                const d = new Date(Math.round((date - 25569) * 86400 * 1000));
+                return d.toISOString().split('T')[0];
+              }
+              return String(date).trim();
+            };
+
+            // Format dates
+            let reqDate = row['Request Date'] ? parseExcelDate(row['Request Date']) : new Date().toISOString().split('T')[0];
+            let reqTime = row['Request Time'] ? parseExcelTime(row['Request Time']) : new Date().toTimeString().split(' ')[0];
+
+            // Resolve Requester ID from name
+            const reqName = String(row['Requester Name'] || '').trim().toLowerCase();
+            let resolvedRequesterId = state.currentUser.id; // fallback to admin
+            if (reqName && userMap[reqName]) {
+              resolvedRequesterId = userMap[reqName];
+            }
+
+            requestGroups[reqRef] = {
+              metadata: {
+                request_no: String(row['Request No'] || '').trim(), 
+                request_year: parsedYear,
+                customer_name: String(row['Customer Name'] || '').trim(),
+                request_date: reqDate,
+                request_time: reqTime,
+                po_number: String(row['PO Number'] || '').trim(),
+                car_plate: String(row['Car Plate'] || '').trim(),
+                seal_no: String(row['Seal No'] || '').trim(),
+                container_no: String(row['Container No'] || '').trim(),
+                notes: String(row['Notes'] || '').trim(),
+                lab_comments: String(row['Lab Comments'] || '').trim(),
+                status: 'Approved', 
+                requester_id: resolvedRequesterId, 
+                need_base_oil_view: false,
+                created_at: new Date().toISOString()
+              },
+              items: []
+            };
+          }
+
+          requestGroups[reqRef].items.push({
+            product_name: String(row['Product Name'] || '').trim(),
+            batch_number: String(row['Batch Number'] || '').trim(),
+            quantity: String(row['Quantity'] || '').trim(),
+            rm_no: String(row['RM No'] || '').trim(),
+            test_result: String(row['Test Result'] || 'Pass').trim(), 
+            item_comment: String(row['Item Comment'] || '').trim()
+          });
+        });
+
+        // Generate UUIDs
+        const generateUUID = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+
+        for (const [ref, group] of Object.entries(requestGroups)) {
+          const requestId = generateUUID();
+          
+          requestsToImport.push({
+            id: requestId,
+            ...group.metadata
+          });
+
+          group.items.forEach(item => {
+            itemsToImport.push({
+              id: generateUUID(),
+              request_id: requestId,
+              ...item
+            });
+          });
+        }
+
+        if (requestsToImport.length === 0) {
+          throw new Error('ไม่พบข้อมูลที่จัดกลุ่ม (ตรวจสอบคอลัมน์ "Request Ref")');
+        }
+
+        await window.DB.bulkImportRequests(requestsToImport, itemsToImport);
+        
+        showToast(`นำเข้าสำเร็จ ${requestsToImport.length} ใบแจ้ง (${itemsToImport.length} รายการ)`, 'success');
+        event.target.value = ''; 
+        
+        if (state.currentView === 'requests') {
+          renderRequestsList();
+        }
+      } catch (err) {
+        console.error('Import Error:', err);
+        showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+        event.target.value = '';
+      }
+    };
+    
+    reader.readAsArrayBuffer(file);
+  }
+
   async function exportRequestsExcel() {
     if (state.currentUser.role !== 'admin') {
       showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์ส่งออกข้อมูลได้', 'error');
@@ -3014,6 +3172,7 @@ const App = (function () {
     closeConfigModal,
     saveDatabaseConfig,
     handleConfigModeChange,
+    handleImportExcel,
     exportRequestsExcel,
     showToast,
     saveDraft,
