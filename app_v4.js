@@ -95,7 +95,7 @@ const App = (function () {
     if (window.AppConfig.isSupabaseConfigured(config)) {
       badge.innerHTML = `
         <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#38bdf8; box-shadow:0 0 8px #0284c7;"></span>
-        <span style="color:#0284c7;">Supabase Cloud Connected</span>
+        <span style="color:#0284c7; white-space:nowrap;">Supabase Cloud Connected</span>
       `;
     } else {
       badge.innerHTML = `
