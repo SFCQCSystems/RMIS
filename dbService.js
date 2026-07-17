@@ -708,7 +708,11 @@
     // --- REALTIME STUBS ---
     async setupRealtimeNotifications(onInsert, onUpdate) {},
     async cleanupRealtimeNotifications() {},
-    async fetchRequesterName(userId) { return 'Unknown'; }
+    async fetchRequesterName(userId) { return 'Unknown'; },
+    async fetchEditRequests() { return []; },
+    async createEditRequest(data) { return null; },
+    async updateEditRequestStatus(id, status, actionedBy) { return false; },
+    async deleteEditRequest(id) { return false; }
   };
 
   // --- SUPABASE DATABASE SERVICE ---
@@ -1492,6 +1496,9 @@
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
           if (onUpdate) onUpdate(payload.new, payload.old);
         })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
+          window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
+        })
         .subscribe();
     },
 
@@ -1509,6 +1516,58 @@
       const { data, error } = await client.from('profiles').select('display_name').eq('id', userId).single();
       if (error || !data) return 'Unknown';
       return data.display_name;
+    },
+
+    async fetchEditRequests() {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Database not connected');
+      const { data, error } = await client.from('edit_requests').select(`
+        id,
+        request_id,
+        requester_id,
+        reason,
+        note,
+        status,
+        actioned_by,
+        actioned_at,
+        created_at,
+        requests (
+          request_no, customer_name, request_date, status,
+          request_items ( product_name )
+        ),
+        requester:profiles!edit_requests_requester_id_fkey ( display_name ),
+        actioned_user:profiles!edit_requests_actioned_by_fkey ( display_name )
+      `).order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+
+    async createEditRequest(editData) {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Database not connected');
+      const { data, error } = await client.from('edit_requests').insert([editData]).select();
+      if (error) throw error;
+      return data[0];
+    },
+
+    async updateEditRequestStatus(id, status, actionedBy) {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Database not connected');
+      const { error } = await client.from('edit_requests').update({
+        status: status,
+        actioned_by: actionedBy,
+        actioned_at: new Date().toISOString()
+      }).eq('id', id);
+      if (error) throw error;
+      return true;
+    },
+
+    async deleteEditRequest(id) {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Database not connected');
+      const { error } = await client.from('edit_requests').delete().eq('id', id);
+      if (error) throw error;
+      return true;
     }
   };
 
@@ -1547,6 +1606,10 @@
     
     async setupRealtimeNotifications(onInsert, onUpdate) { return this.getService().setupRealtimeNotifications(onInsert, onUpdate); },
     async cleanupRealtimeNotifications() { return this.getService().cleanupRealtimeNotifications(); },
-    async fetchRequesterName(userId) { return this.getService().fetchRequesterName(userId); }
+    async fetchRequesterName(userId) { return this.getService().fetchRequesterName(userId); },
+    async fetchEditRequests() { return this.getService().fetchEditRequests(); },
+    async createEditRequest(data) { return this.getService().createEditRequest(data); },
+    async updateEditRequestStatus(id, status, actionedBy) { return this.getService().updateEditRequestStatus(id, status, actionedBy); },
+    async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); }
   };
 })();

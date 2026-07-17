@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ (RMIS)</title>
   <meta name="description" content="Raw Material Inspection System - ระบบจัดการใบแจ้งตรวจสอบห้องปฏิบัติการ สำหรับบริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด">
-  <link rel="stylesheet" href="style_v2.css?v=3">
+  <link rel="stylesheet" href="style_v2.css?v=5">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
   <link rel="icon" href="icons/icon-192.png">
@@ -59,6 +59,12 @@
           <a href="#" onclick="App.navigate('history'); return false;">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             ประวัติวัตถุดิบย้อนหลัง
+          </a>
+        </li>
+        <li class="menu-item" id="nav-edit-requests" style="display:none;">
+          <a href="#" onclick="App.navigate('edit-requests'); return false;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            คำขอแก้ไขข้อมูล
           </a>
         </li>
 
@@ -209,7 +215,7 @@
             <h1 style="font-size: 20px; font-weight: 700;">รายการใบแจ้งตรวจสอบ</h1>
             <div class="flex gap-10">
               <button class="btn btn-secondary btn-sm" onclick="App.openFilterModal()" style="border-color:var(--primary-color); color:var(--primary-color);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <i data-lucide="filter"></i>
                 ค้นหา / กรองข้อมูล
               </button>
               <button class="btn btn-secondary btn-sm admin-field" id="btn-admin-import" style="display: none; border-color:#10b981; color:#10b981;" onclick="document.getElementById('file-import-excel').click()">
@@ -218,7 +224,7 @@
               </button>
               <input type="file" id="file-import-excel" accept=".xlsx, .xls" style="display: none;" onchange="App.handleImportExcel(event)">
               <button class="btn btn-secondary btn-sm" id="btn-admin-export" style="display: none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportRequestsExcel()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <i data-lucide="upload"></i>
                 ส่งออก Excel / CSV
               </button>
               <button class="btn btn-primary btn-sm" id="btn-create-request" onclick="App.navigate('request-create')">
@@ -263,24 +269,23 @@
                 <h1 style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin: 0; text-transform: uppercase;">รายละเอียดใบแจ้งตรวจสอบ</h1>
                 <div class="flex gap-10">
                   <button id="btn-detail-print" class="btn btn-secondary btn-sm" style="display:none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportPDF()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    <i data-lucide="printer"></i>
                     พิมพ์รายงาน A4 (PDF)
                   </button>
                   <button class="btn btn-primary btn-sm" id="btn-detail-edit" style="display:none;" onclick="App.editCurrentRequest()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    <i data-lucide="edit"></i>
                     แก้ไขข้อมูลใบแจ้ง
                   </button>
-                  <button class="btn btn-logout btn-sm" id="btn-detail-delete" style="display:none; width:auto; border-radius:var(--radius-sm);" onclick="App.deleteCurrentRequest()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  <button class="btn btn-danger btn-sm" id="btn-detail-delete" style="display:none; width:auto; border-radius:var(--radius-sm);" onclick="App.deleteCurrentRequest()">
+                    <i data-lucide="trash-2"></i>
                     ลบข้อมูล
                   </button>
-                  <!-- Lab Approve/Reject Buttons -->
                   <button class="btn btn-sm" id="btn-detail-approve" style="display:none; background-color:#16a34a; color:white; border:none;" onclick="App.approveRequest()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <i data-lucide="check-circle"></i>
                     Approve
                   </button>
                   <button class="btn btn-sm" id="btn-detail-reject" style="display:none; background-color:#dc2626; color:white; border:none;" onclick="App.rejectRequest()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    <i data-lucide="x-circle"></i>
                     Reject
                   </button>
                 </div>
@@ -382,7 +387,10 @@
         <section id="view-drafts" class="page-view" style="display: none;">
           <div class="flex justify-between align-center mb-20">
             <h1 style="font-size: 24px; font-weight: 700;">รายการแบบร่าง (Drafts)</h1>
-            <button class="btn btn-primary" onclick="App.navigate('request-create')" id="btn-draft-create">+ สร้างใบแจ้งใหม่</button>
+            <button class="btn btn-primary" onclick="App.navigate('request-create')" id="btn-draft-create">
+              <i data-lucide="plus"></i>
+              สร้างใบแจ้งใหม่
+            </button>
           </div>
           <div class="card p-20">
             <div class="filters-container">
@@ -639,6 +647,59 @@
           </div>
         </section>
 
+        <!-- EDIT REQUESTS VIEW -->
+        <section id="view-edit-requests" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">คำขอแก้ไขข้อมูล (Edit Requests)</h1>
+            <button class="btn btn-primary" id="btn-create-edit-request" onclick="App.openCreateEditRequestModal()" style="display:none;">
+              <i data-lucide="plus"></i>
+              สร้างคำขอแก้ไขข้อมูล
+            </button>
+          </div>
+          
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">รายการคำขอแก้ไขข้อมูล</div>
+            </div>
+            <div class="card-body">
+              <div class="search-filter-bar flex justify-between align-center mb-20">
+                <div class="search-box">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="text" id="search-edit-requests" placeholder="ค้นหา..." onkeyup="App.filterEditRequests()">
+                </div>
+                <div class="flex gap-10 align-center">
+                  <select id="filter-edit-request-status" class="form-control" onchange="App.filterEditRequests()">
+                    <option value="">ทุกสถานะ</option>
+                    <option value="Pending">รอดำเนินการ</option>
+                    <option value="Approved">ดำเนินการแล้ว</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="edit-requests-table">
+                  <thead>
+                    <tr>
+                      <th onclick="App.sortEditRequests('created_at')" style="cursor:pointer;">วันที่ส่งคำขอ ↕</th>
+                      <th onclick="App.sortEditRequests('request_no')" style="cursor:pointer;">เลขที่ใบแจ้ง ↕</th>
+                      <th onclick="App.sortEditRequests('supplier_name')" style="cursor:pointer;">Supplier ↕</th>
+                      <th onclick="App.sortEditRequests('product_name')" style="cursor:pointer;">Product ↕</th>
+                      <th onclick="App.sortEditRequests('requester_name')" style="cursor:pointer;">ผู้ส่งคำขอ ↕</th>
+                      <th>เหตุผล</th>
+                      <th onclick="App.sortEditRequests('status')" style="cursor:pointer;">สถานะ ↕</th>
+                      <th>วันที่ดำเนินการ</th>
+                      <th>ผู้ดำเนินการ</th>
+                      <th style="text-align:center">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="edit-requests-tbody">
+                    <!-- Dynamic Data -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- 6. LAB SIGNATURES MANAGER VIEW (ADMIN ONLY) -->
         <section id="view-signatures" class="page-view" style="display: none;">
           <div class="flex justify-between align-center mb-20">
@@ -880,6 +941,61 @@
   <!-- =========================================================================
        MODAL: CHANGE USER PASSWORD (ADMIN ONLY)
        ========================================================================= -->
+  <!-- =========================================================================
+       MODAL: CREATE EDIT REQUEST
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-create-edit-request">
+    <div class="modal-container" style="max-width:600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">สร้างคำขอแก้ไขข้อมูล</h3>
+        <button class="btn-close" onclick="App.closeCreateEditRequestModal()">&times;</button>
+      </div>
+      <form id="create-edit-request-form" onsubmit="App.handleCreateEditRequestSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>เลือกใบแจ้งตรวจสอบ <span style="color:red;">*</span></label>
+            <select id="edit-req-select" class="form-control" required onchange="App.handleEditRequestSelectChange()">
+              <option value="">-- เลือกใบแจ้งตรวจสอบ --</option>
+            </select>
+          </div>
+          
+          <div class="grid-2 mb-20" style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-top:10px;">
+            <div>
+              <label style="font-size:12px; color:var(--text-muted);">Supplier</label>
+              <div id="edit-req-supplier" style="font-weight:600;">-</div>
+            </div>
+            <div>
+              <label style="font-size:12px; color:var(--text-muted);">Product</label>
+              <div id="edit-req-product" style="font-weight:600;">-</div>
+            </div>
+            <div style="margin-top:10px;">
+              <label style="font-size:12px; color:var(--text-muted);">วันที่รับเข้า</label>
+              <div id="edit-req-date" style="font-weight:600;">-</div>
+            </div>
+            <div style="margin-top:10px;">
+              <label style="font-size:12px; color:var(--text-muted);">สถานะปัจจุบัน</label>
+              <div id="edit-req-status" style="font-weight:600;">-</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>เหตุผลในการขอแก้ไข <span style="color:red;">*</span></label>
+            <textarea id="edit-req-reason" class="form-control" rows="3" required placeholder="ระบุสิ่งที่ต้องการให้แก้ไข..."></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label>หมายเหตุเพิ่มเติม (ถ้ามี)</label>
+            <input type="text" id="edit-req-note" class="form-control" placeholder="ข้อความเพิ่มเติม...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="App.closeCreateEditRequestModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">ส่งคำขอ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-change-password">
     <div class="modal-container">
       <div class="modal-header">
@@ -1231,7 +1347,28 @@
     </div>
   </div>
 
+  <!-- GLOBAL SPINNER -->
+  <div id="global-spinner-overlay" class="global-spinner-overlay">
+    <div class="spinner"></div>
+    <div class="spinner-text">กำลังโหลด...</div>
+  </div>
+
+  <!-- EMPTY STATE TEMPLATE -->
+  <template id="empty-state-template">
+    <div class="empty-state">
+      <i data-lucide="file-x"></i>
+      <h3 class="empty-state-title">ไม่มีข้อมูล</h3>
+      <p class="empty-state-desc">ไม่พบข้อมูลในระบบ หรือยังไม่มีการเพิ่มข้อมูลในขณะนี้</p>
+    </div>
+  </template>
+
   <!-- JavaScript Modules -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -1246,3 +1383,4 @@
   <script src="app_v4.js?v=3"></script>
 </body>
 </html>
+

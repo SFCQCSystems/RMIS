@@ -39,6 +39,7 @@ const App = (function () {
     'request-edit': 'view-request-form',
     'request-detail': 'view-request-detail',
     history: 'view-history',
+    'edit-requests': 'view-edit-requests',
     'daily-report': 'view-daily-report',
     signatures: 'view-signatures',
     users: 'view-users'
@@ -269,6 +270,7 @@ const App = (function () {
       'request-edit': 'nav-requests',
       'request-detail': 'nav-requests',
       history: 'nav-history',
+      'edit-requests': 'nav-edit-requests',
       'daily-report': 'nav-daily-report',
       signatures: 'nav-settings',
       users: 'nav-settings' // Keep active on settings tab when managing users/signatures
@@ -335,6 +337,9 @@ const App = (function () {
         break;
       case 'history':
         loadMaterialHistory();
+        break;
+      case 'edit-requests':
+        loadEditRequests();
         break;
       case 'signatures':
         loadSignaturesManager();
@@ -456,6 +461,7 @@ const App = (function () {
     
     // Sidebar nav nodes
     const navHistory = document.getElementById('nav-history');
+    const navEditRequests = document.getElementById('nav-edit-requests');
     const navDailyReport = document.getElementById('nav-daily-report');
     const navSignatures = document.getElementById('setting-nav-signatures');
     const navUsers = document.getElementById('setting-nav-users');
@@ -464,6 +470,11 @@ const App = (function () {
     const navDrafts = document.getElementById('nav-drafts');
     
     if (navHistory) navHistory.style.display = (isUserAdmin || isUserLab) ? 'block' : 'none';
+    if (navEditRequests) {
+      // Admin, Lab, Requester can see Edit Requests (everyone except Base Oil)
+      const isBaseOil = state.currentUser.role === 'baseoil';
+      navEditRequests.style.display = !isBaseOil ? 'block' : 'none';
+    }
     if (navSignatures) navSignatures.style.display = isUserAdmin ? 'block' : 'none';
     if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
     if (navDrafts) {
@@ -585,14 +596,15 @@ const App = (function () {
   // --- 2. REQUESTS LIST LOADER & FILTERS ---
   async function loadRequestsList() {
     const listBody = document.getElementById('requests-list-tbody');
-    listBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดรายการใบแจ้งตรวจสอบ...</td></tr>`;
+    showLoading();
 
     try {
       const requests = await window.DB.getRequests(state.filters);
       listBody.innerHTML = '';
 
       if (requests.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบรายการใบแจ้งตรวจสอบที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
+        listBody.innerHTML = getEmptyStateHtml('ไม่พบรายการใบแจ้งตรวจสอบที่ตรงกับเงื่อนไขการค้นหา');
+        hideLoading();
         return;
       }
 
@@ -640,9 +652,12 @@ const App = (function () {
         `;
         listBody.appendChild(tr);
       });
+      if (window.lucide) window.lucide.createIcons();
     } catch (e) {
       console.error(e);
-      listBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-danger); padding:30px;">เกิดข้อผิดพลาดในการดึงข้อมูล: ${e.message}</td></tr>`;
+      listBody.innerHTML = getEmptyStateHtml(`เกิดข้อผิดพลาดในการดึงข้อมูล: ${e.message}`);
+    } finally {
+      hideLoading();
     }
   }
 
@@ -684,7 +699,7 @@ const App = (function () {
   // --- 2.5 DRAFTS LIST LOADER ---
   async function loadDraftsList() {
     const listBody = document.getElementById('drafts-list-tbody');
-    listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดข้อมูลแบบร่าง...</td></tr>`;
+    showLoading();
 
     try {
       const filters = { isDraft: true };
@@ -711,7 +726,8 @@ const App = (function () {
       listBody.innerHTML = '';
 
       if (requests.length === 0) {
-        listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบรายการแบบร่างที่ตรงกับเงื่อนไข</td></tr>`;
+        listBody.innerHTML = getEmptyStateHtml('ไม่พบรายการแบบร่างที่ตรงกับเงื่อนไข');
+        hideLoading();
         return;
       }
 
@@ -1108,6 +1124,13 @@ const App = (function () {
           // Update request (Admin/Lab)
           const updated = await window.DB.updateRequest(state.currentRequestId, requestData, itemsData);
           showToast('แก้ไขข้อมูลใบแจ้งตรวจสอบเรียบร้อยแล้ว', 'success');
+          
+          if (currentFulfillingEditRequestId) {
+            await window.DB.updateEditRequestStatus(currentFulfillingEditRequestId, 'Approved', state.currentUser.id);
+            currentFulfillingEditRequestId = null;
+            showToast('ตอบรับและบันทึกคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
+          }
+
           navigate('request-detail', { id: updated.id });
         }
       } else {
@@ -1461,6 +1484,7 @@ const App = (function () {
   }
 
   async function deleteRequest(id) {
+    if (!confirm('ยืนยันการลบข้อมูลนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
     try {
       await window.DB.deleteRequest(id);
       showToast('ลบแบบร่างเรียบร้อยแล้ว', 'success');
@@ -2611,6 +2635,30 @@ const App = (function () {
     }
   }
 
+  function showLoading() {
+    const el = document.getElementById('global-spinner-overlay');
+    if (el) el.classList.add('active');
+  }
+  
+  function hideLoading() {
+    const el = document.getElementById('global-spinner-overlay');
+    if (el) el.classList.remove('active');
+  }
+
+  function getEmptyStateHtml(message = 'ไม่พบข้อมูลในขณะนี้') {
+    return `
+      <tr>
+        <td colspan="100%" style="text-align: center; padding: 48px 24px; border-bottom: none;">
+          <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted);">
+            <i data-lucide="file-x" style="width: 48px; height: 48px; color: #cbd5e1; margin-bottom: 16px;"></i>
+            <h3 style="font-size: 16px; font-weight: 600; color: var(--text-main); margin: 0 0 8px 0;">ไม่มีข้อมูล</h3>
+            <p style="font-size: 14px; max-width: 300px; margin: 0 auto;">${message}</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
   function formatThaiDate(dateStr) {
     if (!dateStr) return '';
     try {
@@ -2790,6 +2838,29 @@ const App = (function () {
 
   // Bind init to window load event
   window.addEventListener('DOMContentLoaded', init);
+
+  window.addEventListener('edit_request_inserted', async (e) => {
+    const payload = e.detail;
+    const role = state.currentUser?.role;
+    if (role === 'admin' && payload.status === 'Pending') {
+      const requesterName = await window.DB.fetchRequesterName(payload.requester_id);
+      playNotificationSound();
+      showToast(
+        `<b>📝 มีคำขอแก้ไขข้อมูลใหม่</b><br/>จาก: ${requesterName}<br/>เหตุผล: ${payload.reason}`,
+        'info',
+        {
+          duration: 10000,
+          onClick: () => {
+            navigate('edit-requests');
+          }
+        }
+      );
+      // Auto refresh if already on edit-requests view
+      if (document.getElementById('view-edit-requests').style.display !== 'none') {
+        loadEditRequests();
+      }
+    }
+  });
 
   // Expose module APIs
   // --- STICKER PRINTING HELPERS ---
@@ -2982,6 +3053,7 @@ const App = (function () {
   /* =========================================================================
      RESIZABLE COLUMNS & TOOLTIPS (Global Logic)
      ========================================================================= */
+
   function initResizableColumns() {
     if (window.innerWidth <= 768) return; // Disable on mobile
 
@@ -3048,6 +3120,241 @@ const App = (function () {
       }
     }
   });
+
+  let editRequestsData = [];
+  let currentFulfillingEditRequestId = null;
+
+  async function loadEditRequests() {
+    try {
+      editRequestsData = await window.DB.fetchEditRequests();
+      renderEditRequestsTable();
+    } catch (error) {
+      console.error('Failed to load edit requests', error);
+      alert('Failed to load edit requests: ' + error.message);
+      // Even if it fails, try to render the button if possible
+      renderEditRequestsTable();
+    }
+  }
+
+  function renderEditRequestsTable() {
+    const tbody = document.getElementById('edit-requests-tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (!state.currentUser) return;
+    const role = state.currentUser.role;
+    const isBaseOil = role === 'baseoil';
+    if (isBaseOil) return; 
+    
+    const isAdmin = role === 'admin';
+    
+    const searchQuery = (document.getElementById('search-edit-requests')?.value || '').toLowerCase();
+    const statusFilter = document.getElementById('filter-edit-request-status')?.value || '';
+    
+    let filteredData = editRequestsData;
+    
+    if (statusFilter) {
+      filteredData = filteredData.filter(er => er.status === statusFilter);
+    }
+    
+    if (searchQuery) {
+      filteredData = filteredData.filter(er => {
+        const req = er.requests || {};
+        const pNames = (req.request_items || []).map(i => i.product_name || '').join(' ');
+        return (req.request_no || '').toLowerCase().includes(searchQuery) ||
+               (req.customer_name || '').toLowerCase().includes(searchQuery) ||
+               pNames.toLowerCase().includes(searchQuery) ||
+               (er.reason || '').toLowerCase().includes(searchQuery);
+      });
+    }
+    
+    const btnCreate = document.getElementById('btn-create-edit-request');
+    if (btnCreate) {
+      btnCreate.style.display = (role === 'requester' || isAdmin) ? 'inline-flex' : 'none';
+    }
+    
+    if (filteredData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่มีข้อมูลคำขอแก้ไข</td></tr>';
+      return;
+    }
+    
+    filteredData.forEach(er => {
+      const tr = document.createElement('tr');
+      const req = er.requests || {};
+      const customerName = req.customer_name || '-';
+      const productName = (req.request_items && req.request_items.length > 0) ? req.request_items.map(i => i.product_name).join(', ') : '-';
+      
+      const statusBadge = er.status === 'Approved' 
+        ? '<span class="badge approved" style="background:#10b981; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">ดำเนินการแล้ว</span>' 
+        : '<span class="badge pending" style="background:#f59e0b; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">รอดำเนินการ</span>';
+      
+      const createdDate = new Date(er.created_at).toLocaleString('th-TH');
+      const actionedDate = er.actioned_at ? new Date(er.actioned_at).toLocaleString('th-TH') : '-';
+      
+      let actionHtml = '';
+      if (isAdmin && er.status === 'Pending') {
+        actionHtml += `<button class="btn btn-sm btn-primary" onclick="App.fulfillEditRequest('${er.id}', '${er.request_id}')">เปิดใบ Request</button>`;
+      }
+      if (isAdmin) {
+        actionHtml += `<button class="btn btn-sm" style="background:#ef4444;color:white;margin-left:5px;" onclick="App.deleteEditRequest('${er.id}')">ลบ</button>`;
+      }
+      
+      tr.innerHTML = `
+        <td>${createdDate}</td>
+        <td style="font-weight:600;">${req.request_no || '-'}</td>
+        <td>${customerName}</td>
+        <td>${productName}</td>
+        <td>${er.requester?.display_name || '-'}</td>
+        <td style="max-width:200px; white-space:normal;">${er.reason} <br><small style="color:gray">${er.note || ''}</small></td>
+        <td>${statusBadge}</td>
+        <td>${actionedDate}</td>
+        <td>${er.actioned_user?.display_name || '-'}</td>
+        <td style="text-align:center">${actionHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function filterEditRequests() {
+    renderEditRequestsTable();
+  }
+
+  function sortEditRequests(field) {
+    editRequestsData.reverse();
+    renderEditRequestsTable();
+  }
+
+  async function openCreateEditRequestModal() {
+    try {
+      const select = document.getElementById('edit-req-select');
+      if(select) select.innerHTML = '<option value="">-- เลือกใบแจ้งตรวจสอบ --</option>';
+      
+      const role = state.currentUser.role;
+      let eligibleRequests = state.requests || [];
+      
+      // Fallback if state.requests is empty
+      if (eligibleRequests.length === 0) {
+        try {
+           eligibleRequests = await window.DB.getRequests({});
+           state.requests = eligibleRequests;
+        } catch(e) {
+           console.warn("Could not fetch requests on the fly", e);
+        }
+      }
+
+      if (role === 'requester') {
+        eligibleRequests = eligibleRequests.filter(r => r.requester_id === state.currentUser.id);
+      }
+      
+      eligibleRequests.sort((a,b) => {
+        const da = a.request_date ? new Date(a.request_date) : new Date(0);
+        const db = b.request_date ? new Date(b.request_date) : new Date(0);
+        return db - da;
+      });
+      
+      eligibleRequests.forEach(req => {
+        const opt = document.createElement('option');
+        opt.value = req.id;
+        const pName = (req.request_items && req.request_items.length > 0) ? req.request_items[0].product_name : '-';
+        opt.textContent = `${req.request_no} - ${req.customer_name} (${pName})`;
+        if(select) select.appendChild(opt);
+      });
+      
+      document.getElementById('edit-req-supplier').textContent = '-';
+      document.getElementById('edit-req-product').textContent = '-';
+      document.getElementById('edit-req-date').textContent = '-';
+      document.getElementById('edit-req-status').textContent = '-';
+      
+      const reasonEl = document.getElementById('edit-req-reason');
+      if (reasonEl) reasonEl.value = '';
+      
+      const noteEl = document.getElementById('edit-req-note');
+      if (noteEl) noteEl.value = '';
+      
+      const modal = document.getElementById('modal-create-edit-request');
+      if (modal) {
+        modal.classList.add('open');
+      } else {
+        alert('Modal element not found');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error opening modal: ' + e.message);
+    }
+  }
+
+  function closeCreateEditRequestModal() {
+    const modal = document.getElementById('modal-create-edit-request');
+    if (modal) modal.classList.remove('open');
+  }
+
+  function handleEditRequestSelectChange() {
+    const reqId = document.getElementById('edit-req-select').value;
+    if (!reqId) {
+      document.getElementById('edit-req-supplier').textContent = '-';
+      document.getElementById('edit-req-product').textContent = '-';
+      document.getElementById('edit-req-date').textContent = '-';
+      document.getElementById('edit-req-status').textContent = '-';
+      return;
+    }
+    const req = state.requests.find(r => r.id === reqId);
+    if (req) {
+      document.getElementById('edit-req-supplier').textContent = req.customer_name || '-';
+      const pNames = (req.request_items && req.request_items.length > 0) ? req.request_items.map(i => i.product_name).join(', ') : '-';
+      document.getElementById('edit-req-product').textContent = pNames;
+      document.getElementById('edit-req-date').textContent = new Date(req.request_date).toLocaleDateString('th-TH');
+      document.getElementById('edit-req-status').textContent = req.status;
+    }
+  }
+
+  async function handleCreateEditRequestSubmit(e) {
+    e.preventDefault();
+    const reqId = document.getElementById('edit-req-select').value;
+    const reason = document.getElementById('edit-req-reason').value;
+    const note = document.getElementById('edit-req-note').value;
+    
+    if (!reqId || !reason) return;
+    
+    try {
+      showLoadingButton(e.submitter, true, 'กำลังส่ง...');
+      await window.DB.createEditRequest({
+        request_id: reqId,
+        requester_id: state.currentUser.id,
+        reason: reason,
+        note: note
+      });
+      closeCreateEditRequestModal();
+      showToast('ส่งคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
+      loadEditRequests();
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message || err.error_description || String(err);
+      if (err.details) errMsg += ' ' + err.details;
+      alert('เกิดข้อผิดพลาด: ' + errMsg);
+      showToast('เกิดข้อผิดพลาดในการส่งคำขอ: ' + errMsg, 'error');
+    } finally {
+      showLoadingButton(e.submitter, false, 'ส่งคำขอ');
+    }
+  }
+
+  async function fulfillEditRequest(editReqId, reqId) {
+    currentFulfillingEditRequestId = editReqId;
+    showToast('เข้าสู่โหมดแก้ไขข้อมูลเพื่อตอบรับคำขอ', 'info');
+    navigate('request-edit', {id: reqId});
+  }
+
+  async function deleteEditRequest(id) {
+    if (!confirm('ยืนยันการลบคำขอแก้ไขข้อมูลนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+    try {
+      await window.DB.deleteEditRequest(id);
+      showToast('ลบคำขอแก้ไขข้อมูลแล้ว', 'success');
+      loadEditRequests();
+    } catch(e) {
+      console.error(e);
+      showToast('เกิดข้อผิดพลาดในการลบคำขอ', 'error');
+    }
+  }
 
   return {
     initResizableColumns,
@@ -3177,6 +3484,15 @@ const App = (function () {
     showToast,
     saveDraft,
     openFilterModal,
-    closeFilterModal
+    closeFilterModal,
+    loadEditRequests,
+    filterEditRequests,
+    sortEditRequests,
+    openCreateEditRequestModal,
+    closeCreateEditRequestModal,
+    handleEditRequestSelectChange,
+    handleCreateEditRequestSubmit,
+    fulfillEditRequest,
+    deleteEditRequest
   };
 })();
