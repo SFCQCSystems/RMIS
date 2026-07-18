@@ -2358,8 +2358,9 @@ const App = (function () {
 
     try {
       const history = await window.DB.getMaterialHistory();
-      // Filter items for the selected date and exclude drafts
-      const dateItems = history.filter(item => item.request_date === dateStr && item.status !== 'Draft');
+      // Filter items for the selected date and exclude drafts, then sort by request_no ascending
+      const dateItems = history.filter(item => item.request_date === dateStr && item.status !== 'Draft')
+                               .sort((a, b) => parseInt(a.request_no || 0) - parseInt(b.request_no || 0));
 
       const tbody = document.getElementById('print-daily-tbody');
       tbody.innerHTML = '';
