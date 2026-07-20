@@ -1,0 +1,95 @@
+﻿
+        <!-- 2. REQUESTS LIST VIEW -->
+        <section id="view-requests" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 style="font-size: 24px; font-weight: 700;">เธฃเธฒเธขเธเธฒเธฃเนเธเนเธเนเธเธ•เธฃเธงเธเธชเธญเธเธซเนเธญเธเธเธเธดเธเธฑเธ•เธดเธเธฒเธฃ</h1>
+            <div class="flex gap-10">
+              <button class="btn btn-secondary" id="btn-admin-export" style="display: none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportRequestsExcel()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                เธชเนเธเธญเธญเธ Excel / CSV
+              </button>
+              <button class="btn btn-primary" id="btn-create-request" onclick="App.navigate('request-create')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                เธชเธฃเนเธฒเธเนเธเนเธเนเธเธ•เธฃเธงเธเธชเธญเธ
+              </button>
+            </div>
+          </div>
+
+          <!-- Advanced Search and Filters -->
+          <div class="search-filter-bar">
+            <form id="filter-form" onsubmit="App.handleFilterSubmit(event)">
+              <div class="filter-grid">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-no">เน€เธฅเธเธ—เธตเนเนเธเนเธเนเธ</label>
+                  <input type="text" id="filter-no" placeholder="เน€เธเนเธ 1, 2">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-customer">เธเธทเนเธญเธฅเธนเธเธเนเธฒ</label>
+                  <input type="text" id="filter-customer" placeholder="เธเนเธเธซเธฒเธฅเธนเธเธเนเธฒ...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-product">เธเธทเนเธญเธชเธดเธเธเนเธฒ</label>
+                  <input type="text" id="filter-product" placeholder="เน€เธเนเธ AW 68...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-batch">Batch Number</label>
+                  <input type="text" id="filter-batch" placeholder="เธเนเธเธซเธฒเน€เธฅเธ Batch...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-po">PO Number</label>
+                  <input type="text" id="filter-po" placeholder="เธเนเธเธซเธฒ PO Number...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-rm">RM No.</label>
+                  <input type="text" id="filter-rm" placeholder="เธเนเธเธซเธฒ RM No...">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-status">เธชเธ–เธฒเธเธฐ</label>
+                  <select id="filter-status">
+                    <option value="">เธ—เธฑเนเธเธซเธกเธ”</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Process">In Process</option>
+                    <option value="Complete">Complete</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-start-date">เธ•เธฑเนเธเนเธ•เนเธงเธฑเธเธ—เธตเน</label>
+                  <input type="date" id="filter-start-date">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <label for="filter-end-date">เธ–เธถเธเธงเธฑเธเธ—เธตเน</label>
+                  <input type="date" id="filter-end-date">
+                </div>
+              </div>
+              <div class="filter-actions">
+                <button type="button" class="btn btn-secondary" onclick="App.clearFilters()">เธฅเนเธฒเธเธ•เธฑเธงเธเธฃเธญเธ</button>
+                <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">เธเนเธเธซเธฒ</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Main Table -->
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>เน€เธฅเธเธ—เธตเนเนเธเนเธเนเธ</th>
+                  <th>เธงเธฑเธเธ—เธตเน / เน€เธงเธฅเธฒ</th>
+                  <th>เธฅเธนเธเธเนเธฒ</th>
+                  <th>เธงเธฑเธ•เธ–เธธเธ”เธดเธ</th>
+                  <th>เธเธนเนเนเธเนเธ</th>
+                  <th>เธชเธ–เธฒเธเธฐ</th>
+                  <th class="actions-column">เธเธฑเธ”เธเธฒเธฃ</th>
+                </tr>
+              </thead>
+              <tbody id="requests-list-tbody">
+                <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 2.5 DRAFTS LIST VIEW -->
+        <section id="view-drafts" class="page-view" style="display: none;">

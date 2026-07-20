@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lrms-cache-v4';
+﻿const CACHE_NAME = 'lrms-cache-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',

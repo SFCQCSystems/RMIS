@@ -526,6 +526,7 @@
         const requester = req ? users.find(u => u.id === req.requester_id) : null;
         return {
           id: item.id,
+          item_id: item.id,
           request_id: item.request_id,
           request_no: req ? req.request_no : null,
           request_year: req ? req.request_year : null,
@@ -538,7 +539,9 @@
           batch_number: item.batch_number,
           quantity: item.quantity,
           rm_no: item.rm_no,
-          test_result: item.test_result
+          test_result: item.test_result,
+          inspection_date: item.inspection_date,
+          item_comment: item.item_comment
         };
       });
 
@@ -1005,20 +1008,42 @@
       if (reqErr) throw new Error(reqErr.message);
 
       // Fetch existing item IDs for this request
-      const { data: currentItems } = await client.from('request_items').select('id').eq('request_id', id);
+      const { data: currentItems } = await client.from('request_items').select('id, test_result, inspection_date').eq('request_id', id);
       const existingIds = (currentItems || []).map(i => i.id);
+      const existingMap = {};
+      (currentItems || []).forEach(i => existingMap[i.id] = i);
+      
+      const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD local timezone approximation is fine for UTC here if not critical, but let's do local time
+      // Better local date string:
+      const localDate = new Date();
+      const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
       // Prepare upsert items
-      const upsertItems = itemsData.map(item => ({
-        id: item.id || generateUUID(),
-        request_id: id,
-        product_name: item.product_name,
-        batch_number: item.batch_number,
-        quantity: item.quantity,
-        rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process',
-        item_comment: item.item_comment || ''
-      }));
+      const upsertItems = itemsData.map(item => {
+        const payload = {
+          id: item.id || generateUUID(),
+          request_id: id,
+          product_name: item.product_name,
+          batch_number: item.batch_number,
+          quantity: item.quantity,
+          rm_no: item.rm_no || '',
+          test_result: item.test_result || 'In Process',
+          item_comment: item.item_comment || ''
+        };
+        
+        const existing = payload.id ? existingMap[payload.id] : null;
+        const oldResult = existing ? existing.test_result : 'In Process';
+        const newResult = payload.test_result;
+        
+        // If changed to Pass/Fail/Hold and it wasn't that before
+        if (newResult !== 'In Process' && oldResult !== newResult) {
+           payload.inspection_date = localTodayStr;
+        } else if (newResult === 'In Process' && oldResult !== 'In Process') {
+           payload.inspection_date = null; // Clear if reverted to In Process
+        }
+        
+        return payload;
+      });
 
       // Determine which existing IDs should be kept
       const keepIds = itemsData.filter(i => i.id).map(i => i.id);
@@ -1046,19 +1071,38 @@
       const client = getSupabaseClient();
 
       // 1. MUST UPSERT/DELETE ITEMS FIRST WHILE STATUS IS STILL DRAFT
-      const { data: currentItems } = await client.from('request_items').select('id').eq('request_id', id);
+      const { data: currentItems } = await client.from('request_items').select('id, test_result, inspection_date').eq('request_id', id);
       const existingIds = (currentItems || []).map(i => i.id);
+      const existingMap = {};
+      (currentItems || []).forEach(i => existingMap[i.id] = i);
+      
+      const localDate = new Date();
+      const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
-      const upsertItems = itemsData.map(item => ({
-        id: item.id || generateUUID(),
-        request_id: id,
-        product_name: item.product_name,
-        batch_number: item.batch_number,
-        quantity: item.quantity,
-        rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process',
-        item_comment: item.item_comment || ''
-      }));
+      const upsertItems = itemsData.map(item => {
+        const payload = {
+          id: item.id || generateUUID(),
+          request_id: id,
+          product_name: item.product_name,
+          batch_number: item.batch_number,
+          quantity: item.quantity,
+          rm_no: item.rm_no || '',
+          test_result: item.test_result || 'In Process',
+          item_comment: item.item_comment || ''
+        };
+        
+        const existing = payload.id ? existingMap[payload.id] : null;
+        const oldResult = existing ? existing.test_result : 'In Process';
+        const newResult = payload.test_result;
+        
+        if (newResult !== 'In Process' && oldResult !== newResult) {
+           payload.inspection_date = localTodayStr;
+        } else if (newResult === 'In Process' && oldResult !== 'In Process') {
+           payload.inspection_date = null;
+        }
+        
+        return payload;
+      });
 
       const keepIds = itemsData.filter(i => i.id).map(i => i.id);
       const deleteIds = existingIds.filter(eid => !keepIds.includes(eid));
@@ -1100,19 +1144,38 @@
       const client = getSupabaseClient();
 
       // 1. MUST UPSERT/DELETE ITEMS FIRST WHILE STATUS IS STILL DRAFT
-      const { data: currentItems } = await client.from('request_items').select('id').eq('request_id', id);
+      const { data: currentItems } = await client.from('request_items').select('id, test_result, inspection_date').eq('request_id', id);
       const existingIds = (currentItems || []).map(i => i.id);
+      const existingMap = {};
+      (currentItems || []).forEach(i => existingMap[i.id] = i);
+      
+      const localDate = new Date();
+      const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
-      const upsertItems = itemsData.map(item => ({
-        id: item.id || generateUUID(),
-        request_id: id,
-        product_name: item.product_name,
-        batch_number: item.batch_number,
-        quantity: item.quantity,
-        rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process',
-        item_comment: item.item_comment || ''
-      }));
+      const upsertItems = itemsData.map(item => {
+        const payload = {
+          id: item.id || generateUUID(),
+          request_id: id,
+          product_name: item.product_name,
+          batch_number: item.batch_number,
+          quantity: item.quantity,
+          rm_no: item.rm_no || '',
+          test_result: item.test_result || 'In Process',
+          item_comment: item.item_comment || ''
+        };
+        
+        const existing = payload.id ? existingMap[payload.id] : null;
+        const oldResult = existing ? existing.test_result : 'In Process';
+        const newResult = payload.test_result;
+        
+        if (newResult !== 'In Process' && oldResult !== newResult) {
+           payload.inspection_date = localTodayStr;
+        } else if (newResult === 'In Process' && oldResult !== 'In Process') {
+           payload.inspection_date = null;
+        }
+        
+        return payload;
+      });
 
       const keepIds = itemsData.filter(i => i.id).map(i => i.id);
       const deleteIds = existingIds.filter(eid => !keepIds.includes(eid));
@@ -1232,6 +1295,7 @@
         const requester = req.profiles || {};
         return {
           id: item.id,
+          item_id: item.id,
           request_id: item.request_id,
           request_no: req.request_no || null,
           request_year: req.request_year || null,
@@ -1244,7 +1308,9 @@
           batch_number: item.batch_number,
           quantity: item.quantity,
           rm_no: item.rm_no,
-          test_result: item.test_result
+          test_result: item.test_result,
+          inspection_date: item.inspection_date,
+          item_comment: item.item_comment
         };
       });
 
@@ -1570,14 +1636,15 @@
       return true;
     },
 
-    async updateRequestItemTestedDate(itemId, testedDate) {
+    async updateRequestItemInspectionDate(itemId, testedDate) {
       const client = getSupabaseClient();
       if (!client) throw new Error('Database not connected');
-      const { error } = await client.from('request_items').update({
-        tested_date: testedDate
-      }).eq('id', itemId);
+      const { data, error } = await client.from('request_items').update({
+        inspection_date: testedDate
+      }).eq('id', itemId).select();
       if (error) throw error;
-      return true;
+      if (!data || data.length === 0) throw new Error('ไม่พบข้อมูลรายการทดสอบที่ต้องการอัปเดต (ID: ' + itemId + ') - อาจติดปัญหา Permissions (RLS)');
+      return data;
     }
   };
 
@@ -1621,6 +1688,6 @@
     async createEditRequest(data) { return this.getService().createEditRequest(data); },
     async updateEditRequestStatus(id, status, actionedBy) { return this.getService().updateEditRequestStatus(id, status, actionedBy); },
     async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
-    async updateRequestItemTestedDate(itemId, testedDate) { return this.getService().updateRequestItemTestedDate(itemId, testedDate); }
+    async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); }
   };
 })();

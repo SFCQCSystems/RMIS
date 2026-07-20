@@ -231,8 +231,7 @@ const App = (function () {
         document.getElementById('btn-detail-print').style.display = 'none';
         document.getElementById('btn-detail-edit').style.display = 'none';
         document.getElementById('btn-detail-delete').style.display = 'none';
-        document.getElementById('btn-detail-approve').style.display = 'none';
-        document.getElementById('btn-detail-reject').style.display = 'none';
+        const arc = document.getElementById('approve-reject-btn-container'); if (arc) arc.innerHTML = '';
         document.getElementById('detail-approval-card').style.display = 'none';
       }
     }
@@ -1285,7 +1284,7 @@ const App = (function () {
             const safeBatch = escapeHtml(item.batch_number).replace(/'/g, '&#39;');
             stickerBtnHtml = `
               <button class="btn-icon" style="font-size:16px;" title="🖨️ พิมพ์สติกเกอร์"
-                onclick="App.openStickerPreviewDirect('${item.test_result}','${safeProduct}','${safeBatch}','${details.request_date || ''}','${item.tested_date || ''}', ${item.id})">
+                onclick="App.openStickerPreviewDirect('${item.test_result}','${safeProduct}','${safeBatch}','${details.request_date || ''}','${item.inspection_date || ''}', '${item.id}')">
                 🖨️
               </button>`;
           } else {
@@ -1295,6 +1294,15 @@ const App = (function () {
                 🔒
               </button>`;
           }
+        }
+
+        // Inspection Date Column
+        let inspectionDateHtml = '-';
+        if (item.inspection_date) {
+            inspectionDateHtml = _formatRecDate(item.inspection_date);
+        }
+        if (state.currentUser.role === 'admin') {
+            inspectionDateHtml += ` <button onclick="App.editInspectionDate('${item.id}', '${item.inspection_date || ''}')" style="background:none;border:none;cursor:pointer;color:var(--primary-color);" title="แก้ไขวันที่ตรวจสอบ">✏️</button>`;
         }
 
         tr.innerHTML = `
@@ -1308,6 +1316,7 @@ const App = (function () {
           <td>${escapeHtml(item.quantity)}</td>
           <td>${displayRm ? `<code>${escapeHtml(displayRm)}</code>` : ''}</td>
           <td>${displayRes ? `<span class="badge ${resClass}">${displayRes}</span>` : ''}</td>
+          <td style="text-align:center;">${inspectionDateHtml}</td>
           <td style="text-align:center;">${stickerBtnHtml}</td>
           <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(item.item_comment || '')}</td>
         `;
@@ -1320,16 +1329,28 @@ const App = (function () {
       const printBtn = document.getElementById('btn-detail-print');
       const editBtn = document.getElementById('btn-detail-edit');
       const deleteBtn = document.getElementById('btn-detail-delete');
-      const approveBtn = document.getElementById('btn-detail-approve');
-      const rejectBtn = document.getElementById('btn-detail-reject');
 
       if (printBtn) printBtn.style.display = 'inline-flex';
       if (editBtn) editBtn.style.display = (isAdmin || (isLab && !details.approved)) ? 'inline-flex' : 'none';
       if (deleteBtn) deleteBtn.style.display = isAdmin ? 'inline-flex' : 'none';
 
-      // Hide old Approve/Reject buttons
-      if (approveBtn) approveBtn.style.display = 'none';
-      if (rejectBtn) rejectBtn.style.display = 'none';
+      // Dynamically render Approve/Reject buttons ONLY when status is Complete
+      const approveRejectContainer = document.getElementById('approve-reject-btn-container');
+      if (approveRejectContainer) {
+        if (details.status && details.status.trim().toLowerCase() === 'complete' && (isAdmin || isLab)) {
+          approveRejectContainer.innerHTML = `
+            <button class="btn btn-sm" id="btn-detail-approve" style="background-color:#16a34a; color:white; border:none;" onclick="App.approveRequest()">
+              <i data-lucide="check-circle"></i> Approve
+            </button>
+            <button class="btn btn-sm" id="btn-detail-reject" style="background-color:#dc2626; color:white; border:none;" onclick="App.rejectRequest()">
+              <i data-lucide="x-circle"></i> Reject
+            </button>
+          `;
+          if (window.lucide) window.lucide.createIcons();
+        } else {
+          approveRejectContainer.innerHTML = '';
+        }
+      }
 
       // Document Approval Card Logic
       const approvalCard = document.getElementById('detail-approval-card');
@@ -1552,6 +1573,15 @@ const App = (function () {
           }
         }
 
+        // Inspection Date Column
+        let inspectionDateHtml = '-';
+        if (h.inspection_date) {
+            inspectionDateHtml = _formatRecDate(h.inspection_date);
+        }
+        if (state.currentUser.role === 'admin') {
+            inspectionDateHtml += ` <button onclick="App.editInspectionDate('${h.item_id}', '${h.inspection_date || ''}')" style="background:none;border:none;cursor:pointer;color:var(--primary-color);" title="แก้ไขวันที่ตรวจสอบ">✏️</button>`;
+        }
+
         tr.innerHTML = `
           <td style="white-space: nowrap;"><strong>${h.request_no}/${h.request_year}</strong></td>
           <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
@@ -1563,6 +1593,7 @@ const App = (function () {
           </td>
           <td style="white-space: nowrap;">${h.rm_no ? `<code>${escapeHtml(h.rm_no)}</code>` : '<em style="color:var(--text-muted);">ว่าง</em>'}</td>
           <td style="white-space: nowrap;"><span class="badge ${resClass}">${h.test_result}</span></td>
+          <td style="white-space: nowrap; text-align:center;">${inspectionDateHtml}</td>
           <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(h.item_comment || '')}</td>
           <td style="white-space: nowrap;">${escapeHtml(h.requester_name)}</td>
           <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status}</span></td>
@@ -2908,12 +2939,12 @@ const App = (function () {
     const tzOffset = today.getTimezoneOffset() * 60000; 
     const defaultDate = new Date(today.getTime() - tzOffset).toISOString().split('T')[0];
 
-    // If stickerData doesn't have a specific passed_date, set it to today
-    if (!stickerData.passed_date) {
-      stickerData.passed_date = defaultDate;
+    // If stickerData doesn't have a specific inspection_date, set it to today
+    if (!stickerData.inspection_date) {
+      stickerData.inspection_date = defaultDate;
     }
     // Rebuild preview HTML with the default date
-    previewHtml = _buildStickerPreviewHtml(stickerData.test_result, stickerData.product_name, stickerData.batch_number, stickerData.passed_date);
+    previewHtml = _buildStickerPreviewHtml(stickerData.test_result, stickerData.product_name, stickerData.batch_number, stickerData.inspection_date);
 
     // Determine if date should be editable
     const isRequester = state.currentUser && state.currentUser.role === 'requester';
@@ -2934,7 +2965,7 @@ const App = (function () {
           <div id="sticker-preview-container" style="display:flex;justify-content:center;margin-bottom:20px;">${previewHtml}</div>
           <div style="margin-bottom:12px;">
             <label style="display:block;margin-bottom:6px;font-weight:600;color:#333;">วันที่ผ่าน (Passed Date):</label>
-            <input type="date" id="sticker-passed-date" value="${stickerData.passed_date}" onchange="App.updateStickerPreviewDate(this.value)"
+            <input type="date" id="sticker-passed-date" value="${stickerData.inspection_date}" onchange="App.updateStickerPreviewDate(this.value)"
               style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box;" ${dateDisabled}>
           </div>
         </div>
@@ -2951,7 +2982,7 @@ const App = (function () {
 
   function updateStickerPreviewDate(dateStr) {
     if (!state.currentStickerItem) return;
-    state.currentStickerItem.passed_date = dateStr;
+    state.currentStickerItem.inspection_date = dateStr;
     const previewHtml = _buildStickerPreviewHtml(
       state.currentStickerItem.test_result, 
       state.currentStickerItem.product_name, 
@@ -2967,7 +2998,7 @@ const App = (function () {
     if (!state.historyList) return;
     const item = state.historyList.find(i => i.id === itemId || i.id === Number(itemId));
     if (!item) return;
-    const previewHtml = _buildStickerPreviewHtml(item.test_result, item.product_name, item.batch_number, item.tested_date || item.request_date);
+    const previewHtml = _buildStickerPreviewHtml(item.test_result, item.product_name, item.batch_number, item.inspection_date || item.request_date);
     _showStickerModal(previewHtml, item);
   }
 
@@ -2979,7 +3010,7 @@ const App = (function () {
       product_name: productName, 
       batch_number: batchNumber, 
       request_date: requestDate,
-      tested_date: testedDate 
+      inspection_date: testedDate 
     };
     const previewHtml = _buildStickerPreviewHtml(testResult, productName, batchNumber, testedDate || requestDate);
     _showStickerModal(previewHtml, stickerData);
@@ -3004,12 +3035,18 @@ const App = (function () {
       const btn = document.querySelector('#modal-sticker-preview button[onclick="App.saveStickerDate()"]');
       if (btn) { btn.disabled = true; btn.innerText = 'กำลังบันทึก...'; }
       
-      await window.DB.updateRequestItemTestedDate(item.id, dateInput.value);
-      item.tested_date = dateInput.value;
-      item.passed_date = dateInput.value;
+      await window.DB.updateRequestItemInspectionDate(item.id, dateInput.value);
+      
+      item.inspection_date = dateInput.value;
+      
       showToast('บันทึกวันที่สำเร็จ', 'success');
       
       if (btn) { btn.disabled = false; btn.innerText = '💾 บันทึก'; }
+      
+      // Refresh the detail table to update the HTML onclick handlers with the new date
+      if (state.currentRequestId) {
+        await loadRequestDetail(state.currentRequestId);
+      }
     } catch (err) {
       console.error('Error saving tested date:', err);
       showToast('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, 'error');
@@ -3391,11 +3428,39 @@ const App = (function () {
     }
   }
 
+  // --- INSPECTION DATE EDITOR (ADMIN ONLY) ---
+  async function editInspectionDate(itemId, currentDate) {
+    const newDate = prompt("แก้ไขวันที่ตรวจสอบ (YYYY-MM-DD):", currentDate || "");
+    if (newDate === null) return; // User cancelled
+    
+    // Validate format roughly
+    if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+      showToast('รูปแบบวันที่ไม่ถูกต้อง กรุณาใช้ YYYY-MM-DD', 'error');
+      return;
+    }
+
+    try {
+      await window.DB.updateRequestItemInspectionDate(itemId, newDate || null);
+      showToast('อัปเดตวันที่ตรวจสอบสำเร็จ', 'success');
+      
+      // Refresh the view depending on what is currently active
+      if (state.currentView === 'requests' && state.currentRequestId) {
+        loadRequestDetail(state.currentRequestId);
+      } else if (state.currentView === 'history') {
+        loadMaterialHistory();
+      }
+    } catch (err) {
+      console.error('Error updating inspection date:', err);
+      showToast('เกิดข้อผิดพลาดในการอัปเดต: ' + err.message, 'error');
+    }
+  }
+
   return {
     initResizableColumns,
     navigate,
     toggleSidebar,
     handleLogin,
+    editInspectionDate,
     logout,
     handleFilterSubmit,
     clearFilters,
