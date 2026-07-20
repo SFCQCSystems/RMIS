@@ -1285,7 +1285,7 @@ const App = (function () {
             const safeBatch = escapeHtml(item.batch_number).replace(/'/g, '&#39;');
             stickerBtnHtml = `
               <button class="btn-icon" style="font-size:16px;" title="🖨️ พิมพ์สติกเกอร์"
-                onclick="App.openStickerPreviewDirect('${item.test_result}','${safeProduct}','${safeBatch}','${details.request_date || ''}','${item.tested_date || ''}')">
+                onclick="App.openStickerPreviewDirect('${item.test_result}','${safeProduct}','${safeBatch}','${details.request_date || ''}','${item.tested_date || ''}', ${item.id})">
                 🖨️
               </button>`;
           } else {
@@ -2939,6 +2939,7 @@ const App = (function () {
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid #e0e0e0;">
+          ${!isRequester ? `<button onclick="App.saveStickerDate()" style="padding:8px 20px;background:#10b981;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;">💾 บันทึก</button>` : ''}
           <button onclick="App.closeStickerModal()"
             style="padding:8px 20px;border:1px solid #ccc;background:white;border-radius:8px;cursor:pointer;font-size:14px;">ยกเลิก</button>
           <button onclick="App.confirmPrintSticker()"
@@ -2971,8 +2972,9 @@ const App = (function () {
   }
 
   // Used by Request Detail page (data passed directly from row)
-  function openStickerPreviewDirect(testResult, productName, batchNumber, requestDate, testedDate) {
+  function openStickerPreviewDirect(testResult, productName, batchNumber, requestDate, testedDate, itemId) {
     const stickerData = { 
+      id: itemId,
       test_result: testResult, 
       product_name: productName, 
       batch_number: batchNumber, 
@@ -2987,6 +2989,33 @@ const App = (function () {
     const modal = document.getElementById('modal-sticker-preview');
     if (modal) modal.style.display = 'none';
     state.currentStickerItem = null;
+  }
+
+  async function saveStickerDate() {
+    const item = state.currentStickerItem;
+    if (!item || !item.id) {
+      showToast('ไม่สามารถบันทึกได้ เนื่องจากไม่พบรหัสรายการ', 'error');
+      return;
+    }
+    const dateInput = document.getElementById('sticker-passed-date');
+    if (!dateInput || !dateInput.value) return;
+    
+    try {
+      const btn = document.querySelector('#modal-sticker-preview button[onclick="App.saveStickerDate()"]');
+      if (btn) { btn.disabled = true; btn.innerText = 'กำลังบันทึก...'; }
+      
+      await window.DB.updateRequestItemTestedDate(item.id, dateInput.value);
+      item.tested_date = dateInput.value;
+      item.passed_date = dateInput.value;
+      showToast('บันทึกวันที่สำเร็จ', 'success');
+      
+      if (btn) { btn.disabled = false; btn.innerText = '💾 บันทึก'; }
+    } catch (err) {
+      console.error('Error saving tested date:', err);
+      showToast('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, 'error');
+      const btn = document.querySelector('#modal-sticker-preview button[onclick="App.saveStickerDate()"]');
+      if (btn) { btn.disabled = false; btn.innerText = '💾 บันทึก'; }
+    }
   }
 
   function confirmPrintSticker() {
@@ -3378,6 +3407,7 @@ const App = (function () {
     openStickerPreviewDirect,
     closeStickerModal,
     updateStickerPreviewDate,
+    saveStickerDate,
     confirmPrintSticker,
     clearDraftFilters: () => {
       document.getElementById('draft-filter-customer').value = '';

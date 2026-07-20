@@ -1568,6 +1568,16 @@
       const { error } = await client.from('edit_requests').delete().eq('id', id);
       if (error) throw error;
       return true;
+    },
+
+    async updateRequestItemTestedDate(itemId, testedDate) {
+      const client = getSupabaseClient();
+      if (!client) throw new Error('Database not connected');
+      const { error } = await client.from('request_items').update({
+        tested_date: testedDate
+      }).eq('id', itemId);
+      if (error) throw error;
+      return true;
     }
   };
 
@@ -1610,6 +1620,7 @@
     async fetchEditRequests() { return this.getService().fetchEditRequests(); },
     async createEditRequest(data) { return this.getService().createEditRequest(data); },
     async updateEditRequestStatus(id, status, actionedBy) { return this.getService().updateEditRequestStatus(id, status, actionedBy); },
-    async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); }
+    async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
+    async updateRequestItemTestedDate(itemId, testedDate) { return this.getService().updateRequestItemTestedDate(itemId, testedDate); }
   };
 })();
