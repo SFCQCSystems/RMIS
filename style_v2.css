@@ -1,4 +1,4 @@
-﻿/* =========================================================================
+/* =========================================================================
    LABORATORY REQUEST MANAGEMENT SYSTEM - CORE STYLING
    Aesthetic: Professional, Sleek, Laboratory/Factory Theme (Blue & White)
    ========================================================================= */
@@ -930,11 +930,11 @@ a:hover {
     display: none !important;
   }
 
-  body.print-daily-report > #daily-report-print-template {
+  body.print-mode-daily > #daily-report-print-template {
     display: block !important;
   }
 
-  body:not(.print-daily-report) > #a4-print-template {
+  body.print-mode-detail > #a4-print-template {
     display: block !important;
   }
 

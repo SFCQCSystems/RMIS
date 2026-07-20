@@ -2405,15 +2405,15 @@ const App = (function () {
       document.title = `รายงานการตรวจสอบวัตถุดิบ_${dateStr}`;
       
       // Add a class to body to ensure only the daily report template is printed
-      document.body.classList.add('print-daily-report');
+      document.body.classList.remove('print-mode-detail');
+      document.body.classList.add('print-mode-daily');
       
       // Allow DOM to update before triggering print dialog
       setTimeout(() => {
         window.print();
         
-        // Restore title and class
+        // Restore title
         document.title = originalTitle;
-        document.body.classList.remove('print-daily-report');
       }, 300);
 
     } catch (error) {
@@ -2436,6 +2436,11 @@ const App = (function () {
       showToast('ยังไม่มีข้อมูลใบแจ้ง กรุณาเปิดรายละเอียดใบแจ้งก่อน', 'warning');
       return;
     }
+    
+    // Add class for detail print mode
+    document.body.classList.remove('print-mode-daily');
+    document.body.classList.add('print-mode-detail');
+    
     // Trigger browser native print dialog (Print Preview)
     window.print();
   }
