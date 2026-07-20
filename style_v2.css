@@ -1,4 +1,4 @@
-/* =========================================================================
+﻿/* =========================================================================
    LABORATORY REQUEST MANAGEMENT SYSTEM - CORE STYLING
    Aesthetic: Professional, Sleek, Laboratory/Factory Theme (Blue & White)
    ========================================================================= */
@@ -1084,7 +1084,7 @@ a:hover {
   }
 }
 
-/* Hidden by default in screen view — shown during print via @media print */
+/* Hidden by default in screen view โ€” shown during print via @media print */
 .a4-print-layout {
   display: none;
 }
@@ -1193,7 +1193,6 @@ a:hover {
     display: none !important;
   }
 }
-
 .page-view > .flex > h1 {
   white-space: nowrap !important;
   flex-shrink: 0 !important;
@@ -1210,8 +1209,21 @@ a:hover {
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+  .search-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
+  .search-filter-bar .search-box {
+    width: 100%;
+  }
   .search-filter-bar .flex.gap-10 {
+    width: 100%;
     flex-wrap: wrap;
+  }
+  .search-filter-bar .flex.gap-10 > * {
+    flex: 1;
+    min-width: 120px;
   }
 }
 
@@ -1357,10 +1369,10 @@ body, input, select, textarea, button {
 
 .card { background: white !important; border-radius: var(--radius-md) !important; box-shadow: var(--shadow-sm) !important; border: 1px solid var(--border-color) !important; padding: 24px !important; margin-bottom: 24px !important; }
 
-.modal-container { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-lg) !important; overflow: hidden !important; }
+.modal-container { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-lg) !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; max-height: 90vh !important; }
 .modal-header { padding: 16px 24px !important; background: var(--bg-app) !important; border-bottom: 1px solid var(--border-color) !important; }
 .modal-header h2, .modal-header h3 { font-size: 18px !important; font-weight: 600 !important; margin: 0 !important; color: var(--text-main) !important; }
-.modal-body { padding: 24px !important; }
+.modal-body { padding: 24px !important; overflow-y: auto !important; flex: 1 !important; }
 .modal-footer { padding: 16px 24px !important; background: var(--bg-app) !important; border-top: 1px solid var(--border-color) !important; display: flex !important; justify-content: flex-end !important; gap: 12px !important; }
 
 .global-spinner-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(2px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; visibility: hidden; opacity: 0; transition: all 0.2s; }
