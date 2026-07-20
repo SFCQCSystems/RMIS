@@ -921,14 +921,27 @@ const App = (function () {
     }
     
     // Toggle Save Draft vs Submit Request buttons based on role and edit state
-    const saveDraftBtn = document.getElementById('btn-save-draft');
-    if (saveDraftBtn) {
-      // Show save draft only if it's new or currently a draft, and user is requester or admin
-      const isDraftStatus = statusSelect ? statusSelect.value === 'Draft' : false;
-      if ((!isEditMode || isDraftStatus) && (isRequester || isAdmin)) {
-        saveDraftBtn.style.display = 'inline-flex';
-      } else {
-        saveDraftBtn.style.display = 'none';
+    let saveDraftBtn = document.getElementById('btn-save-draft');
+    
+    // Show save draft only if it's a new request, and user is requester or admin
+    if (!isEditMode && (isRequester || isAdmin)) {
+      if (!saveDraftBtn) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'btn-save-draft';
+        btn.className = 'btn btn-secondary';
+        btn.onclick = () => App.saveDraft();
+        btn.innerText = 'Save Draft';
+        
+        // Insert before Submit Request button
+        const submitBtn = document.getElementById('btn-submit-request');
+        if (submitBtn && submitBtn.parentNode) {
+          submitBtn.parentNode.insertBefore(btn, submitBtn);
+        }
+      }
+    } else {
+      if (saveDraftBtn) {
+        saveDraftBtn.remove();
       }
     }
   }
