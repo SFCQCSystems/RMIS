@@ -3329,7 +3329,8 @@ const App = (function () {
       // Fallback if state.requests is empty
       if (eligibleRequests.length === 0) {
         try {
-           eligibleRequests = await window.DB.getRequests({});
+           const fetchFilters = role === 'requester' ? { requesterId: state.currentUser.id } : {};
+           eligibleRequests = await window.DB.getRequests(fetchFilters);
            state.requests = eligibleRequests;
         } catch(e) {
            console.warn("Could not fetch requests on the fly", e);
@@ -3382,28 +3383,63 @@ const App = (function () {
     if (modal) modal.classList.remove('open');
   }
 
-  function handleEditRequestSelectChange() {
-    const reqId = document.getElementById('edit-req-select').value;
-    if (!reqId) {
-      document.getElementById('edit-req-supplier').textContent = '-';
-      document.getElementById('edit-req-product').textContent = '-';
-      document.getElementById('edit-req-date').textContent = '-';
-      document.getElementById('edit-req-status').textContent = '-';
-      return;
-    }
-    const req = state.requests.find(r => r.id === reqId);
-    if (req) {
-      document.getElementById('edit-req-supplier').textContent = req.customer_name || '-';
-      const pNames = (req.request_items && req.request_items.length > 0) ? req.request_items.map(i => i.product_name).join(', ') : '-';
-      document.getElementById('edit-req-product').textContent = pNames;
-      document.getElementById('edit-req-date').textContent = new Date(req.request_date).toLocaleDateString('th-TH');
-      document.getElementById('edit-req-status').textContent = req.status;
+  async function searchEditRequest() {
+    const input = document.getElementById('edit-req-search-input').value.trim();
+    const errorEl = document.getElementById('edit-req-search-error');
+    const detailsContainer = document.getElementById('edit-req-details-container');
+    
+    errorEl.style.display = 'none';
+    detailsContainer.style.display = 'none';
+    state.currentEditTargetRequest = null;
+    
+    if (!input) return;
+    
+    // Check if input is a valid request number (number or contains a valid request no format)
+    const btn = document.querySelector('#modal-create-edit-request .btn-primary');
+    const oldText = btn.innerText;
+    btn.innerText = 'กำลังค้นหา...';
+    btn.disabled = true;
+
+    try {
+      // Search from DB directly by requestNo (No requesterId filter so it searches ALL)
+      const reqs = await window.DB.getRequests({ requestNo: input });
+      
+      // Find the best match (exact match first)
+      let match = reqs.find(r => r.request_no === input);
+      if (!match && reqs.length > 0) {
+        match = reqs[0];
+      }
+
+      if (!match) {
+        errorEl.style.display = 'block';
+      } else {
+        state.currentEditTargetRequest = match;
+        
+        document.getElementById('edit-req-supplier').textContent = match.customer_name || '-';
+        const pNames = (match.request_items && match.request_items.length > 0) ? match.request_items.map(i => i.product_name).join(', ') : '-';
+        document.getElementById('edit-req-product').textContent = pNames;
+        document.getElementById('edit-req-date').textContent = match.request_date ? new Date(match.request_date).toLocaleDateString('th-TH') : '-';
+        document.getElementById('edit-req-status').textContent = match.status;
+        
+        detailsContainer.style.display = 'block';
+      }
+    } catch(e) {
+      console.error(e);
+      errorEl.innerText = 'เกิดข้อผิดพลาด: ' + e.message;
+      errorEl.style.display = 'block';
+    } finally {
+      btn.innerText = oldText;
+      btn.disabled = false;
     }
   }
 
   async function handleCreateEditRequestSubmit(e) {
     e.preventDefault();
-    const reqId = document.getElementById('edit-req-select').value;
+    if (!state.currentEditTargetRequest) {
+      alert('กรุณาค้นหาและระบุใบแจ้งตรวจสอบที่ต้องการแก้ไข');
+      return;
+    }
+    const reqId = state.currentEditTargetRequest.id;
     const reason = document.getElementById('edit-req-reason').value;
     const note = document.getElementById('edit-req-note').value;
     
@@ -3612,7 +3648,7 @@ const App = (function () {
     sortEditRequests,
     openCreateEditRequestModal,
     closeCreateEditRequestModal,
-    handleEditRequestSelectChange,
+    searchEditRequest,
     handleCreateEditRequestSubmit,
     fulfillEditRequest,
     deleteEditRequest

@@ -780,8 +780,8 @@
   <!-- =========================================================================
        1. LOGIN PAGE VIEW (Visible initially)
        ========================================================================= -->
-  <div class="login-container" id="login-screen">
-    <div class="login-card">
+  <div class="login-container" id="login-screen" style="min-height: 100vh !important; position: relative !important; display: block !important;">
+    <div class="login-card" style="position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; margin: 0 !important; width: 90% !important; max-width: 500px !important;">
       <div class="login-header">
         <div class="login-logo" style="background: transparent; box-shadow: none; border-radius: 0; width: auto; height: 120px; margin-bottom: 20px;">
           <img src="icons/icon-192.png" alt="RMIS Logo" style="max-height: 100%; object-fit: contain;">
@@ -802,7 +802,7 @@
         <div id="login-error-msg" style="color:var(--text-danger); font-size:13px; margin-bottom:15px; display:none; text-align:center; font-weight:500;">
           ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">เข้าสู่ระบบ</button>
+        <button type="submit" class="btn btn-primary" style="width: 100% !important; justify-content: center !important; margin-top: 10px;">เข้าสู่ระบบ</button>
       </form>
     </div>
   </div>
@@ -948,12 +948,15 @@
       <form id="create-edit-request-form" onsubmit="App.handleCreateEditRequestSubmit(event)">
         <div class="modal-body">
           <div class="form-group">
-            <label>เลือกใบแจ้งตรวจสอบ <span style="color:red;">*</span></label>
-            <select id="edit-req-select" class="form-control" required onchange="App.handleEditRequestSelectChange()">
-              <option value="">-- เลือกใบแจ้งตรวจสอบ --</option>
-            </select>
+            <label>ค้นหาเลขที่ใบแจ้งตรวจสอบ <span style="color:red;">*</span></label>
+            <div style="display:flex; gap:10px;">
+              <input type="text" id="edit-req-search-input" class="form-control" placeholder="ระบุเลขที่ใบแจ้ง (เช่น 2767)" onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.searchEditRequest(); }" style="margin-bottom:0;">
+              <button type="button" class="btn btn-primary" onclick="App.searchEditRequest()" style="white-space:nowrap;">ค้นหา</button>
+            </div>
+            <div id="edit-req-search-error" style="color:var(--text-danger); font-size:13px; margin-top:5px; display:none;">ไม่พบข้อมูลใบแจ้งนี้</div>
           </div>
           
+          <div id="edit-req-details-container" style="display:none;">
           <div class="grid-2 mb-20" style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-top:10px;">
             <div>
               <label style="font-size:12px; color:var(--text-muted);">Supplier</label>
@@ -982,6 +985,7 @@
             <label>หมายเหตุเพิ่มเติม (ถ้ามี)</label>
             <input type="text" id="edit-req-note" class="form-control" placeholder="ข้อความเพิ่มเติม...">
           </div>
+          </div> <!-- End edit-req-details-container -->
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="App.closeCreateEditRequestModal()">ยกเลิก</button>
@@ -1568,9 +1572,9 @@
       });
     }
   </script>
-  <script src="config.js?v=18"></script>
-  <script src="dbService.js?v=21"></script>
-  <script src="app_v4.js?v=19"></script>
+  <script src="config.js?v=20"></script>
+  <script src="dbService.js?v=25"></script>
+  <script src="app_v4.js?v=23"></script>
 </body>
 </html>
 

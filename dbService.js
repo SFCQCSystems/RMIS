@@ -129,6 +129,11 @@
       if (currentUser.role === 'base_oil') {
         requests = requests.filter(r => r.need_base_oil_view === true);
       }
+      
+      // Filter by requesterId if provided
+      if (filters.requesterId) {
+        requests = requests.filter(r => r.requester_id === filters.requesterId);
+      }
       // Populate Requester display name
       requests = requests.map(r => {
         const u = users.find(user => user.id === r.requester_id);
@@ -829,8 +834,14 @@
       if (currentUser && currentUser.role === 'base_oil') {
         query = query.eq('need_base_oil_view', true);
       }
+      if (filters.requesterId) {
+        query = query.eq('requester_id', filters.requesterId);
+      }
       if (filters.requestNo) {
-        query = query.ilike('request_no::text', `%${filters.requestNo}%`);
+        const reqNoInt = parseInt(filters.requestNo, 10);
+        if (!isNaN(reqNoInt)) {
+          query = query.eq('request_no', reqNoInt);
+        }
       }
       if (filters.customerName) {
         query = query.ilike('customer_name', `%${filters.customerName}%`);
