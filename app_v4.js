@@ -764,11 +764,13 @@ const App = (function () {
         `;
         listBody.appendChild(tr);
       });
+      hideLoading();
 
     } catch (e) {
       console.error(e);
       listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-danger); padding:30px;">ไม่สามารถโหลดข้อมูลแบบร่างได้: ${escapeHtml(e.message)}</td></tr>`;
       showToast('ไม่สามารถดึงข้อมูลรายการแบบร่างได้: ' + e.message, 'error');
+      hideLoading();
     }
   }
 
@@ -2036,6 +2038,26 @@ const App = (function () {
         }
 
         // Group by Request Ref
+        // Function to convert excel time fraction to HH:MM:SS
+        const parseExcelTime = (time) => {
+          if (typeof time === 'number') {
+            let totalSeconds = Math.round(time * 86400);
+            let hours = Math.floor(totalSeconds / 3600);
+            let minutes = Math.floor((totalSeconds % 3600) / 60);
+            let seconds = totalSeconds % 60;
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+          }
+          return String(time).trim();
+        };
+
+        const parseExcelDate = (date) => {
+          if (typeof date === 'number') {
+            const d = new Date(Math.round((date - 25569) * 86400 * 1000));
+            return d.toISOString().split('T')[0];
+          }
+          return String(date).trim();
+        };
+
         rawData.forEach(row => {
           const reqRef = String(row['Request Ref'] || '').trim();
           if (!reqRef) return; 
@@ -2044,26 +2066,6 @@ const App = (function () {
             let parsedYear = parseInt(row['Request Year']);
             if (isNaN(parsedYear)) parsedYear = new Date().getFullYear();
             
-            // Function to convert excel time fraction to HH:MM:SS
-            const parseExcelTime = (time) => {
-              if (typeof time === 'number') {
-                let totalSeconds = Math.round(time * 86400);
-                let hours = Math.floor(totalSeconds / 3600);
-                let minutes = Math.floor((totalSeconds % 3600) / 60);
-                let seconds = totalSeconds % 60;
-                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-              }
-              return String(time).trim();
-            };
-
-            const parseExcelDate = (date) => {
-              if (typeof date === 'number') {
-                const d = new Date(Math.round((date - 25569) * 86400 * 1000));
-                return d.toISOString().split('T')[0];
-              }
-              return String(date).trim();
-            };
-
             // Format dates
             let reqDate = row['Request Date'] ? parseExcelDate(row['Request Date']) : new Date().toISOString().split('T')[0];
             let reqTime = row['Request Time'] ? parseExcelTime(row['Request Time']) : new Date().toTimeString().split(' ')[0];
@@ -2097,13 +2099,19 @@ const App = (function () {
             };
           }
 
+          let itemInspectionDate = null;
+          if (row['Inspection Date']) {
+            itemInspectionDate = parseExcelDate(row['Inspection Date']);
+          }
+
           requestGroups[reqRef].items.push({
             product_name: String(row['Product Name'] || '').trim(),
             batch_number: String(row['Batch Number'] || '').trim(),
             quantity: String(row['Quantity'] || '').trim(),
             rm_no: String(row['RM No'] || '').trim(),
             test_result: String(row['Test Result'] || 'Pass').trim(), 
-            item_comment: String(row['Item Comment'] || '').trim()
+            item_comment: String(row['Item Comment'] || '').trim(),
+            inspection_date: itemInspectionDate
           });
         });
 
