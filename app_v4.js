@@ -228,9 +228,9 @@ const App = (function () {
         document.getElementById('detail-items-tbody').innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">กรุณาเลือกรายการใบแจ้งเพื่อดูรายละเอียด</td></tr>';
         document.getElementById('detail-notes').innerText = '-';
         document.getElementById('detail-lab-comments').innerText = '-';
-        document.getElementById('btn-detail-print').style.display = 'none';
-        document.getElementById('btn-detail-edit').style.display = 'none';
-        document.getElementById('btn-detail-delete').style.display = 'none';
+        document.getElementById('btn-detail-print')?.style && (document.getElementById('btn-detail-print').style.display = 'none');
+        document.getElementById('btn-detail-edit')?.style && (document.getElementById('btn-detail-edit').style.display = 'none');
+        document.getElementById('btn-detail-delete')?.style && (document.getElementById('btn-detail-delete').style.display = 'none');
         const arc = document.getElementById('approve-reject-btn-container'); if (arc) arc.innerHTML = '';
         document.getElementById('detail-approval-card').style.display = 'none';
       }
@@ -268,6 +268,7 @@ const App = (function () {
       'request-create': 'nav-requests',
       'request-edit': 'nav-requests',
       'request-detail': 'nav-requests',
+      drafts: 'nav-drafts',
       history: 'nav-history',
       'edit-requests': 'nav-edit-requests',
       'daily-report': 'nav-daily-report',
@@ -350,6 +351,9 @@ const App = (function () {
 
     // Scroll view back to top
     window.scrollTo(0, 0);
+    
+    // Re-apply role-based UI restrictions on every navigation
+    if (state.currentUser) updateUIForUser();
   }
 
   // --- FILTER MODAL LOGIC ---
@@ -457,6 +461,7 @@ const App = (function () {
     // Role features visibility
     const isUserAdmin = state.currentUser.role === 'admin';
     const isUserLab = state.currentUser.role === 'lab';
+    const isBaseOil = state.currentUser.role === 'base_oil';
     
     // Sidebar nav nodes
     const navHistory = document.getElementById('nav-history');
@@ -471,7 +476,6 @@ const App = (function () {
     if (navHistory) navHistory.style.display = (isUserAdmin || isUserLab) ? 'block' : 'none';
     if (navEditRequests) {
       // Admin, Lab, Requester can see Edit Requests (everyone except Base Oil)
-      const isBaseOil = state.currentUser.role === 'baseoil';
       navEditRequests.style.display = !isBaseOil ? 'block' : 'none';
     }
     if (navSignatures) navSignatures.style.display = isUserAdmin ? 'block' : 'none';
@@ -486,10 +490,21 @@ const App = (function () {
       }
     }
 
-    // List export buttons
-    if (exportBtn) exportBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
-    const importBtn = document.getElementById('btn-admin-import');
-    if (importBtn) importBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
+    // Remove or show action buttons based on role
+    if (isBaseOil) {
+      // Physically remove buttons from DOM for Base Oil - they should never appear
+      ['btn-admin-import', 'btn-admin-export', 'btn-create-request', 'file-import-excel',
+       'btn-dashboard-create-request', 'btn-detail-edit', 'btn-detail-delete'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      });
+    } else {
+      if (exportBtn) exportBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
+      const importBtn = document.getElementById('btn-admin-import');
+      if (importBtn) importBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
+      const createBtn = document.getElementById('btn-create-request');
+      if (createBtn) createBtn.style.display = 'inline-flex';
+    }
     
     // Kick off async background update for drafts
     updateDraftCountsInBackground();
@@ -572,6 +587,11 @@ const App = (function () {
           }
         }
 
+        tr.style.cursor = 'pointer';
+        tr.style.transition = 'background 0.15s';
+        tr.onmouseover = () => tr.style.background = 'var(--bg-secondary)';
+        tr.onmouseout = () => tr.style.background = 'transparent';
+        tr.onclick = () => navigate('request-detail', {id: r.id});
         tr.innerHTML = `
           <td style="white-space: nowrap;"><strong>${r.request_no}/${r.request_year}</strong></td>
           <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
@@ -812,12 +832,15 @@ const App = (function () {
     const isRequester = state.currentUser.role === 'requester';
     const isBaseOil = state.currentUser.role === 'base_oil';
     const isAdminOrLab = isAdmin || isLab;
+    
+    // Scope to the form section only (NOT the whole document) to avoid hiding top-bar buttons
+    const formSection = document.getElementById('view-request-form') || document;
 
-    document.querySelectorAll('.admin-field').forEach(el => {
+    formSection.querySelectorAll('.admin-field').forEach(el => {
       el.style.display = isAdmin ? 'block' : 'none';
     });
 
-    document.querySelectorAll('.admin-lab-field').forEach(el => {
+    formSection.querySelectorAll('.admin-lab-field').forEach(el => {
       const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
       el.style.display = isAdminOrLab ? (isTableCell ? 'table-cell' : 'block') : 'none';
     });
@@ -1341,13 +1364,14 @@ const App = (function () {
       // Show/Hide action buttons according to rules
       const isAdmin = state.currentUser.role === 'admin';
       const isLab = state.currentUser.role === 'lab';
+      const isBaseOil = state.currentUser.role === 'base_oil';
       const printBtn = document.getElementById('btn-detail-print');
       const editBtn = document.getElementById('btn-detail-edit');
       const deleteBtn = document.getElementById('btn-detail-delete');
 
       if (printBtn) printBtn.style.display = 'inline-flex';
-      if (editBtn) editBtn.style.display = (isAdmin || (isLab && !details.approved)) ? 'inline-flex' : 'none';
-      if (deleteBtn) deleteBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+      if (editBtn) editBtn.style.display = (isBaseOil) ? 'none' : ((isAdmin || (isLab && !details.approved)) ? 'inline-flex' : 'none');
+      if (deleteBtn) deleteBtn.style.display = (isBaseOil) ? 'none' : (isAdmin ? 'inline-flex' : 'none');
 
       // Dynamically render Approve/Reject buttons ONLY when status is Complete
       const approveRejectContainer = document.getElementById('approve-reject-btn-container');
