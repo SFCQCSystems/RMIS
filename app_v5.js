@@ -589,9 +589,13 @@ const App = (function () {
 
         tr.style.cursor = 'pointer';
         tr.style.transition = 'background 0.15s';
-        tr.onmouseover = () => tr.style.background = 'var(--bg-secondary)';
-        tr.onmouseout = () => tr.style.background = 'transparent';
-        tr.onclick = () => navigate('request-detail', {id: r.id});
+        tr.onclick = (e) => {
+          if (!e.target.closest('button')) {
+            Array.from(tr.parentNode.children).forEach(child => child.classList.remove('selected-row'));
+            tr.classList.add('selected-row');
+            navigate('request-detail', {id: r.id});
+          }
+        };
         tr.innerHTML = `
           <td style="white-space: nowrap;"><strong>${r.request_no}/${r.request_year}</strong></td>
           <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
@@ -647,11 +651,11 @@ const App = (function () {
 
         tr.style.cursor = 'pointer';
         tr.style.transition = 'background 0.15s';
-        tr.onmouseover = () => tr.style.background = 'var(--bg-secondary)';
-        tr.onmouseout = () => tr.style.background = 'transparent';
         tr.onclick = (e) => {
           // Prevent double navigation if they clicked the button directly
           if (!e.target.closest('button')) {
+            Array.from(tr.parentNode.children).forEach(child => child.classList.remove('selected-row'));
+            tr.classList.add('selected-row');
             navigate('request-detail', {id: r.id});
           }
         };
