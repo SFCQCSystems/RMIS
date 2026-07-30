@@ -2122,7 +2122,7 @@ const App = (function () {
                 container_no: String(row['Container No'] || '').trim(),
                 notes: String(row['Notes'] || '').trim(),
                 lab_comments: String(row['Lab Comments'] || '').trim(),
-                status: 'Approved', 
+                status: row['Request Status'] ? String(row['Request Status']).trim() : 'Approved', 
                 requester_id: resolvedRequesterId, 
                 need_base_oil_view: false,
                 created_at: new Date().toISOString()
