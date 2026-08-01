@@ -844,10 +844,32 @@ const App = (function () {
       el.style.display = isAdmin ? 'block' : 'none';
     });
 
-    formSection.querySelectorAll('.admin-lab-field').forEach(el => {
-      const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
-      el.style.display = isAdminOrLab ? (isTableCell ? 'table-cell' : 'block') : 'none';
-    });
+    // Helper: apply base-oil-field column visibility based on checkbox state
+    function applyBaseOilFieldVisibility(checked) {
+      const isBaseOilViewVisible = isAdminOrLab && checked;
+      formSection.querySelectorAll('.admin-lab-field').forEach(el => {
+        const isTableCell = el.tagName === 'TH' || el.tagName === 'TD';
+        let shouldShow = isAdminOrLab;
+        if (el.classList.contains('base-oil-field')) {
+          shouldShow = isBaseOilViewVisible;
+        }
+        el.style.display = shouldShow ? (isTableCell ? 'table-cell' : 'block') : 'none';
+      });
+    }
+
+    // Initial visibility (before loading DB values — checkbox will be unchecked by default after form.reset())
+    applyBaseOilFieldVisibility(false);
+
+    if (needBaseOilCheck) {
+      // Remove old listener if any to avoid duplicates
+      const newCheck = needBaseOilCheck.cloneNode(true);
+      if (needBaseOilCheck.parentNode) {
+        needBaseOilCheck.parentNode.replaceChild(newCheck, needBaseOilCheck);
+      }
+      newCheck.addEventListener('change', (e) => {
+        applyBaseOilFieldVisibility(e.target.checked);
+      });
+    }
 
     // Show Base Oil sharing checkbox and Status dropdown for admin/lab in edit mode
     if (baseOilSection) baseOilSection.style.display = isAdminOrLab ? 'block' : 'none';
@@ -869,6 +891,9 @@ const App = (function () {
         if (poInput) poInput.value = details.po_number || '';
         if (needBaseOilCheck) needBaseOilCheck.checked = !!details.need_base_oil_view;
         if (statusSelect) statusSelect.value = details.status || 'Pending';
+
+        // Re-apply base-oil-field visibility now that checkbox is populated from DB
+        applyBaseOilFieldVisibility(!!details.need_base_oil_view);
 
         // Show fields to manually edit request no and request year
         if (isAdminOrLab && adminNoBlock && formReqNo && formReqYear) {
@@ -994,12 +1019,16 @@ const App = (function () {
     const rm = item.rm_no || '';
     const result = item.test_result || 'In Process';
     const comment = item.item_comment || '';
+    const density15c = item.density_15c || '';
+    const density30c = item.density_30c || '';
 
     const isEditMode = state.currentRequestId !== null;
     const statusSelect = document.getElementById('form-status');
     const isDraftStatus = statusSelect ? statusSelect.value === 'Draft' : false;
     const disableInputs = isEditMode && ((isLab && !isAdmin) || (isRequester && !isDraftStatus));
     const showDelete = !disableInputs;
+    const needBaseOilCheck = document.getElementById('form-need-base-oil');
+    const isBaseOilChecked = needBaseOilCheck ? needBaseOilCheck.checked : false;
 
     tr.innerHTML = `
       <td>
@@ -1022,6 +1051,12 @@ const App = (function () {
           <option value="Fail" ${result === 'Fail' ? 'selected' : ''}>Fail</option>
           <option value="Hold" ${result === 'Hold' ? 'selected' : ''}>Hold</option>
         </select>
+      </td>
+      <td class="admin-lab-field base-oil-field" style="display:${(isAdminOrLab && isBaseOilChecked) ? 'table-cell' : 'none'};">
+        <input type="text" class="item-form-density15c" placeholder="เช่น 0.85" value="${escapeHtml(density15c)}" ${isRequester ? 'disabled readonly' : ''}>
+      </td>
+      <td class="admin-lab-field base-oil-field" style="display:${(isAdminOrLab && isBaseOilChecked) ? 'table-cell' : 'none'};">
+        <input type="text" class="item-form-density30c" placeholder="เช่น 0.83" value="${escapeHtml(density30c)}" ${isRequester ? 'disabled readonly' : ''}>
       </td>
       <td class="admin-lab-field" style="display:${isAdminOrLab ? 'table-cell' : 'none'};">
         <input type="text" class="item-form-comment" placeholder="หมายเหตุ" value="${escapeHtml(comment)}" ${isRequester ? 'disabled readonly' : ''}>
@@ -1079,10 +1114,14 @@ const App = (function () {
       const rmInput = row.querySelector('.item-form-rm');
       const resultSelect = row.querySelector('.item-form-result');
       const commentInput = row.querySelector('.item-form-comment');
+      const den15Input = row.querySelector('.item-form-density15c');
+      const den30Input = row.querySelector('.item-form-density30c');
 
       const pRm = rmInput ? rmInput.value.trim() : '';
       const pResult = resultSelect ? resultSelect.value : 'In Process';
       const pComment = commentInput ? commentInput.value.trim() : '';
+      const pDen15 = den15Input ? den15Input.value.trim() : '';
+      const pDen30 = den30Input ? den30Input.value.trim() : '';
 
       if (!pName || !pBatch || !pQty) {
         showToast('กรุณากรอกข้อมูลสินค้าให้ครบถ้วนในทุกแถว', 'warning');
@@ -1097,7 +1136,9 @@ const App = (function () {
         quantity: pQty,
         rm_no: pRm,
         test_result: pResult,
-        item_comment: pComment
+        item_comment: pComment,
+        density_15c: pDen15,
+        density_30c: pDen30
       });
     }
 
@@ -1205,12 +1246,16 @@ const App = (function () {
       const itemRows = document.querySelectorAll('#form-items-tbody tr');
       const itemsData = [];
       for (let row of itemRows) {
+        const den15Input = row.querySelector('.item-form-density15c');
+        const den30Input = row.querySelector('.item-form-density30c');
         itemsData.push({
           id: row.querySelector('.item-form-id').value || undefined,
           product_name: row.querySelector('.item-form-name').value.trim() || '-',
           batch_number: row.querySelector('.item-form-batch').value.trim() || '-',
           quantity: row.querySelector('.item-form-qty').value.trim() || '-',
-          test_result: 'In Process'
+          test_result: 'In Process',
+          density_15c: den15Input ? den15Input.value.trim() : '',
+          density_30c: den30Input ? den30Input.value.trim() : ''
         });
       }
 
@@ -1290,10 +1335,36 @@ const App = (function () {
 
       // Notes and comments
       document.getElementById('detail-notes').innerText = details.notes || 'ไม่มีหมายเหตุ';
-      document.getElementById('detail-lab-comments').innerText = details.lab_comments || 'ไม่มีความคิดเห็นจากห้องปฏิบัติการ';
+
+      // Lab comments — and append Density summary when need_base_oil_view is true
+      const labCommentEl = document.getElementById('detail-lab-comments');
+      let labCommentText = details.lab_comments || 'ไม่มีความคิดเห็นจากห้องปฏิบัติการ';
+
+      const isBaseOilVisible = details.need_base_oil_view === true;
+      if (isBaseOilVisible && details.items && details.items.length > 0) {
+        const densityLines = details.items
+          .filter(it => it.density_15c || it.density_30c)
+          .map(it => {
+            const den15 = it.density_15c ? `Den@15°C: ${it.density_15c}` : '';
+            const den30 = it.density_30c ? `Den@30°C: ${it.density_30c}` : '';
+            return [den15, den30].filter(Boolean).join(' | ');
+          });
+
+        if (densityLines.length > 0) {
+          labCommentText += '\n\n📊 ค่าความหนาแน่น (Density):\n' + densityLines.join('\n');
+        }
+      }
+      labCommentEl.innerText = labCommentText;
 
       // Items table
       itemsTbody.innerHTML = '';
+      
+      const detailTable = itemsTbody.closest('table');
+      if (detailTable) {
+        detailTable.querySelectorAll('th.base-oil-field').forEach(th => {
+          th.style.display = isBaseOilVisible ? 'table-cell' : 'none';
+        });
+      }
       details.items.forEach(item => {
         const tr = document.createElement('tr');
         
@@ -1358,6 +1429,8 @@ const App = (function () {
           <td>${escapeHtml(item.quantity)}</td>
           <td>${displayRm ? `<code>${escapeHtml(displayRm)}</code>` : ''}</td>
           <td>${displayRes ? `<span class="badge ${resClass}">${displayRes}</span>` : ''}</td>
+          <td class="base-oil-field" style="display:${isBaseOilVisible ? 'table-cell' : 'none'};">${escapeHtml(item.density_15c || '-')}</td>
+          <td class="base-oil-field" style="display:${isBaseOilVisible ? 'table-cell' : 'none'};">${escapeHtml(item.density_30c || '-')}</td>
           <td style="text-align:center;">${inspectionDateHtml}</td>
           <td style="text-align:center;">${stickerBtnHtml}</td>
           <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(item.item_comment || '')}</td>
@@ -1509,11 +1582,27 @@ const App = (function () {
     document.getElementById('print-container-no').innerText = details.container_no || '-';
 
     document.getElementById('print-notes').innerText = details.notes || '';
-    document.getElementById('print-lab-comments').innerText = details.lab_comments || '';
+
+    // Lab comments for print — append Density summary when need_base_oil_view is true
+    let printLabCommentText = details.lab_comments || '';
+    const isBaseOilVisible = details.need_base_oil_view === true;
+    if (isBaseOilVisible && details.items && details.items.length > 0) {
+      const densityLines = details.items
+        .filter(it => it.density_15c || it.density_30c)
+        .map(it => {
+          const den15 = it.density_15c ? `Den@15°C: ${it.density_15c}` : '';
+          const den30 = it.density_30c ? `Den@30°C: ${it.density_30c}` : '';
+          return [den15, den30].filter(Boolean).join(' | ');
+        });
+      if (densityLines.length > 0) {
+        printLabCommentText += (printLabCommentText ? '\n\n' : '') + '📊 ค่าความหนาแน่น (Density):\n' + densityLines.join('\n');
+      }
+    }
+    document.getElementById('print-lab-comments').innerText = printLabCommentText;
 
     const printTbody = document.getElementById('print-items-tbody');
     printTbody.innerHTML = '';
-    
+
     const isRequester = state.currentUser.role === 'requester';
     
     details.items.forEach((item, idx) => {
@@ -2237,7 +2326,9 @@ const App = (function () {
                 'Batch Number': item.batch_number,
                 'Quantity (จำนวน)': item.quantity,
                 'RM No.': item.rm_no || '',
-                'ผลการทดสอบ (Test Result)': item.test_result
+                'ผลการทดสอบ (Test Result)': item.test_result,
+                'Density@15C': item.density_15c || '',
+                'Density@30C': item.density_30c || ''
               });
             });
           } else {
@@ -2258,7 +2349,9 @@ const App = (function () {
               'Batch Number': '',
               'Quantity (จำนวน)': '',
               'RM No.': '',
-              'ผลการทดสอบ (Test Result)': ''
+              'ผลการทดสอบ (Test Result)': '',
+              'Density@15C': '',
+              'Density@30C': ''
             });
           }
         } catch (itemErr) {

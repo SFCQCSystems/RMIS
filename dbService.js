@@ -967,7 +967,9 @@
         quantity: item.quantity,
         rm_no: item.rm_no || '',
         test_result: item.test_result || 'In Process',
-        item_comment: item.item_comment || ''
+        item_comment: item.item_comment || '',
+        density_15c: item.density_15c || null,
+        density_30c: item.density_30c || null
       }));
 
       const { data: newItems, error: itemsErr } = await client
@@ -1039,7 +1041,9 @@
           quantity: item.quantity,
           rm_no: item.rm_no || '',
           test_result: item.test_result || 'In Process',
-          item_comment: item.item_comment || ''
+          item_comment: item.item_comment || '',
+          density_15c: item.density_15c || null,
+          density_30c: item.density_30c || null
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
@@ -1099,7 +1103,9 @@
           quantity: item.quantity,
           rm_no: item.rm_no || '',
           test_result: item.test_result || 'In Process',
-          item_comment: item.item_comment || ''
+          item_comment: item.item_comment || '',
+          density_15c: item.density_15c || null,
+          density_30c: item.density_30c || null
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
@@ -1172,7 +1178,9 @@
           quantity: item.quantity,
           rm_no: item.rm_no || '',
           test_result: item.test_result || 'In Process',
-          item_comment: item.item_comment || ''
+          item_comment: item.item_comment || '',
+          density_15c: item.density_15c || null,
+          density_30c: item.density_30c || null
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
