@@ -889,7 +889,8 @@ const App = (function () {
         notesInput.value = details.notes || '';
         commentsInput.value = details.lab_comments || '';
         if (poInput) poInput.value = details.po_number || '';
-        if (needBaseOilCheck) needBaseOilCheck.checked = !!details.need_base_oil_view;
+        const currentBaseOilCheck = document.getElementById('form-need-base-oil');
+        if (currentBaseOilCheck) currentBaseOilCheck.checked = !!details.need_base_oil_view;
         if (statusSelect) statusSelect.value = details.status || 'Pending';
 
         // Re-apply base-oil-field visibility now that checkbox is populated from DB
