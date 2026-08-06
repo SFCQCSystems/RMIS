@@ -1348,7 +1348,8 @@ const App = (function () {
           .map(it => {
             const den15 = it.density_15c ? `Den@15°C: ${it.density_15c}` : '';
             const den30 = it.density_30c ? `Den@30°C: ${it.density_30c}` : '';
-            return [den15, den30].filter(Boolean).join(' | ');
+            const densities = [den15, den30].filter(Boolean).join(' | ');
+            return `- ${it.product_name || 'ไม่ระบุชื่อสินค้า'}: ${densities}`;
           });
 
         if (densityLines.length > 0) {
@@ -1593,7 +1594,8 @@ const App = (function () {
         .map(it => {
           const den15 = it.density_15c ? `Den@15°C: ${it.density_15c}` : '';
           const den30 = it.density_30c ? `Den@30°C: ${it.density_30c}` : '';
-          return [den15, den30].filter(Boolean).join(' | ');
+          const densities = [den15, den30].filter(Boolean).join(' | ');
+          return `- ${it.product_name || 'ไม่ระบุชื่อสินค้า'}: ${densities}`;
         });
       if (densityLines.length > 0) {
         printLabCommentText += (printLabCommentText ? '\n\n' : '') + '📊 ค่าความหนาแน่น (Density):\n' + densityLines.join('\n');
