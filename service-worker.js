@@ -1,9 +1,9 @@
-const CACHE_NAME = 'lrms-cache-v8';
+const CACHE_NAME = 'rmis-cache-v10';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './style_v2.css',
-  './app_v4.js',
+  './app_v5.js',
   './config.js',
   './dbService.js',
   './manifest.json',
@@ -46,7 +46,6 @@ self.addEventListener('fetch', event => {
 
   // Bypass cache for Supabase API (Database & Auth)
   if (url.hostname.includes('supabase.co')) {
-    // Network only for Supabase
     return;
   }
 
@@ -58,21 +57,82 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
-        // Return cached response if found (Cache First)
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        // Otherwise, fetch from network
         return fetch(event.request).then(response => {
-          // Optional: dynamically cache other static assets (like fonts/images) here if needed
           return response;
         }).catch(() => {
-          // If network fails (offline) and the request is for an HTML page
           if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
             return caches.match('./offline.html');
           }
         });
       })
+  );
+});
+
+// ==============================================================================
+// WEB PUSH NOTIFICATIONS
+// ==============================================================================
+
+// Handle incoming Push Notification event from Server
+self.addEventListener('push', event => {
+  let data = {
+    title: 'RMIS (ระบบแจ้งตรวจสอบคุณภาพ)',
+    body: 'มีการแจ้งเตือนใหม่ในระบบ',
+    url: './'
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    vibrate: [200, 100, 200, 100, 200],
+    tag: data.tag || 'rmis-notification',
+    renotify: true,
+    data: {
+      url: data.url || './'
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Handle click on Notification
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // If a window is already open, focus it
+      for (const client of clientList) {
+        if (client.url.includes('index.html') || client.url.endsWith('/')) {
+          if ('focus' in client) {
+            client.focus();
+            if (targetUrl && client.navigate) {
+              client.navigate(targetUrl);
+            }
+            return;
+          }
+        }
+      }
+      // If no window is open, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
   );
 });

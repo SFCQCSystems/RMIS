@@ -480,6 +480,15 @@ const App = (function () {
     }
     if (navSignatures) navSignatures.style.display = isUserAdmin ? 'block' : 'none';
     if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
+
+    const navPush = document.getElementById('setting-nav-push');
+    if (navPush) {
+      const canUsePush = isUserAdmin || isUserLab || isBaseOil;
+      navPush.style.display = canUsePush ? 'block' : 'none';
+      if (canUsePush) {
+        checkPushSubscriptionStatus();
+      }
+    }
     if (navDrafts) {
       const isRequester = state.currentUser.role === 'requester';
       navDrafts.style.display = (isRequester || isUserAdmin) ? 'block' : 'none';
@@ -2969,6 +2978,105 @@ const App = (function () {
     playNotificationSound();
   }
 
+  // --- WEB PUSH NOTIFICATION HELPERS ---
+  function urlB64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  async function checkPushSubscriptionStatus() {
+    const btn = document.getElementById('btn-toggle-push');
+    const statusText = document.getElementById('push-status-text');
+    if (!btn || !statusText) return;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      statusText.innerText = 'อุปกรณ์นี้ยังไม่รองรับ Web Push (หากใช้ iOS ต้องกด Add to Home Screen ก่อน)';
+      btn.disabled = true;
+      btn.innerText = 'ไม่รองรับ';
+      btn.className = 'btn btn-sm btn-secondary';
+      return;
+    }
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (sub) {
+        btn.innerText = 'เปิดใช้งานอยู่ (คลิกเพื่อปิด)';
+        btn.className = 'btn btn-sm btn-success';
+        btn.style.backgroundColor = '#10b981';
+        btn.style.color = 'white';
+        statusText.innerText = 'อุปกรณ์นี้เปิดรับการแจ้งเตือนบนหน้าจอแล้ว ✅';
+      } else {
+        btn.innerText = 'เปิดใช้งาน';
+        btn.className = 'btn btn-sm btn-primary';
+        btn.style.backgroundColor = '';
+        btn.style.color = '';
+        statusText.innerText = 'รับแจ้งเตือนเมื่อมีใบงานใหม่ / อนุมัติ แม้ปิดหน้าจอ';
+      }
+    } catch (e) {
+      console.warn('Error checking push subscription:', e);
+    }
+  }
+
+  async function togglePushNotification() {
+    const btn = document.getElementById('btn-toggle-push');
+    const statusText = document.getElementById('push-status-text');
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('อุปกรณ์หรือเบราว์เซอร์นี้ไม่รองรับ Web Push Notifications\n(หากใช้งานบน iPhone/iPad ต้องกดปุ่ม Share แล้วเลือก "เพิ่มไปยังหน้าจอโฮม" ก่อนใช้งานครับ)');
+      return;
+    }
+
+    try {
+      showLoadingButton(btn, true, 'กำลังดำเนินการ...');
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (sub) {
+        // Unsubscribe
+        await sub.unsubscribe();
+        await window.DB.deletePushSubscription(sub.endpoint);
+        showToast('ปิดการแจ้งเตือนบนอุปกรณ์นี้เรียบร้อยแล้ว', 'info');
+      } else {
+        // Subscribe
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('คุณไม่ได้อนุญาตการแจ้งเตือน กรุณาเปิดสิทธิ์การแจ้งเตือนในการตั้งค่าเบราว์เซอร์');
+          showToast('ไม่ได้รับสิทธิ์การแจ้งเตือน', 'warning');
+          return;
+        }
+
+        const config = window.AppConfig.load();
+        const vapidKey = config.vapidPublicKey || 'BPoDZ0Z17eH8XmeJJL-hZHr9N3Pu63vXt82iN2IUoHk6KmxlmduN-T3I-IfKwLJVzc3gLSIh_pWtbVcWwqx8dF0';
+        
+        const newSub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(vapidKey)
+        });
+
+        await window.DB.savePushSubscription(newSub, state.currentUser.role);
+        showToast('เปิดรับการแจ้งเตือนบนอุปกรณ์นี้เรียบร้อยแล้ว! 🔔', 'success');
+      }
+    } catch (err) {
+      console.error('Push Notification Error:', err);
+      showToast('เกิดข้อผิดพลาดในการตั้งค่าแจ้งเตือน: ' + err.message, 'error');
+    } finally {
+      showLoadingButton(btn, false, 'ดำเนินการ');
+      checkPushSubscriptionStatus();
+    }
+  }
+
   function initRealtime() {
     if (!state.currentUser) return;
     const role = state.currentUser.role;
@@ -3783,6 +3891,8 @@ const App = (function () {
     searchEditRequest,
     handleCreateEditRequestSubmit,
     fulfillEditRequest,
-    deleteEditRequest
+    deleteEditRequest,
+    togglePushNotification,
+    checkPushSubscriptionStatus
   };
 })();

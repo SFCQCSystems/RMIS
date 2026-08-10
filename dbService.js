@@ -1664,6 +1664,47 @@
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('ไม่พบข้อมูลรายการทดสอบที่ต้องการอัปเดต (ID: ' + itemId + ') - อาจติดปัญหา Permissions (RLS)');
       return data;
+    },
+
+    // --- PUSH NOTIFICATIONS ---
+    async savePushSubscription(subscription, role) {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+      if (!client || !currentUser) throw new Error('Unauthenticated');
+
+      const subObj = typeof subscription.toJSON === 'function' ? subscription.toJSON() : subscription;
+      const endpoint = subObj.endpoint;
+      const p256dh = subObj.keys?.p256dh;
+      const auth = subObj.keys?.auth;
+
+      if (!endpoint || !p256dh || !auth) {
+        throw new Error('Invalid Push Subscription Object');
+      }
+
+      const { data, error } = await client
+        .from('push_subscriptions')
+        .upsert({
+          user_id: currentUser.id,
+          role: role || currentUser.role,
+          endpoint: endpoint,
+          p256dh: p256dh,
+          auth: auth,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'endpoint' })
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+
+    async deletePushSubscription(endpoint) {
+      const client = getSupabaseClient();
+      if (!client) return;
+      const { error } = await client
+        .from('push_subscriptions')
+        .delete()
+        .eq('endpoint', endpoint);
+      if (error) console.warn('Error removing push subscription:', error);
     }
   };
 
@@ -1707,6 +1748,8 @@
     async createEditRequest(data) { return this.getService().createEditRequest(data); },
     async updateEditRequestStatus(id, status, actionedBy) { return this.getService().updateEditRequestStatus(id, status, actionedBy); },
     async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
-    async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); }
+    async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); },
+    async savePushSubscription(subscription, role) { return this.getService().savePushSubscription(subscription, role); },
+    async deletePushSubscription(endpoint) { return this.getService().deletePushSubscription(endpoint); }
   };
 })();
