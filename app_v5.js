@@ -16,7 +16,9 @@ const App = (function () {
       rmNo: '',
       status: '',
       startDate: '',
-      endDate: ''
+      endDate: '',
+      page: 1,
+      pageSize: 20
     },
     historyFilters: {
       productName: '',
@@ -25,7 +27,9 @@ const App = (function () {
       requestNo: '',
       testResult: '',
       startDate: '',
-      endDate: ''
+      endDate: '',
+      page: 1,
+      pageSize: 20
     }
   };
 
@@ -547,29 +551,21 @@ const App = (function () {
   // --- 1. DASHBOARD CARD LOADER ---
   async function loadDashboard() {
     try {
-      const requests = await window.DB.getRequests({});
+      const stats = await window.DB.getDashboardStats();
       
-      const total = requests.length;
-      const pending = requests.filter(r => r.status === 'Pending').length;
-      const inProcess = requests.filter(r => r.status === 'In Process').length;
-      const complete = requests.filter(r => r.status === 'Complete').length;
-      const rejected = requests.filter(r => r.status === 'Rejected').length;
-
-
-      document.getElementById('stat-total').innerText = total;
-      document.getElementById('stat-pending').innerText = pending;
-      // stat-in-progress id retained for backward compatibility
+      document.getElementById('stat-total').innerText = stats.total;
+      document.getElementById('stat-pending').innerText = stats.pending;
       const inProgressEl = document.getElementById('stat-in-progress');
-      if (inProgressEl) inProgressEl.innerText = inProcess;
-      document.getElementById('stat-completed').innerText = complete;
+      if (inProgressEl) inProgressEl.innerText = stats.inProcess;
+      document.getElementById('stat-completed').innerText = stats.complete;
       const rejectedEl = document.getElementById('stat-rejected');
-      if (rejectedEl) rejectedEl.innerText = rejected;
+      if (rejectedEl) rejectedEl.innerText = stats.rejected;
 
       // Populate recent request table (Max 5 items)
       const recentBody = document.getElementById('dashboard-recent-tbody');
       recentBody.innerHTML = '';
 
-      const recents = requests.slice(0, 5);
+      const recents = stats.recents || [];
       if (recents.length === 0) {
         recentBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">ไม่มีข้อมูลรายการล่าสุด</td></tr>`;
         return;
@@ -622,17 +618,84 @@ const App = (function () {
     }
   }
 
+  // --- PAGINATION HELPER ---
+  function renderPaginationControls({ containerId, page, pageSize, totalCount, onPageChange, onPageSizeChange }) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!totalCount || totalCount <= 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const startItem = (page - 1) * pageSize + 1;
+    const endItem = Math.min(page * pageSize, totalCount);
+
+    container.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:10px 16px; background:var(--bg-secondary); border-top:1px solid var(--border-color); font-size:13px; color:var(--text-color);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span>แสดง <strong>${startItem} - ${endItem}</strong> จากทั้งหมด <strong>${totalCount}</strong> รายการ</span>
+          <span style="color:var(--text-muted);">|</span>
+          <span>หน้าละ</span>
+          <select class="form-control" style="width:auto; padding:3px 8px; font-size:13px; display:inline-block;" onchange="${onPageSizeChange}(parseInt(this.value, 10))">
+            <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button class="btn btn-sm btn-secondary" ${page <= 1 ? 'disabled' : ''} onclick="${onPageChange}(${page - 1})" style="padding:4px 10px;">
+            ❮ ก่อนหน้า
+          </button>
+          <span style="font-weight:600; padding:0 6px;">หน้า ${page} / ${totalPages}</span>
+          <button class="btn btn-sm btn-secondary" ${page >= totalPages ? 'disabled' : ''} onclick="${onPageChange}(${page + 1})" style="padding:4px 10px;">
+            ถัดไป ❯
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function setRequestsPage(p) {
+    state.filters.page = Math.max(1, p);
+    loadRequestsList();
+  }
+
+  function setRequestsPageSize(ps) {
+    state.filters.pageSize = ps;
+    state.filters.page = 1;
+    loadRequestsList();
+  }
+
+  function setHistoryPage(p) {
+    state.historyFilters.page = Math.max(1, p);
+    loadMaterialHistory();
+  }
+
+  function setHistoryPageSize(ps) {
+    state.historyFilters.pageSize = ps;
+    state.historyFilters.page = 1;
+    loadMaterialHistory();
+  }
+
   // --- 2. REQUESTS LIST LOADER & FILTERS ---
   async function loadRequestsList() {
     const listBody = document.getElementById('requests-list-tbody');
     showLoading();
 
     try {
-      const requests = await window.DB.getRequests(state.filters);
+      const rawRes = await window.DB.getRequests(state.filters);
+      const requests = Array.isArray(rawRes) ? rawRes : (rawRes.data || []);
+      const totalCount = Array.isArray(rawRes) ? requests.length : (rawRes.totalCount || 0);
+      const page = state.filters.page || 1;
+      const pageSize = state.filters.pageSize || 20;
+
       listBody.innerHTML = '';
 
       if (requests.length === 0) {
         listBody.innerHTML = getEmptyStateHtml('ไม่พบรายการใบแจ้งตรวจสอบที่ตรงกับเงื่อนไขการค้นหา');
+        renderPaginationControls({ containerId: 'requests-pagination', page: 1, pageSize, totalCount: 0, onPageChange: 'App.setRequestsPage', onPageSizeChange: 'App.setRequestsPageSize' });
         hideLoading();
         return;
       }
@@ -658,7 +721,6 @@ const App = (function () {
         tr.style.cursor = 'pointer';
         tr.style.transition = 'background 0.15s';
         tr.onclick = (e) => {
-          // Prevent double navigation if they clicked the button directly
           if (!e.target.closest('button')) {
             Array.from(tr.parentNode.children).forEach(child => child.classList.remove('selected-row'));
             tr.classList.add('selected-row');
@@ -681,6 +743,16 @@ const App = (function () {
         `;
         listBody.appendChild(tr);
       });
+
+      renderPaginationControls({
+        containerId: 'requests-pagination',
+        page: page,
+        pageSize: pageSize,
+        totalCount: totalCount,
+        onPageChange: 'App.setRequestsPage',
+        onPageSizeChange: 'App.setRequestsPageSize'
+      });
+
       if (window.lucide) window.lucide.createIcons();
     } catch (e) {
       console.error(e);
@@ -1680,12 +1752,18 @@ const App = (function () {
     listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดประวัติวัตถุดิบ...</td></tr>`;
 
     try {
-      const history = await window.DB.getMaterialHistory(state.historyFilters);
+      const rawHistory = await window.DB.getMaterialHistory(state.historyFilters);
+      const history = Array.isArray(rawHistory) ? rawHistory : (rawHistory.data || []);
+      const totalCount = Array.isArray(rawHistory) ? history.length : (rawHistory.totalCount || 0);
+      const page = state.historyFilters.page || 1;
+      const pageSize = state.historyFilters.pageSize || 20;
+
       state.historyList = history;
       listBody.innerHTML = '';
 
       if (history.length === 0) {
         listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบประวัติการส่งทดสอบของชิ้นงาน/วัตถุดิบนี้</td></tr>`;
+        renderPaginationControls({ containerId: 'history-pagination', page: 1, pageSize, totalCount: 0, onPageChange: 'App.setHistoryPage', onPageSizeChange: 'App.setHistoryPageSize' });
         return;
       }
 
@@ -1754,6 +1832,15 @@ const App = (function () {
           </td>
         `;
         listBody.appendChild(tr);
+      });
+
+      renderPaginationControls({
+        containerId: 'history-pagination',
+        page: page,
+        pageSize: pageSize,
+        totalCount: totalCount,
+        onPageChange: 'App.setHistoryPage',
+        onPageSizeChange: 'App.setHistoryPageSize'
       });
     } catch (e) {
       console.error(e);
@@ -2153,6 +2240,53 @@ const App = (function () {
     }
   }
 
+  // --- DYNAMIC SCRIPT LOADERS (LAZY LOADING FOR HEAVY LIBRARIES) ---
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${url}"]`);
+      if (existing) {
+        if (existing.getAttribute('data-loaded') === 'true' || typeof XLSX !== 'undefined' || typeof html2pdf !== 'undefined') {
+          return resolve();
+        }
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', (e) => reject(e));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = url;
+      script.onload = () => {
+        script.setAttribute('data-loaded', 'true');
+        resolve();
+      };
+      script.onerror = (e) => reject(new Error('Failed to load script ' + url));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function ensureXLSXLoaded() {
+    if (typeof XLSX !== 'undefined') return true;
+    showToast('กำลังโหลดโมดูลจัดการไฟล์ Excel...', 'info');
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      return true;
+    } catch (e) {
+      console.warn('XLSX script load failed:', e);
+      return false;
+    }
+  }
+
+  async function ensureHtml2PdfLoaded() {
+    if (typeof html2pdf !== 'undefined') return true;
+    showToast('กำลังโหลดโมดูลสร้างไฟล์ PDF...', 'info');
+    try {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+      return true;
+    } catch (e) {
+      console.warn('html2pdf script load failed:', e);
+      return false;
+    }
+  }
+
   // --- EXPORT TO EXCEL & CSV ---
   async function handleImportExcel(event) {
     if (state.currentUser.role !== 'admin') {
@@ -2162,6 +2296,8 @@ const App = (function () {
 
     const file = event.target.files[0];
     if (!file) return;
+
+    await ensureXLSXLoaded();
 
     showToast('กำลังนำเข้าข้อมูล กรุณารอสักครู่...', 'info');
 
@@ -2323,6 +2459,7 @@ const App = (function () {
     }
 
     try {
+      await ensureXLSXLoaded();
       showToast('กำลังจัดเตรียมข้อมูลสำหรับการส่งออก...', 'info');
 
       // 1. Fetch matching requests based on current filters
@@ -3790,6 +3927,10 @@ const App = (function () {
   }
 
   return {
+    setRequestsPage,
+    setRequestsPageSize,
+    setHistoryPage,
+    setHistoryPageSize,
     initResizableColumns,
     navigate,
     toggleSidebar,

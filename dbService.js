@@ -814,6 +814,10 @@
       const client = getSupabaseClient();
       const currentUser = await this.getCurrentUser();
       
+      const isPaginated = !!filters.page;
+      const page = Math.max(1, parseInt(filters.page) || 1);
+      const pageSize = Math.max(1, parseInt(filters.pageSize) || 20);
+
       // Starting base query
       let query = client
         .from('requests')
@@ -821,7 +825,7 @@
           *,
           profiles:requester_id (display_name),
           request_items (product_name)
-        `);
+        `, isPaginated ? { count: 'exact' } : undefined);
 
       // Handle Draft filtering
       if (filters.isDraft) {
@@ -877,17 +881,63 @@
         if (itemErr) throw new Error(itemErr.message);
 
         const ids = [...new Set(matchedItems.map(item => item.request_id))];
-        if (ids.length === 0) return []; // Return empty if no matches
+        if (ids.length === 0) {
+          return isPaginated ? { data: [], totalCount: 0, page, pageSize } : [];
+        }
         query = query.in('id', ids);
       }
 
-      const { data, error } = await query.order('request_year', { ascending: false }).order('request_no', { ascending: false });
+      query = query.order('request_year', { ascending: false }).order('request_no', { ascending: false });
+
+      if (isPaginated) {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, count, error } = await query;
       if (error) throw new Error(error.message);
 
-      return data.map(r => ({
+      const formatted = data.map(r => ({
         ...r,
         requester_name: r.profiles ? r.profiles.display_name : 'ไม่ระบุ'
       }));
+
+      if (isPaginated) {
+        return { data: formatted, totalCount: count || 0, page, pageSize };
+      }
+      return formatted;
+    },
+
+    async getDashboardStats() {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+
+      const applyBaseFilter = (q) => {
+        let query = q.neq('status', 'Draft');
+        if (currentUser && currentUser.role === 'base_oil') {
+          query = query.eq('need_base_oil_view', true);
+        }
+        return query;
+      };
+
+      const [totalRes, pendingRes, inProcessRes, completeRes, rejectedRes, recentsRes] = await Promise.all([
+        applyBaseFilter(client.from('requests').select('id', { count: 'exact', head: true })),
+        applyBaseFilter(client.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'Pending')),
+        applyBaseFilter(client.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'In Process')),
+        applyBaseFilter(client.from('requests').select('id', { count: 'exact', head: true }).in('status', ['Complete', 'Completed'])),
+        applyBaseFilter(client.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'Rejected')),
+        applyBaseFilter(client.from('requests').select('id, request_no, request_year, request_date, request_time, customer_name, status, request_items(product_name)')).order('created_at', { ascending: false }).limit(5)
+      ]);
+
+      return {
+        total: totalRes.count || 0,
+        pending: pendingRes.count || 0,
+        inProcess: inProcessRes.count || 0,
+        complete: completeRes.count || 0,
+        rejected: rejectedRes.count || 0,
+        recents: recentsRes.data || []
+      };
     },
 
     async getRequestDetail(id) {
@@ -1265,6 +1315,10 @@
     async getMaterialHistory(filters = {}) {
       const client = getSupabaseClient();
 
+      const isPaginated = !!filters.page;
+      const page = Math.max(1, parseInt(filters.page) || 1);
+      const pageSize = Math.max(1, parseInt(filters.pageSize) || 20);
+
       let query = client
         .from('request_items')
         .select(`
@@ -1278,7 +1332,7 @@
             status,
             profiles:requester_id (display_name)
           )
-        `);
+        `, isPaginated ? { count: 'exact' } : undefined);
 
       if (filters.productName) {
         query = query.ilike('product_name', `%${filters.productName}%`);
@@ -1291,18 +1345,6 @@
       }
       if (filters.testResult) {
         query = query.eq('test_result', filters.testResult);
-      }
-
-      // Filters targeting parent table
-      if (filters.requestNo || filters.startDate || filters.endDate) {
-        // Note: For complex cross-table filtering in Supabase without nested query limitations,
-        // we can filter client side or construct filter criteria depending on parent fields.
-        // Let's filter client-side or build nested strings. Standard client filtering on fetched rows
-        // is reliable if the result list is manageable, or we query with inner joins.
-        // In PostgREST, we can filter on parent fields like `requests.request_no=eq.value` but the row is omitted, 
-        // which leaves records with null requests unless we query request first.
-        // Let's query from requests instead if date filters are active, or filter post-fetch.
-        // Post-fetch filtering is safest for complex relational searches in Supabase JS Client v2:
       }
 
       const { data, error } = await query;
@@ -1719,6 +1761,7 @@
     async login(username, password) { return this.getService().login(username, password); },
     async logout() { return this.getService().logout(); },
     async getCurrentUser() { return this.getService().getCurrentUser(); },
+    async getDashboardStats() { return this.getService().getDashboardStats(); },
     async getRequests(filters) { return this.getService().getRequests(filters); },
     async getRequestDetail(id) { return this.getService().getRequestDetail(id); },
     async createRequest(requestData, itemsData) { return this.getService().createRequest(requestData, itemsData); },
