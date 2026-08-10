@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rmis-cache-v10';
+const CACHE_NAME = 'rmis-cache-v15';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -40,31 +40,34 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event - Cache First for static, Network Only for API
+// Fetch event - Network First with Cache Fallback for instant updates
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Bypass cache for Supabase API (Database & Auth)
-  if (url.hostname.includes('supabase.co')) {
-    return;
-  }
-
-  // Bypass for non-GET requests
-  if (event.request.method !== 'GET') {
+  // Bypass cache for Supabase API
+  if (url.hostname.includes('supabase.co') || event.request.method !== 'GET') {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          return cachedResponse;
+    fetch(event.request)
+      .then(networkResponse => {
+        // Cache the fresh response in the background
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
         }
-
-        return fetch(event.request).then(response => {
-          return response;
-        }).catch(() => {
-          if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
+        return networkResponse;
+      })
+      .catch(() => {
+        // If network fails (offline), fall back to cache
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (event.request.headers.get('accept')?.includes('text/html')) {
             return caches.match('./offline.html');
           }
         });

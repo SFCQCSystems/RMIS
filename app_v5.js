@@ -483,11 +483,8 @@ const App = (function () {
 
     const navPush = document.getElementById('setting-nav-push');
     if (navPush) {
-      const canUsePush = isUserAdmin || isUserLab || isBaseOil;
-      navPush.style.display = canUsePush ? 'block' : 'none';
-      if (canUsePush) {
-        checkPushSubscriptionStatus();
-      }
+      navPush.style.display = 'block';
+      checkPushSubscriptionStatus();
     }
     if (navDrafts) {
       const isRequester = state.currentUser.role === 'requester';
@@ -1952,8 +1949,30 @@ const App = (function () {
 
   // --- SETTINGS MODAL (all roles) ---
   function openSettingsModal() {
+    // เปิด modal ก่อนเสมอ
     const modal = document.getElementById('modal-settings');
     if (modal) modal.classList.add('open');
+
+    if (state.currentUser) {
+      const role = (state.currentUser.role || '').toLowerCase();
+      const isUserAdmin = role === 'admin';
+
+      const navPush = document.getElementById('setting-nav-push');
+      if (navPush) {
+        navPush.style.display = 'block';
+        // เรียก async หลังจาก modal เปิดแล้ว ไม่บล็อค
+        setTimeout(() => checkPushSubscriptionStatus(), 50);
+      }
+
+      const navUsers = document.getElementById('setting-nav-users');
+      if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
+
+      const navSigs = document.getElementById('setting-nav-signatures');
+      if (navSigs) navSigs.style.display = isUserAdmin ? 'block' : 'none';
+
+      const btnSys = document.getElementById('setting-btn-system');
+      if (btnSys) btnSys.style.display = isUserAdmin ? 'block' : 'none';
+    }
   }
 
   function closeSettingsModal() {
@@ -2999,6 +3018,16 @@ const App = (function () {
     const statusText = document.getElementById('push-status-text');
     if (!btn || !statusText) return;
 
+    // กรณีเปิดจาก file:// หรือไม่รองรับ
+    const protocol = window.location.protocol;
+    if (protocol === 'file:') {
+      statusText.innerText = 'กรุณาเปิดผ่าน Web Server (localhost หรือ https://) เพื่อเปิดใช้งาน';
+      btn.innerText = 'ต้องใช้ Web Server';
+      btn.disabled = true;
+      btn.className = 'btn btn-sm btn-secondary';
+      return;
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       statusText.innerText = 'อุปกรณ์นี้ยังไม่รองรับ Web Push (หากใช้ iOS ต้องกด Add to Home Screen ก่อน)';
       btn.disabled = true;
@@ -3008,7 +3037,11 @@ const App = (function () {
     }
 
     try {
-      const reg = await navigator.serviceWorker.ready;
+      // timeout 3 วินาที ไม่รอนานจนค้าง
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+      ]);
       const sub = await reg.pushManager.getSubscription();
 
       if (sub) {
@@ -3023,9 +3056,13 @@ const App = (function () {
         btn.style.backgroundColor = '';
         btn.style.color = '';
         statusText.innerText = 'รับแจ้งเตือนเมื่อมีใบงานใหม่ / อนุมัติ แม้ปิดหน้าจอ';
+        btn.disabled = false;
       }
     } catch (e) {
       console.warn('Error checking push subscription:', e);
+      statusText.innerText = 'รับแจ้งเตือนเมื่อมีใบงานใหม่ / อนุมัติ แม้ปิดหน้าจอ';
+      btn.innerText = 'เปิดใช้งาน';
+      btn.disabled = false;
     }
   }
 

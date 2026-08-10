@@ -1227,6 +1227,20 @@
               <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </li>
+          <li id="setting-nav-push">
+            <div style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <div style="display:flex;align-items:center;gap:14px;">
+                <span style="font-size:22px;width:32px;text-align:center;">🔔</span>
+                <div>
+                  <div style="font-weight:600;">แจ้งเตือนบนอุปกรณ์ (Push Notification)</div>
+                  <div id="push-status-text" style="font-size:12px;color:var(--text-muted);margin-top:2px;">รับแจ้งเตือนบนหน้าจอมือถือ/คอมพิวเตอร์</div>
+                </div>
+              </div>
+              <button id="btn-toggle-push" class="btn btn-sm btn-primary" onclick="App.togglePushNotification()" style="padding:6px 14px;font-size:13px;border-radius:20px;white-space:nowrap;">
+                เปิดใช้งาน
+              </button>
+            </div>
+          </li>
           <li id="setting-btn-system" style="display:none;">
             <button onclick="App.openConfigModal(); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
               <span style="font-size:22px;width:32px;text-align:center;">⚙️</span>
@@ -1422,7 +1436,7 @@
               <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
           </li>
-          <li id="setting-nav-push" style="display:none;">
+          <li id="setting-nav-push">
             <div style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;border-bottom:1px solid var(--border-color);">
               <div style="display:flex;align-items:center;gap:14px;">
                 <span style="font-size:22px;width:32px;text-align:center;">🔔</span>
@@ -1585,14 +1599,17 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
-          .then(reg => console.log('Service Worker registered', reg))
+          .then(reg => {
+            console.log('Service Worker registered', reg);
+            reg.update();
+          })
           .catch(err => console.error('Service Worker registration failed', err));
       });
     }
   </script>
-  <script src="config.js?v=20"></script>
-  <script src="dbService.js?v=25"></script>
-  <script src="app_v5.js?v=1"></script>
+  <script src="config.js?v=105"></script>
+  <script src="dbService.js?v=105"></script>
+  <script src="app_v5.js?v=105"></script>
 </body>
 </html>
 
