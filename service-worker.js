@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rmis-cache-v15';
+const CACHE_NAME = 'rmis-cache-v17';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -12,66 +12,50 @@ const STATIC_ASSETS = [
   './icons/icon-512.png'
 ];
 
-// Install event - cache static assets
+// Install
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(STATIC_ASSETS);
-      })
+      .then(cache => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - clean up old caches
+// Activate - clean old caches
 self.addEventListener('activate', event => {
-  const cacheAllowlist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheAllowlist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then(cacheNames =>
+      Promise.all(
+        cacheNames
+          .filter(name => name !== CACHE_NAME)
+          .map(name => caches.delete(name))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-// Fetch event - Network First with Cache Fallback for instant updates
+// Fetch - Network First
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // Bypass cache for Supabase API
-  if (url.hostname.includes('supabase.co') || event.request.method !== 'GET') {
-    return;
-  }
+  if (url.hostname.includes('supabase.co') || event.request.method !== 'GET') return;
 
   event.respondWith(
     fetch(event.request)
-      .then(networkResponse => {
-        // Cache the fresh response in the background
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
+      .then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
-        return networkResponse;
+        return res;
       })
-      .catch(() => {
-        // If network fails (offline), fall back to cache
-        return caches.match(event.request).then(cachedResponse => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
+      .catch(() =>
+        caches.match(event.request).then(cached => {
+          if (cached) return cached;
           if (event.request.headers.get('accept')?.includes('text/html')) {
             return caches.match('./offline.html');
           }
-        });
-      })
+        })
+      )
   );
 });
 
@@ -79,60 +63,51 @@ self.addEventListener('fetch', event => {
 // WEB PUSH NOTIFICATIONS
 // ==============================================================================
 
-// Handle incoming Push Notification event from Server
 self.addEventListener('push', event => {
-  let data = {
-    title: 'RMIS (ระบบแจ้งตรวจสอบคุณภาพ)',
-    body: 'มีการแจ้งเตือนใหม่ในระบบ',
-    url: './'
-  };
+  let title = 'RMIS (ระบบแจ้งตรวจสอบคุณภาพ)';
+  let body = 'มีการแจ้งเตือนใหม่ในระบบ';
 
   if (event.data) {
     try {
       const parsed = event.data.json();
-      data = { ...data, ...parsed };
+      if (parsed.title) title = parsed.title;
+      if (parsed.body) body = parsed.body;
     } catch (e) {
-      data.body = event.data.text();
+      body = event.data.text();
     }
   }
 
-  const options = {
-    body: data.body,
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: data.tag || 'rmis-notification',
-    renotify: true,
-    data: {
-      url: data.url || './'
-    }
-  };
+  // ใช้ absolute URL ของ service worker scope
+  const targetUrl = self.registration.scope;
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, {
+      body: body,
+      icon: self.registration.scope + 'icons/icon-192.png',
+      badge: self.registration.scope + 'icons/icon-192.png',
+      vibrate: [200, 100, 200, 100, 200],
+      tag: 'rmis-notification',
+      renotify: true,
+      data: { url: targetUrl }
+    })
   );
 });
 
-// Handle click on Notification
+// Handle notification click
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || './';
+  const targetUrl = event.notification.data?.url || self.registration.scope;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // If a window is already open, focus it
+      // ถ้ามีหน้าต่างเปิดอยู่แล้ว ให้ focus
       for (const client of clientList) {
-        if (client.url.includes('index.html') || client.url.endsWith('/')) {
-          if ('focus' in client) {
-            client.focus();
-            if (targetUrl && client.navigate) {
-              client.navigate(targetUrl);
-            }
-            return;
-          }
+        if ('focus' in client) {
+          client.focus();
+          return;
         }
       }
-      // If no window is open, open a new one
+      // ถ้าไม่มี ให้เปิดใหม่
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

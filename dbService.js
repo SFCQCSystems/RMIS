@@ -1685,7 +1685,7 @@
         .from('push_subscriptions')
         .upsert({
           user_id: currentUser.id,
-          role: role || currentUser.role,
+          role: (role || currentUser.role || '').toLowerCase(),
           endpoint: endpoint,
           p256dh: p256dh,
           auth: auth,
