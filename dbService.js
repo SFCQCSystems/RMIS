@@ -824,7 +824,7 @@
         .select(`
           *,
           profiles:requester_id (display_name),
-          request_items (product_name)
+          request_items (*)
         `, isPaginated ? { count: 'exact' } : undefined);
 
       // Handle Draft filtering
@@ -1660,7 +1660,7 @@
         created_at,
         requests (
           request_no, customer_name, request_date, status,
-          request_items ( product_name )
+          request_items ( * )
         ),
         requester:profiles!edit_requests_requester_id_fkey ( display_name ),
         actioned_user:profiles!edit_requests_actioned_by_fkey ( display_name )

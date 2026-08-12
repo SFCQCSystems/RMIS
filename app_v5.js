@@ -2452,61 +2452,123 @@ const App = (function () {
     reader.readAsArrayBuffer(file);
   }
 
-  async function exportRequestsExcel() {
+  function openExportModal() {
+    if (state.currentUser.role !== 'admin') {
+      showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์ส่งออกข้อมูลได้', 'error');
+      return;
+    }
+    
+    // Set default start (1st day of month) and end dates (today)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    const formatDateStr = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const startDateEl = document.getElementById('export-start-date');
+    const endDateEl = document.getElementById('export-end-date');
+    
+    if (startDateEl && !startDateEl.value) startDateEl.value = formatDateStr(firstDay);
+    if (endDateEl && !endDateEl.value) endDateEl.value = formatDateStr(today);
+
+    const modal = document.getElementById('modal-export-data');
+    if (modal) modal.classList.add('open');
+  }
+
+  function closeExportModal() {
+    const modal = document.getElementById('modal-export-data');
+    if (modal) modal.classList.remove('open');
+  }
+
+  async function handleExportSubmit(e) {
+    e.preventDefault();
     if (state.currentUser.role !== 'admin') {
       showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์ส่งออกข้อมูลได้', 'error');
       return;
     }
 
+    const startDate = document.getElementById('export-start-date').value;
+    const endDate = document.getElementById('export-end-date').value;
+    const statusVal = document.getElementById('export-status-filter').value;
+    
+    const formatRadios = document.getElementsByName('export_format');
+    let format = 'excel';
+    for (let r of formatRadios) {
+      if (r.checked) { format = r.value; break; }
+    }
+
+    if (!startDate || !endDate) {
+      alert('กรุณาระบุวันที่เริ่มต้นและวันที่สิ้นสุด');
+      return;
+    }
+
+    const submitBtn = e.submitter;
+    const oldBtnText = submitBtn ? submitBtn.innerText : 'ส่งออกข้อมูล';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'กำลังประมวลผล...';
+    }
+
     try {
-      await ensureXLSXLoaded();
       showToast('กำลังจัดเตรียมข้อมูลสำหรับการส่งออก...', 'info');
 
-      // 1. Fetch matching requests based on current filters
-      const requests = await window.DB.getRequests(state.filters);
-      if (requests.length === 0) {
-        showToast('ไม่พบข้อมูลที่จะส่งออก', 'warning');
+      // Build filters with start & end dates
+      const exportFilters = {
+        startDate: startDate,
+        endDate: endDate
+      };
+      if (statusVal && statusVal !== 'ALL') {
+        exportFilters.status = statusVal;
+      }
+
+      // 1. Fetch matching requests based on start & end dates + status filter
+      const requests = await window.DB.getRequests(exportFilters);
+      if (!requests || requests.length === 0) {
+        showToast(`ไม่พบข้อมูลใบแจ้งตามช่วงวันที่ ${startDate} ถึง ${endDate}`, 'warning');
         return;
       }
 
-      // 2. Fetch details for each request to compile its sub-items
+      // 2. Fetch details for each request to compile sub-items
       const flattenedData = [];
-
       for (let r of requests) {
         try {
           const detail = await window.DB.getRequestDetail(r.id);
+          const items = detail.items || detail.request_items || [];
           
-          if (detail.items && detail.items.length > 0) {
-            detail.items.forEach(item => {
+          if (items.length > 0) {
+            items.forEach(item => {
               flattenedData.push({
                 'เลขที่ใบแจ้ง (Request No)': `${detail.request_no}/${detail.request_year}`,
                 'วันที่แจ้ง (Date)': detail.request_date,
                 'เวลาที่แจ้ง (Time)': detail.request_time,
                 'ชื่อลูกค้า (Customer)': detail.customer_name,
-                'ผู้แจ้ง (Requester)': detail.requester_name,
+                'ผู้แจ้ง (Requester)': detail.requester_name || '',
                 'ทะเบียนรถ (Car Plate)': detail.car_plate || '',
                 'หมายเลขซีล (Seal No)': detail.seal_no || '',
                 'หมายเลขตู้ (Container No)': detail.container_no || '',
                 'หมายเหตุ (Notes)': detail.notes || '',
                 'ความคิดเห็นห้องปฏิบัติการ (Lab Comments)': detail.lab_comments || '',
                 'สถานะใบแจ้ง (Request Status)': detail.status,
-                'ชื่อสินค้า (Product Name)': item.product_name,
-                'Batch Number': item.batch_number,
-                'Quantity (จำนวน)': item.quantity,
+                'ชื่อสินค้า (Product Name)': item.product_name || '',
+                'Batch Number': item.batch_number || item.batch_no || '',
+                'Quantity (จำนวน)': item.quantity || '',
                 'RM No.': item.rm_no || '',
-                'ผลการทดสอบ (Test Result)': item.test_result,
+                'ผลการทดสอบ (Test Result)': item.test_result || '',
                 'Density@15C': item.density_15c || '',
                 'Density@30C': item.density_30c || ''
               });
             });
           } else {
-            // Append parent details if request has no product items
             flattenedData.push({
               'เลขที่ใบแจ้ง (Request No)': `${detail.request_no}/${detail.request_year}`,
               'วันที่แจ้ง (Date)': detail.request_date,
               'เวลาที่แจ้ง (Time)': detail.request_time,
               'ชื่อลูกค้า (Customer)': detail.customer_name,
-              'ผู้แจ้ง (Requester)': detail.requester_name,
+              'ผู้แจ้ง (Requester)': detail.requester_name || '',
               'ทะเบียนรถ (Car Plate)': detail.car_plate || '',
               'หมายเลขซีล (Seal No)': detail.seal_no || '',
               'หมายเลขตู้ (Container No)': detail.container_no || '',
@@ -2527,31 +2589,45 @@ const App = (function () {
         }
       }
 
-      // 3. Export data logic
-      // Check if SheetJS library is loaded successfully via CDN
-      if (typeof XLSX !== 'undefined') {
-        const worksheet = XLSX.utils.json_to_sheet(flattenedData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Laboratory Requests');
-        
-        // Generate download name
-        const timestamp = new Date().toISOString().slice(0, 10);
-        XLSX.writeFile(workbook, `LRMS_Export_${timestamp}.xlsx`);
-        showToast('ส่งออกไฟล์ Excel (.xlsx) สำเร็จแล้ว', 'success');
+      // 3. Perform export based on selected format
+      if (format === 'excel') {
+        await ensureXLSXLoaded();
+        if (typeof XLSX !== 'undefined') {
+          const worksheet = XLSX.utils.json_to_sheet(flattenedData);
+          const workbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(workbook, worksheet, 'Laboratory Requests');
+          
+          XLSX.writeFile(workbook, `RMIS_Export_${startDate}_to_${endDate}.xlsx`);
+          showToast('ส่งออกไฟล์ Excel (.xlsx) สำเร็จแล้ว', 'success');
+        } else {
+          console.warn('XLSX library not loaded. Falling back to CSV export.');
+          triggerCSVDownload(flattenedData, startDate, endDate);
+        }
       } else {
-        // Fallback to CSV generation if CDN fails or runs completely offline
-        console.warn('XLSX library not loaded. Falling back to CSV export.');
-        triggerCSVDownload(flattenedData);
+        triggerCSVDownload(flattenedData, startDate, endDate);
+        showToast('ส่งออกไฟล์ CSV (.csv) สำเร็จแล้ว', 'success');
       }
 
-    } catch (e) {
-      console.error('Export failed:', e);
-      showToast('การส่งออกข้อมูลล้มเหลว: ' + e.message, 'error');
+      closeExportModal();
+
+    } catch (err) {
+      console.error('Export failed:', err);
+      showToast('การส่งออกข้อมูลล้มเหลว: ' + err.message, 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = oldBtnText;
+      }
     }
   }
 
-  function triggerCSVDownload(data) {
-    if (data.length === 0) return;
+  // Alias for backward compatibility
+  async function exportRequestsExcel() {
+    openExportModal();
+  }
+
+  function triggerCSVDownload(data, startDate = '', endDate = '') {
+    if (!data || data.length === 0) return;
     
     const headers = Object.keys(data[0]);
     const csvRows = [headers.join(',')];
@@ -2570,15 +2646,14 @@ const App = (function () {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const dateRange = (startDate && endDate) ? `${startDate}_to_${endDate}` : new Date().toISOString().slice(0, 10);
     link.setAttribute('href', url);
-    link.setAttribute('download', `LRMS_Export_${timestamp}.csv`);
+    link.setAttribute('download', `RMIS_Export_${dateRange}.csv`);
     link.style.visibility = 'hidden';
     
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('ส่งออกไฟล์ CSV สำเร็จแล้ว (เนื่องจากระบบออฟไลน์)', 'success');
   }
 
   // --- HELPER: Get CSS class for status badge ---
@@ -3732,47 +3807,23 @@ const App = (function () {
     renderEditRequestsTable();
   }
 
-  async function openCreateEditRequestModal() {
+  function openCreateEditRequestModal() {
     try {
-      const select = document.getElementById('edit-req-select');
-      if(select) select.innerHTML = '<option value="">-- เลือกใบแจ้งตรวจสอบ --</option>';
+      const searchInput = document.getElementById('edit-req-search-input');
+      if (searchInput) searchInput.value = '';
       
-      const role = state.currentUser.role;
-      let eligibleRequests = state.requests || [];
+      const errorEl = document.getElementById('edit-req-search-error');
+      if (errorEl) errorEl.style.display = 'none';
       
-      // Fallback if state.requests is empty
-      if (eligibleRequests.length === 0) {
-        try {
-           const fetchFilters = role === 'requester' ? { requesterId: state.currentUser.id } : {};
-           eligibleRequests = await window.DB.getRequests(fetchFilters);
-           state.requests = eligibleRequests;
-        } catch(e) {
-           console.warn("Could not fetch requests on the fly", e);
-        }
-      }
+      const detailsContainer = document.getElementById('edit-req-details-container');
+      if (detailsContainer) detailsContainer.style.display = 'none';
 
-      if (role === 'requester') {
-        eligibleRequests = eligibleRequests.filter(r => r.requester_id === state.currentUser.id);
-      }
+      if (document.getElementById('edit-req-supplier')) document.getElementById('edit-req-supplier').textContent = '-';
+      if (document.getElementById('edit-req-date')) document.getElementById('edit-req-date').textContent = '-';
+      if (document.getElementById('edit-req-status')) document.getElementById('edit-req-status').textContent = '-';
       
-      eligibleRequests.sort((a,b) => {
-        const da = a.request_date ? new Date(a.request_date) : new Date(0);
-        const db = b.request_date ? new Date(b.request_date) : new Date(0);
-        return db - da;
-      });
-      
-      eligibleRequests.forEach(req => {
-        const opt = document.createElement('option');
-        opt.value = req.id;
-        const pName = (req.request_items && req.request_items.length > 0) ? req.request_items[0].product_name : '-';
-        opt.textContent = `${req.request_no} - ${req.customer_name} (${pName})`;
-        if(select) select.appendChild(opt);
-      });
-      
-      document.getElementById('edit-req-supplier').textContent = '-';
-      document.getElementById('edit-req-product').textContent = '-';
-      document.getElementById('edit-req-date').textContent = '-';
-      document.getElementById('edit-req-status').textContent = '-';
+      const itemsTbody = document.getElementById('edit-req-items-tbody');
+      if (itemsTbody) itemsTbody.innerHTML = '';
       
       const reasonEl = document.getElementById('edit-req-reason');
       if (reasonEl) reasonEl.value = '';
@@ -3780,6 +3831,8 @@ const App = (function () {
       const noteEl = document.getElementById('edit-req-note');
       if (noteEl) noteEl.value = '';
       
+      state.currentEditTargetRequest = null;
+
       const modal = document.getElementById('modal-create-edit-request');
       if (modal) {
         modal.classList.add('open');
@@ -3808,14 +3861,14 @@ const App = (function () {
     
     if (!input) return;
     
-    // Check if input is a valid request number (number or contains a valid request no format)
+    // Check if input is a valid request number
     const btn = document.querySelector('#modal-create-edit-request .btn-primary');
     const oldText = btn.innerText;
     btn.innerText = 'กำลังค้นหา...';
     btn.disabled = true;
 
     try {
-      // Search from DB directly by requestNo (No requesterId filter so it searches ALL)
+      // Search from DB directly by requestNo
       const reqs = await window.DB.getRequests({ requestNo: input });
       
       // Find the best match (exact match first)
@@ -3827,14 +3880,44 @@ const App = (function () {
       if (!match) {
         errorEl.style.display = 'block';
       } else {
+        // Fetch full request detail to guarantee request_items with all fields (batch_number, quantity, etc.)
+        try {
+          const fullDetail = await window.DB.getRequestDetail(match.id);
+          if (fullDetail) match = fullDetail;
+        } catch(errDetail) {
+          console.warn('Could not fetch full detail for request', errDetail);
+        }
+
         state.currentEditTargetRequest = match;
         
-        document.getElementById('edit-req-supplier').textContent = match.customer_name || '-';
-        const pNames = (match.request_items && match.request_items.length > 0) ? match.request_items.map(i => i.product_name).join(', ') : '-';
-        document.getElementById('edit-req-product').textContent = pNames;
-        document.getElementById('edit-req-date').textContent = match.request_date ? new Date(match.request_date).toLocaleDateString('th-TH') : '-';
-        document.getElementById('edit-req-status').textContent = match.status;
+        if (document.getElementById('edit-req-supplier')) document.getElementById('edit-req-supplier').textContent = match.customer_name || '-';
+        if (document.getElementById('edit-req-date')) document.getElementById('edit-req-date').textContent = match.request_date ? new Date(match.request_date).toLocaleDateString('th-TH') : '-';
+        if (document.getElementById('edit-req-status')) document.getElementById('edit-req-status').textContent = match.status || '-';
         
+        // Render items table matching user design
+        const tbody = document.getElementById('edit-req-items-tbody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          const itemsArr = match.request_items || match.items || [];
+          if (itemsArr.length > 0) {
+            itemsArr.forEach(item => {
+              const tr = document.createElement('tr');
+              tr.style.borderBottom = '1px solid #f1f5f9';
+              const pName = item.product_name || '-';
+              const bNo = item.batch_number || item.batch_no || '-';
+              const qty = item.quantity || '-';
+              tr.innerHTML = `
+                <td style="padding:12px 16px; font-weight:600; color:#0f172a;">${escapeHtml(pName)}</td>
+                <td style="padding:12px 16px; color:#334155;">${escapeHtml(bNo)}</td>
+                <td style="padding:12px 16px; color:#334155;">${escapeHtml(qty)}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+          } else {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding:14px; text-align:center; color:#94a3b8;">ไม่มีรายการสินค้า</td></tr>';
+          }
+        }
+
         detailsContainer.style.display = 'block';
       }
     } catch(e) {
@@ -4057,6 +4140,9 @@ const App = (function () {
     handleConfigModeChange,
     handleImportExcel,
     exportRequestsExcel,
+    openExportModal,
+    closeExportModal,
+    handleExportSubmit,
     showToast,
     saveDraft,
     openFilterModal,
