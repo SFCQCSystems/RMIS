@@ -465,6 +465,7 @@ const App = (function () {
     // Role features visibility
     const isUserAdmin = state.currentUser.role === 'admin';
     const isUserLab = state.currentUser.role === 'lab';
+    const isRequester = state.currentUser.role === 'requester';
     const isBaseOil = state.currentUser.role === 'base_oil';
     
     // Sidebar nav nodes
@@ -474,7 +475,7 @@ const App = (function () {
     const navSignatures = document.getElementById('setting-nav-signatures');
     const navUsers = document.getElementById('setting-nav-users');
     
-    if (navDailyReport) navDailyReport.style.display = (isUserAdmin || isUserLab) ? 'block' : 'none';
+    if (navDailyReport) navDailyReport.style.display = (!isBaseOil) ? 'block' : 'none';
     const navDrafts = document.getElementById('nav-drafts');
     
     if (navHistory) navHistory.style.display = (isUserAdmin || isUserLab) ? 'block' : 'none';
