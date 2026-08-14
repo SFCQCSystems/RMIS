@@ -2397,6 +2397,9 @@ const App = (function () {
             itemInspectionDate = parseExcelDate(row['Inspection Date']);
           }
 
+          const dens15 = row['Density@15C'] || row['Density 15C'] || row['Density_15C'] || row['density_15c'] || '';
+          const dens30 = row['Density@30C'] || row['Density 30C'] || row['Density_30C'] || row['density_30c'] || '';
+
           requestGroups[reqRef].items.push({
             product_name: String(row['Product Name'] || '').trim(),
             batch_number: String(row['Batch Number'] || '').trim(),
@@ -2404,7 +2407,9 @@ const App = (function () {
             rm_no: String(row['RM No'] || '').trim(),
             test_result: String(row['Test Result'] || 'Pass').trim(), 
             item_comment: String(row['Item Comment'] || '').trim(),
-            inspection_date: itemInspectionDate
+            inspection_date: itemInspectionDate,
+            density_15c: String(dens15).trim(),
+            density_30c: String(dens30).trim()
           });
         });
 
