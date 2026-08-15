@@ -1080,6 +1080,42 @@ const App = (function () {
     }
   }
 
+  let draggedRow = null;
+
+  function initRowDragAndDrop(tr) {
+    tr.setAttribute('draggable', 'true');
+    tr.style.cursor = 'grab';
+
+    tr.addEventListener('dragstart', (e) => {
+      draggedRow = tr;
+      tr.style.opacity = '0.5';
+      tr.style.outline = '2px dashed #0284c7';
+      tr.style.background = '#e0f2fe';
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.id);
+    });
+
+    tr.addEventListener('dragend', () => {
+      tr.style.opacity = '1';
+      tr.style.outline = 'none';
+      tr.style.background = '';
+      draggedRow = null;
+    });
+
+    tr.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedRow || draggedRow === tr) return;
+
+      const rect = tr.getBoundingClientRect();
+      const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+      const tbody = document.getElementById('form-items-tbody');
+      if (tbody) {
+        tbody.insertBefore(draggedRow, next ? tr.nextSibling : tr);
+      }
+    });
+  }
+
   function addFormItemRow(item = {}) {
     const tbody = document.getElementById('form-items-tbody');
     const rowId = 'item-row-' + Math.random().toString(36).slice(2, 9);
@@ -1112,8 +1148,11 @@ const App = (function () {
 
     tr.innerHTML = `
       <td>
-        <input type="hidden" class="item-form-id" value="${id}">
-        <input type="text" class="item-form-name" required placeholder="เช่น Hydraulic Oil AW 68" value="${escapeHtml(name)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''}>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="cursor:grab; color:#94a3b8; font-size:16px; user-select:none;" title="กดลากเพื่อเปลี่ยนลำดับ (Drag to Reorder)">⠿</span>
+          <input type="hidden" class="item-form-id" value="${id}">
+          <input type="text" class="item-form-name" required placeholder="เช่น Hydraulic Oil AW 68" value="${escapeHtml(name)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''} style="flex:1;">
+        </div>
       </td>
       <td>
         <input type="text" class="item-form-batch" required placeholder="เช่น B-260510-1" value="${escapeHtml(batch)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''}>
@@ -1143,13 +1182,24 @@ const App = (function () {
       </td>
       <td style="text-align:center;">
         ${showDelete ? `
-        <button type="button" class="btn btn-secondary btn-sm" style="color:var(--text-danger); border-color:#fee2e2; padding:6px; min-width:32px;" onclick="App.removeFormItemRow('${rowId}')" title="ลบรายการนี้">
+        <button type="button" class="btn btn-secondary btn-sm" style="color:var(--text-danger); border-color:#fee2e2; padding:4px 8px; min-width:32px;" onclick="App.removeFormItemRow('${rowId}')" title="ลบรายการนี้">
           &times;
         </button>
         ` : ''}
       </td>
     `;
     tbody.appendChild(tr);
+    initRowDragAndDrop(tr);
+  }
+
+  function moveFormItemRow(rowId, direction) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    if (direction === -1 && row.previousElementSibling) {
+      row.parentNode.insertBefore(row, row.previousElementSibling);
+    } else if (direction === 1 && row.nextElementSibling) {
+      row.parentNode.insertBefore(row.nextElementSibling, row);
+    }
   }
 
   function removeFormItemRow(rowId) {
@@ -2351,39 +2401,55 @@ const App = (function () {
           return String(date).trim();
         };
 
-        rawData.forEach(row => {
-          const reqRef = String(row['Request Ref'] || '').trim();
-          if (!reqRef) return; 
+        rawData.forEach((row, index) => {
+          // Flexible Thai/English column aliases
+          const pName = String(row['Product Name'] || row['Product'] || row['ชื่อสินค้า'] || row['ชื่อวัตถุดิบ'] || row['รายการวัตถุดิบ'] || row['Item'] || '').trim();
+          const bNo = String(row['Batch Number'] || row['Batch No.'] || row['Batch No'] || row['Batch'] || row['หมายเลขล็อต'] || row['เลขล็อต'] || '').trim();
+          
+          // Skip empty rows without product name or batch number
+          if (!pName && !bNo) return;
+
+          // Smart auto-fallback for Request Ref if not specified
+          let reqRef = String(row['Request Ref'] || row['Request No'] || row['เลขที่ใบแจ้ง'] || row['Inspection Date'] || row['Request Date'] || row['วันที่'] || '').trim();
+          if (!reqRef) {
+            reqRef = `IMPORT_${new Date().toISOString().slice(0,10)}_${Math.floor(index / 20) + 1}`;
+          }
 
           if (!requestGroups[reqRef]) {
-            let parsedYear = parseInt(row['Request Year']);
+            let parsedYear = parseInt(row['Request Year'] || row['ปี']);
             if (isNaN(parsedYear)) parsedYear = new Date().getFullYear();
             
-            // Format dates
-            let reqDate = row['Request Date'] ? parseExcelDate(row['Request Date']) : new Date().toISOString().split('T')[0];
-            let reqTime = row['Request Time'] ? parseExcelTime(row['Request Time']) : new Date().toTimeString().split(' ')[0];
+            // Format dates with fallback to Inspection Date or today's date
+            const dateVal = row['Request Date'] || row['Inspection Date'] || row['วันที่'] || row['วันที่รับเข้า'] || row['วันที่ตรวจ'];
+            let reqDate = dateVal ? parseExcelDate(dateVal) : new Date().toISOString().split('T')[0];
+            
+            const timeVal = row['Request Time'] || row['เวลา'];
+            let reqTime = timeVal ? parseExcelTime(timeVal) : '08:00:00';
 
             // Resolve Requester ID from name
-            const reqName = String(row['Requester Name'] || '').trim().toLowerCase();
-            let resolvedRequesterId = state.currentUser.id; // fallback to admin
+            const reqName = String(row['Requester Name'] || row['ผู้แจ้ง'] || '').trim().toLowerCase();
+            let resolvedRequesterId = state.currentUser.id; // fallback to current user
             if (reqName && userMap[reqName]) {
               resolvedRequesterId = userMap[reqName];
             }
 
+            const custName = String(row['Customer Name'] || row['Customer'] || row['Supplier'] || row['ชื่อลูกค้า'] || row['ซัพพลายเออร์'] || '-').trim();
+            const reqStatus = String(row['Request Status'] || row['สถานะ'] || 'Approved').trim();
+
             requestGroups[reqRef] = {
               metadata: {
-                request_no: String(row['Request No'] || '').trim(), 
+                request_no: String(row['Request No'] || row['เลขที่ใบแจ้ง'] || '').trim(), 
                 request_year: parsedYear,
-                customer_name: String(row['Customer Name'] || '').trim(),
+                customer_name: custName || '-',
                 request_date: reqDate,
                 request_time: reqTime,
-                po_number: String(row['PO Number'] || '').trim(),
-                car_plate: String(row['Car Plate'] || '').trim(),
-                seal_no: String(row['Seal No'] || '').trim(),
-                container_no: String(row['Container No'] || '').trim(),
-                notes: String(row['Notes'] || '').trim(),
-                lab_comments: String(row['Lab Comments'] || '').trim(),
-                status: row['Request Status'] ? String(row['Request Status']).trim() : 'Approved', 
+                po_number: String(row['PO Number'] || row['PO'] || '').trim(),
+                car_plate: String(row['Car Plate'] || row['ทะเบียนรถ'] || '').trim(),
+                seal_no: String(row['Seal No'] || row['หมายเลขซีล'] || '').trim(),
+                container_no: String(row['Container No'] || row['หมายเลขตู้'] || '').trim(),
+                notes: String(row['Notes'] || row['หมายเหตุ'] || '').trim(),
+                lab_comments: String(row['Lab Comments'] || row['ความคิดเห็นแล็บ'] || '').trim(),
+                status: reqStatus, 
                 requester_id: resolvedRequesterId, 
                 need_base_oil_view: false,
                 created_at: new Date().toISOString()
@@ -2393,20 +2459,31 @@ const App = (function () {
           }
 
           let itemInspectionDate = null;
-          if (row['Inspection Date']) {
-            itemInspectionDate = parseExcelDate(row['Inspection Date']);
+          const inspDateVal = row['Inspection Date'] || row['วันที่ตรวจ'] || row['วันที่ทดสอบ'] || row['Request Date'] || row['วันที่'];
+          if (inspDateVal) {
+            itemInspectionDate = parseExcelDate(inspDateVal);
           }
 
-          const dens15 = row['Density@15C'] || row['Density 15C'] || row['Density_15C'] || row['density_15c'] || '';
-          const dens30 = row['Density@30C'] || row['Density 30C'] || row['Density_30C'] || row['density_30c'] || '';
+          const dens15 = row['Density@15C'] || row['Density 15C'] || row['Density_15C'] || row['density_15c'] || row['Density15C'] || '';
+          const dens30 = row['Density@30C'] || row['Density 30C'] || row['Density_30C'] || row['density_30c'] || row['Density30C'] || '';
+          
+          const rawResult = String(row['Test Result'] || row['Result'] || row['ผลการทดสอบ'] || row['ผลการตรวจ'] || row['ผลแล็บ'] || 'Pass').trim();
+          let formattedResult = 'Pass';
+          if (rawResult.toUpperCase().includes('PASS') || rawResult.includes('ผ่าน')) formattedResult = 'Pass';
+          else if (rawResult.toUpperCase().includes('FAIL') || rawResult.includes('ไม่ผ่าน')) formattedResult = 'Fail';
+          else if (rawResult.toUpperCase().includes('HOLD') || rawResult.includes('ชะลอ')) formattedResult = 'Hold';
+
+          const qtyVal = String(row['Quantity'] || row['Qty'] || row['ปริมาณ'] || row['จำนวน'] || '').trim();
+          const rmVal = String(row['RM No'] || row['RM No.'] || row['RM Number'] || row['รหัสวัตถุดิบ'] || '').trim();
+          const itemCommentVal = String(row['Item Comment'] || row['หมายเหตุรายการ'] || '').trim();
 
           requestGroups[reqRef].items.push({
-            product_name: String(row['Product Name'] || '').trim(),
-            batch_number: String(row['Batch Number'] || '').trim(),
-            quantity: String(row['Quantity'] || '').trim(),
-            rm_no: String(row['RM No'] || '').trim(),
-            test_result: String(row['Test Result'] || 'Pass').trim(), 
-            item_comment: String(row['Item Comment'] || '').trim(),
+            product_name: pName || '-',
+            batch_number: bNo || '-',
+            quantity: qtyVal || '',
+            rm_no: rmVal || '',
+            test_result: formattedResult, 
+            item_comment: itemCommentVal,
             inspection_date: itemInspectionDate,
             density_15c: String(dens15).trim(),
             density_30c: String(dens30).trim()
@@ -4030,6 +4107,8 @@ const App = (function () {
     clearFilters,
     addFormItemRow,
     removeFormItemRow,
+    moveFormItemRow,
+    editCurrentRequest,
     handleRequestFormSubmit,
     testNotificationSound,
     openStickerPreview,

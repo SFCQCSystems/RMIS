@@ -210,6 +210,7 @@
       // Security check removed to allow requesters to view all requests
 
       const reqItems = items.filter(item => item.request_id === id);
+      reqItems.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
       const requester = users.find(u => u.id === req.requester_id);
       const approver = users.find(u => u.id === req.lab_approved_by);
 
@@ -256,7 +257,8 @@
         if (isComplete) finalStatus = 'Complete';
       }
 
-      const preparedItems = itemsData.map(item => ({
+      const baseTime = Date.now();
+      const preparedItems = itemsData.map((item, idx) => ({
         id: generateUUID(),
         request_id: requestId,
         product_name: item.product_name,
@@ -265,7 +267,7 @@
         rm_no: item.rm_no || '',
         test_result: item.test_result || 'In Process',
         item_comment: item.item_comment || '',
-        created_at: now.toISOString()
+        created_at: new Date(baseTime + idx * 100).toISOString()
       }));
 
       const newRequest = {
@@ -316,7 +318,8 @@
 
       // Overwrite items for this request: delete old, insert new
       const filteredItems = items.filter(item => String(item.request_id) !== String(id));
-      const preparedItems = itemsData.map(item => ({
+      const baseTime = Date.now();
+      const preparedItems = itemsData.map((item, idx) => ({
         id: item.id || generateUUID(),
         request_id: id,
         product_name: item.product_name,
@@ -324,7 +327,7 @@
         quantity: item.quantity,
         rm_no: item.rm_no || '',
         test_result: item.test_result || 'In Process',
-        created_at: item.created_at || new Date().toISOString()
+        created_at: item.created_at || new Date(baseTime + idx * 100).toISOString()
       }));
 
       // Update status logic
@@ -1009,7 +1012,8 @@
       if (reqErr) throw new Error(reqErr.message);
 
       // 2. Insert items linking to new request ID
-      const itemsToInsert = itemsData.map(item => ({
+      const baseTime = Date.now();
+      const itemsToInsert = itemsData.map((item, idx) => ({
         id: generateUUID(),
         request_id: newReq.id,
         product_name: item.product_name,
@@ -1019,7 +1023,8 @@
         test_result: item.test_result || 'In Process',
         item_comment: item.item_comment || '',
         density_15c: item.density_15c || null,
-        density_30c: item.density_30c || null
+        density_30c: item.density_30c || null,
+        created_at: new Date(baseTime + idx * 100).toISOString()
       }));
 
       const { data: newItems, error: itemsErr } = await client
@@ -1081,8 +1086,9 @@
       const localDate = new Date();
       const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
-      // Prepare upsert items
-      const upsertItems = itemsData.map(item => {
+      // Prepare upsert items with sequential created_at to guarantee order preservation
+      const baseTime = Date.now();
+      const upsertItems = itemsData.map((item, idx) => {
         const payload = {
           id: item.id || generateUUID(),
           request_id: id,
@@ -1093,7 +1099,8 @@
           test_result: item.test_result || 'In Process',
           item_comment: item.item_comment || '',
           density_15c: item.density_15c || null,
-          density_30c: item.density_30c || null
+          density_30c: item.density_30c || null,
+          created_at: new Date(baseTime + idx * 100).toISOString()
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
@@ -1144,7 +1151,8 @@
       const localDate = new Date();
       const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
-      const upsertItems = itemsData.map(item => {
+      const baseDraftTime = Date.now();
+      const upsertItems = itemsData.map((item, idx) => {
         const payload = {
           id: item.id || generateUUID(),
           request_id: id,
@@ -1155,7 +1163,8 @@
           test_result: item.test_result || 'In Process',
           item_comment: item.item_comment || '',
           density_15c: item.density_15c || null,
-          density_30c: item.density_30c || null
+          density_30c: item.density_30c || null,
+          created_at: new Date(baseDraftTime + idx * 100).toISOString()
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
@@ -1219,7 +1228,8 @@
       const localDate = new Date();
       const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
 
-      const upsertItems = itemsData.map(item => {
+      const baseSubmitTime = Date.now();
+      const upsertItems = itemsData.map((item, idx) => {
         const payload = {
           id: item.id || generateUUID(),
           request_id: id,
@@ -1230,7 +1240,8 @@
           test_result: item.test_result || 'In Process',
           item_comment: item.item_comment || '',
           density_15c: item.density_15c || null,
-          density_30c: item.density_30c || null
+          density_30c: item.density_30c || null,
+          created_at: new Date(baseSubmitTime + idx * 100).toISOString()
         };
         
         const existing = payload.id ? existingMap[payload.id] : null;
@@ -1293,6 +1304,12 @@
         if (reqErr) throw new Error('Failed to import requests: ' + reqErr.message);
       }
       if (newItems.length > 0) {
+        const baseImportTime = Date.now();
+        newItems.forEach((item, idx) => {
+          if (!item.created_at) {
+            item.created_at = new Date(baseImportTime + idx * 100).toISOString();
+          }
+        });
         const chunkSize = 1000;
         for (let i = 0; i < newItems.length; i += chunkSize) {
           const chunk = newItems.slice(i, i + chunkSize);
