@@ -1217,7 +1217,33 @@
         if (delErr) throw new Error(delErr.message);
       }
 
-      return this.getRequestDetail(id);
+    return this.getRequestDetail(id);
+    },
+
+    async deleteRequest(id) {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+      if (currentUser.role !== 'admin') {
+        throw new Error('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถลบข้อมูลได้');
+      }
+
+      const client = getSupabaseClient();
+      
+      // Delete request items first to avoid foreign key constraint errors
+      const { error: itemsErr } = await client
+        .from('request_items')
+        .delete()
+        .eq('request_id', id);
+        
+      if (itemsErr) throw new Error(itemsErr.message);
+
+      // Delete the main request record
+      const { error: reqErr } = await client
+        .from('requests')
+        .delete()
+        .eq('id', id);
+
+      if (reqErr) throw new Error(reqErr.message);
     },
 
     async updateDraft(id, requestData, itemsData) {
