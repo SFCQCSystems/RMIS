@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คู่มือการใช้งาน ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ (Raw Material Inspection System : RMIS)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0f24;
+      --card-bg: rgba(18, 26, 56, 0.85);
+      --card-border: rgba(0, 201, 177, 0.3);
+      --primary-teal: #00c9b1;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-orange: #f59e0b;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --text-white: #ffffff;
+      --text-dim: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Sarabun', sans-serif; }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-white);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* Container & Slides */
+    .pres-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .slide {
+      position: absolute;
+      width: 92vw;
+      max-width: 1350px;
+      height: 86vh;
+      max-height: 780px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 30px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(20px) scale(0.98);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+      z-index: 10;
+    }
+
+    /* Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 12px;
+      margin-bottom: 15px;
+    }
+
+    .slide-title {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: var(--text-white);
+    }
+
+    .slide-counter {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* Body Layouts */
+    .slide-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      align-items: center;
+      overflow-y: auto;
+      padding-right: 5px;
+    }
+
+    .slide-body.full-width {
+      grid-template-columns: 1fr;
+    }
+
+    /* Text Lists & Styling */
+    .info-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .info-item {
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 4px solid var(--primary-teal);
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+
+    .info-item strong {
+      color: var(--primary-teal);
+    }
+
+    /* Real Image Display Box */
+    .img-box {
+      border: 1px solid var(--card-border);
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 14px;
+      height: 100%;
+      min-height: 320px;
+      max-height: 480px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .img-box:hover {
+      border-color: var(--primary-teal);
+      box-shadow: 0 0 25px rgba(0, 201, 177, 0.3);
+      transform: scale(1.01);
+    }
+
+    .img-box img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    /* Controls Bar */
+    .controls-bar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: rgba(10, 15, 36, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 10px 25px;
+      border-radius: 30px;
+      border: 1px solid var(--card-border);
+      z-index: 100;
+    }
+
+    .btn-nav {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: var(--text-white);
+      padding: 8px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-nav:hover {
+      background: var(--primary-teal);
+      color: var(--bg-dark);
+    }
+
+    .progress-bar-container {
+      width: 250px;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--primary-teal);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      width: 100%;
+    }
+
+    .role-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .role-card.teal { border-left: 4px solid var(--primary-teal); }
+    .role-card.blue { border-left: 4px solid var(--accent-blue); }
+    .role-card.purple { border-left: 4px solid var(--accent-purple); }
+    .role-card.orange { border-left: 4px solid var(--accent-orange); }
+
+    .role-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; }
+
+    /* Lightbox Zoom */
+    .lightbox-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      cursor: zoom-out;
+    }
+    .lightbox-modal.active { display: flex; }
+    .lightbox-content { max-width: 95%; max-height: 95%; border-radius: 12px; box-shadow: 0 0 40px rgba(0,201,177,0.4); }
+
+    /* Print / PDF Export Styles */
+    @media print {
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
+      body {
+        background: #0a0f24 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: auto !important;
+      }
+      .pres-container {
+        height: auto !important;
+        width: auto !important;
+        display: block !important;
+      }
+      .slide {
+        position: relative !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        border-radius: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        box-sizing: border-box !important;
+        padding: 40px 50px !important;
+      }
+      .controls-bar, .lightbox-modal {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="pres-container">
+
+  <!-- SLIDE 1: COVER -->
+  <div class="slide active" id="slide-1">
+    <div class="slide-header" style="justify-content: flex-end;">
+      <span class="slide-counter">1 / 31</span>
+    </div>
+    <div class="slide-body full-width" style="text-align: center; justify-content: center; align-items: center; display: flex; flex-direction: column; gap: 20px;">
+      <div style="margin-bottom: 10px;">
+        <img src="images/rmis_logo.png" alt="RMIS Logo" style="max-height: 140px; width: auto; filter: drop-shadow(0 0 25px rgba(0, 201, 177, 0.45)); border-radius: 20px;">
+      </div>
+      <h1 style="font-size: 2.8rem; color: var(--primary-teal); font-weight: 700;">ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ</h1>
+      <h2 style="font-size: 1.6rem; color: var(--text-white); font-weight: 500;">(Raw Material Inspection System : RMIS)</h2>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: AGENDA -->
+  <div class="slide" id="slide-2">
+    <div class="slide-header">
+      <span class="slide-title">สารบัญโครงสร้างคู่มือ (Master Table of Contents)</span>
+      <span class="slide-counter">2 / 31</span>
+    </div>
+    <div class="slide-body full-width">
+      <div class="cards-grid" style="grid-template-columns: repeat(3, 1fr); gap: 18px;">
+        <div class="role-card teal"><div class="role-title">1. ภาพรวมระบบ (WI-01)</div>• ข้อมูลระบบ & วัตถุประสงค์<br>• สิทธิ์ 4 Roles หลัก<br>• Login & ติดตั้ง PWA มือถือ<br>• Web Push Notifications</div>
+        <div class="role-card blue"><div class="role-title">2. ผู้แจ้งตรวจสอบ (WI-02)</div>• การสร้างใบแจ้ง & ข้อมูลหัวใบ<br>• เพิ่มวัตถุดิบย่อย & Save Draft<br>• การ Submit & ติดตามสถานะ<br>• ยื่นคำขอแก้ไข & พิมพ์สติกเกอร์</div>
+        <div class="role-card purple"><div class="role-title">3. เจ้าหน้าที่แล็บ (WI-03)</div>• การรับงาน Pending (In Process)<br>• บันทึก Pass / Hold / Fail<br>• Inspection Date & Comments<br>• <strong>กดอนุมัติผลแล็บ</strong> & พิมพ์ PDF/QC</div>
+        <div class="role-card orange"><div class="role-title">4. ผู้ดูแลระบบ (WI-04)</div>• ตารางงานประจำวัน (Daily Check)<br>• Approve / Reject / Reopen<br>• ลายเซ็นดิจิทัล & จัดการ User<br>• Import / Export Excel/CSV</div>
+        <div class="role-card teal"><div class="role-title">5. สิทธิ์ Base Oil (WI-05)</div>• สิทธิ์ Read-Only View<br>• การติดตามผล Base Oil<br>• Material Audit Trail ย้อนหลัง</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: WI-01 OVERVIEW (NO IMAGE -> FULL WIDTH TEXT) -->
+  <div class="slide" id="slide-3">
+    <div class="slide-header">
+      <span class="slide-title">วัตถุประสงค์ ขอบเขต และข้อมูลระบบ</span>
+      <span class="slide-counter">3 / 31</span>
+    </div>
+    <div class="slide-body full-width">
+      <ul class="info-list" style="max-width: 900px; margin: 0 auto;">
+        <li class="info-item"><strong>วัตถุประสงค์:</strong> เพื่อให้การแจ้งตรวจสอบคุณภาพวัตถุดิบเป็นดิจิทัล 100% ไร้กระดาษ ติดตามได้ Real-time</li>
+        <li class="info-item"><strong>ขอบเขต:</strong> ใช้งานผ่าน Web Browser ทั้งบน PC, Tablet และ Smartphone สำหรับ 4 บทบาทผู้ใช้</li>
+        <li class="info-item"><strong>โครงสร้างระบบ:</strong> พัฒนาแบบ PWA บนฐานข้อมูล Supabase PostgreSQL ปลอดภัยสูง</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: WI-01 LOGIN -->
+  <div class="slide" id="slide-4">
+    <div class="slide-header">
+      <span class="slide-title">ขั้นตอนการเข้าสู่ระบบ (Login Procedure)</span>
+      <span class="slide-counter">4 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>1. เปิดเบราว์เซอร์:</strong> แนะนำ Google Chrome หรือ Microsoft Edge เวอร์ชันล่าสุด</li>
+        <li class="info-item"><strong>2. ระบุ URL:</strong> พิมพ์ที่อยู่เว็บไซต์ของระบบ RMIS ในช่องเบราว์เซอร์</li>
+        <li class="info-item"><strong>3. กรอกข้อมูล:</strong> ระบุ Username และ Password (ข้อความแสดงเป็นจุดซ่อน ●●●●)</li>
+        <li class="info-item"><strong>4. เข้าสู่ระบบ:</strong> กดปุ่ม "เข้าสู่ระบบ" ระบบเข้าสู่หน้าหลักตาม Role อัตโนมัติ</li>
+        <li class="info-item"><strong>⚠️ ข้อควรระวัง:</strong> Username/Password เป็น Case-Sensitive ตรวจสอบ Caps Lock ก่อนพิมพ์</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-01-05.png')">
+        <img src="images/รูปหน้าจอ WI-01-05.png" alt="WI-01-05 หน้า Login">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: WI-01 DASHBOARD -->
+  <div class="slide" id="slide-5">
+    <div class="slide-header">
+      <span class="slide-title">หน้าจอหลักและการนำทาง (Dashboard & Navigation)</span>
+      <span class="slide-counter">5 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>Header Bar:</strong> แสดงชื่อระบบ, โลโก้, ชื่อผู้ใช้งานปัจจุบัน และปุ่ม Logout</li>
+        <li class="info-item"><strong>Sidebar Navigation:</strong> เมนูด้านซ้ายเปลี่ยนตามสิทธิ์ Role (Dashboard, ใบแจ้ง, Audit Trail ฯลฯ)</li>
+        <li class="info-item"><strong>Stat Cards:</strong> การ์ดแสดงจำนวนนับสถิติ 4 สถานะ (Pending, In Process, Completed, Rejected)</li>
+        <li class="info-item"><strong>Recent Requests Table:</strong> ตารางสรุปใบแจ้งรายการล่าสุดพร้อมปุ่มจัดการงาน</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-01-06.png')">
+        <img src="images/รูปหน้าจอ WI-01-06.png" alt="WI-01-06 หน้า Dashboard">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: WI-01 PWA MOBILE -->
+  <div class="slide" id="slide-6">
+    <div class="slide-header">
+      <span class="slide-title">การติดตั้งใช้งานบนมือถือ (PWA Mobile Installation)</span>
+      <span class="slide-counter">6 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>🤖 Android (Chrome):</strong> กดเมนู 3 จุด (⋮) มุมขวาบน ➔ เลือก "เพิ่มลงในหน้าจอหลัก (Add to Home Screen)"</li>
+        <li class="info-item"><strong>🍎 iOS (Safari):</strong> กดปุ่ม Share (แชร์) ด้านล่าง ➔ เลื่อนเลือก "เพิ่มไปยังหน้าจอหลัก (Add to Home Screen)"</li>
+        <li class="info-item"><strong>ประโยชน์ของ PWA:</strong> ใช้งานได้เต็มจอเหมือนแอปมือถือ native เปิดได้รวดเร็วโดยไม่ต้องดาวน์โหลดผ่าน App Store</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-01-09.jpg')">
+        <img src="images/รูปหน้าจอ WI-01-09.jpg" alt="WI-01-09 Add to Home Screen">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: WI-01 PUSH NOTIFICATION (NO IMAGE -> FULL WIDTH TEXT) -->
+  <div class="slide" id="slide-7">
+    <div class="slide-header">
+      <span class="slide-title">ระบบแจ้งเตือน Web Push Notifications</span>
+      <span class="slide-counter">7 / 31</span>
+    </div>
+    <div class="slide-body full-width">
+      <ul class="info-list" style="max-width: 900px; margin: 0 auto;">
+        <li class="info-item"><strong>การขอสิทธิ์ (VAPID):</strong> กด "Allow/อนุญาต" เมื่อป็อบอัพเบราว์เซอร์สอบถามการส่งแจ้งเตือน</li>
+        <li class="info-item"><strong>เตือนถึง Lab:</strong> เด้งแจ้งเตือนบนมือถือ/PC ทันทีเมื่อ Requester กด Submit สร้างใบแจ้งใหม่</li>
+        <li class="info-item"><strong>เตือนถึง Base Oil:</strong> เด้งแจ้งเตือนเมื่อวัตถุดิบ Base Oil ผ่านการอนุมัติผลแล็บเรียบร้อยแล้ว</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: WI-02 REQUESTER OVERVIEW -->
+  <div class="slide" id="slide-8">
+    <div class="slide-header">
+      <span class="slide-title">บทบาทและความรับผิดชอบ — Requester</span>
+      <span class="slide-counter">8 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>บทบาทหลัก:</strong> ผู้สร้างและส่งใบแจ้งตรวจสอบคุณภาพวัตถุดิบเข้าสู่ระบบห้องปฏิบัติการ</li>
+        <li class="info-item"><strong>หน้าที่สำคัญ:</strong> กรอกข้อมูลให้ครบถ้วน ถูกต้องตามเอกสารรับสินค้า และส่งทันทีเมื่อวัตถุดิบมาถึง</li>
+        <li class="info-item"><strong>ขอบเขตสิทธิ์:</strong> สร้างใบแจ้ง, Save Draft, Submit, ติดตามสถานะ, ยื่นขอแก้ไข, พิมพ์สติกเกอร์ QC</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-01.png')">
+        <img src="images/รูปหน้าจอ WI-02-01.png" alt="WI-02-01 หน้า Dashboard Requester">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: WI-02 CREATE HEADER -->
+  <div class="slide" id="slide-9">
+    <div class="slide-header">
+      <span class="slide-title">สร้างใบแจ้งใหม่ — การกรอกข้อมูลส่วนหัว (Header)</span>
+      <span class="slide-counter">9 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>Customer / Supplier:</strong> ระบุชื่อลูกค้าหรือผู้ขายวัตถุดิบ</li>
+        <li class="info-item"><strong>Receive Date:</strong> ระบุวันเวลาที่วัตถุดิบจัดส่งมาถึงโรงงาน</li>
+        <li class="info-item"><strong>Truck License & Seal:</strong> ระบุทะเบียนรถขนส่ง และหมายเลขซีลล็อกตู้ออโต้</li>
+        <li class="info-item"><strong>PO Number & Container:</strong> ระบุเลขที่ใบสั่งซื้อ และหมายเลขคอนเทนเนอร์</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-02a.png')">
+        <img src="images/รูปหน้าจอ WI-02-02a.png" alt="WI-02-02a ฟอร์มส่วนหัวใบแจ้ง">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: WI-02 CREATE ITEMS -->
+  <div class="slide" id="slide-10">
+    <div class="slide-header">
+      <span class="slide-title">สร้างใบแจ้งใหม่ — เพิ่มรายการวัตถุดิบย่อย (Items)</span>
+      <span class="slide-counter">10 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>Product Name:</strong> เลือกหรือพิมพ์ชื่อชนิดวัตถุดิบที่ส่งตรวจ</li>
+        <li class="info-item"><strong>Batch Number:</strong> ระบุหมายเลขล็อตการผลิต (สำคัญที่สุดสำหรับการสอบย้อนกลับ)</li>
+        <li class="info-item"><strong>Quantity:</strong> ระบุปริมาณรับเข้า และหน่วยนับ (Kg / Drum / Tank)</li>
+        <li class="info-item"><strong>เพิ่มหลายรายการ:</strong> กดปุ่ม "+ เพิ่มรายการ" หากมีวัตถุดิบหลายล็อตในคันเดียวกัน</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-02b.png')">
+        <img src="images/รูปหน้าจอ WI-02-02b.png" alt="WI-02-02b ตารางเพิ่มวัตถุดิบย่อย">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 11: WI-02 DRAFT VS SUBMIT -->
+  <div class="slide" id="slide-11">
+    <div class="slide-header">
+      <span class="slide-title">การบันทึกแบบร่าง (Draft) vs การส่งใบแจ้ง (Submit)</span>
+      <span class="slide-counter">11 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item">💾 <strong>บันทึกแบบร่าง (Save Draft):</strong> บันทึกข้อมูลชั่วคราว สามารถกลับมาแก้ไขเพิ่มเติมได้ ข้อมูลยังไม่ส่งไป Lab</li>
+        <li class="info-item">🚀 <strong>ส่งใบแจ้ง (Submit):</strong> ยืนยันส่งข้อมูลอย่างเป็นทางการ เปลี่ยนสถานะเป็น Pending และเด้งเตือน Push ไปยัง Lab ทันที</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-03.png')">
+        <img src="images/รูปหน้าจอ WI-02-03.png" alt="WI-02-03 ตารางแบบร่างใบแจ้ง">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 12: WI-02 REQUEST TRACKING -->
+  <div class="slide" id="slide-12">
+    <div class="slide-header">
+      <span class="slide-title">การติดตามสถานะใบแจ้งและการค้นหา</span>
+      <span class="slide-counter">12 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item">🟡 <strong>Pending & In Process:</strong> สีเหลือง — ส่งเรื่องแล้ว และ กำลังสุ่มตัวอย่างทดสอบทางห้องแล็บ</li>
+        <li class="info-item">🔵 <strong>Completed:</strong> สีฟ้า — ผลแล็บผ่านการบันทึกและอนุมัติแล้ว พร้อมใช้งาน</li>
+        <li class="info-item">🔴 <strong>Rejected:</strong> สีแดง — ใบแจ้งไม่ผ่านการอนุมัติหรือถูกปฏิเสธ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-04.png')">
+        <img src="images/รูปหน้าจอ WI-02-04.png" alt="WI-02-04 ตารางรายการใบแจ้ง">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 13: WI-02 EDIT REQUEST -->
+  <div class="slide" id="slide-13">
+    <div class="slide-header">
+      <span class="slide-title">การยื่นคำขอแก้ไขข้อมูล (Request Edit)</span>
+      <span class="slide-counter">13 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>เงื่อนไข:</strong> ใบแจ้งถูก Submit ไปแล้ว แต่พบข้อผิดพลาด เช่น พิมพ์ Batch No. หรือปริมาณผิด</li>
+        <li class="info-item"><strong>ขั้นตอน:</strong> กดปุ่ม "ยื่นคำขอแก้ไข" ➔ ระบุเหตุผลข้อผิดพลาด ➔ ส่งเรื่องให้ Admin พิจารณาอนุมัติ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-05.png')">
+        <img src="images/รูปหน้าจอ WI-02-05.png" alt="WI-02-05 ฟอร์มยื่นคำขอแก้ไขข้อมูล">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 14: WI-02 STICKER PRINTING -->
+  <div class="slide" id="slide-14">
+    <div class="slide-header">
+      <span class="slide-title">การพิมพ์สติกเกอร์ QC Label โดย Requester</span>
+      <span class="slide-counter">14 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>สิทธิ์ Requester:</strong> สามารถสั่งพิมพ์สติกเกอร์ QC ติดภาชนะได้เฉพาะรายการวัตถุดิบที่ผ่านผลการทดสอบ (Pass) แล้วเท่านั้น</li>
+        <li class="info-item"><strong>ขั้นตอน:</strong> คลิกปุ่ม "พิมพ์สติกเกอร์" ตรงแถบรายการวัตถุดิบ ➔ เลือกระบุจำนวนดวงที่ต้องการพิมพ์</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-02-06.png')">
+        <img src="images/รูปหน้าจอ WI-02-06.png" alt="WI-02-06 ป้ายสติกเกอร์ QC Label">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 15: WI-03 LAB OVERVIEW -->
+  <div class="slide" id="slide-15">
+    <div class="slide-header">
+      <span class="slide-title">บทบาทและความรับผิดชอบ — เจ้าหน้าที่ Lab</span>
+      <span class="slide-counter">15 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>บทบาทหลัก:</strong> ดำเนินการทดสอบสุ่มตัวอย่างวัตถุดิบ บันทึกผลแล็บ ออกรายงาน A4 PDF และพิมพ์สติกเกอร์ QC</li>
+        <li class="info-item"><strong>อุปกรณ์ที่ต้องใช้:</strong> เครื่องพิมพ์สติกเกอร์ QC, เครื่องพิมพ์เอกสาร A4, ผลการวิเคราะห์จากแล็บ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-01.png')">
+        <img src="images/รูปหน้าจอ WI-03-01.png" alt="WI-03-01 Dashboard Lab">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 16: WI-03 RECEIVE JOB -->
+  <div class="slide" id="slide-16">
+    <div class="slide-header">
+      <span class="slide-title">การรับงานและเปลี่ยนสถานะเป็น In Process</span>
+      <span class="slide-counter">16 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>1. เช็กงาน Pending:</strong> ดู Notification หรือ กรอง Filter ตารางเลือกสถานะ Pending</li>
+        <li class="info-item"><strong>2. กดรับงาน:</strong> คลิกเลือกใบแจ้ง ➔ กดปุ่ม "เริ่มดำเนินการ (In Process)" เพื่อแจ้งให้ผู้เกี่ยวข้องทราบว่าเริ่มทดสอบแล้ว</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-01.png')">
+        <img src="images/รูปหน้าจอ WI-03-01.png" alt="WI-03-01 รับงาน In Process">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 17: WI-03 TEST RESULTS -->
+  <div class="slide" id="slide-17">
+    <div class="slide-header">
+      <span class="slide-title">การบันทึกผลการทดสอบ (Pass / Hold / Fail)</span>
+      <span class="slide-counter">17 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item">🟢 <strong>Pass:</strong> วัตถุดิบผ่านเกณฑ์มาตรฐาน พร้อมใช้งาน</li>
+        <li class="info-item">🟡 <strong>Hold:</strong> ชะลอการตัดสินใจ รอผลวิเคราะห์เพิ่มเติมหรือรอผู้เชี่ยวชาญตรวจสอบ</li>
+        <li class="info-item">🔴 <strong>Fail:</strong> ไม่ผ่านเกณฑ์มาตรฐาน ต้องระบุเหตุผลความไม่สอดคล้อง (Non-Conformity)</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-03.png')">
+        <img src="images/รูปหน้าจอ WI-03-03.png" alt="WI-03-03 ฟอร์มเลือกระบุผลแล็บ">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 18: WI-03 DATE & COMMENTS -->
+  <div class="slide" id="slide-18">
+    <div class="slide-header">
+      <span class="slide-title">การระบุ Inspection Date & ข้อคิดเห็นแล็บ</span>
+      <span class="slide-counter">18 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>Inspection Date:</strong> บันทึกวันที่ตรวจให้อัตโนมัติเมื่อเลือกผล Pass/Hold/Fail ครั้งแรก</li>
+        <li class="info-item"><strong>Item Comment:</strong> หมายเหตุเฉพาะรายการวัตถุดิบแต่ละล็อต</li>
+        <li class="info-item"><strong>Lab Comments:</strong> หมายเหตุรวมระดับใบแจ้งสำหรับบันทึกลงรายงาน A4 PDF</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-04.png')">
+        <img src="images/รูปหน้าจอ WI-03-04.png" alt="WI-03-04 ระบุ Inspection Date & Comments">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 19: WI-03 LAB APPROVAL -->
+  <div class="slide" id="slide-19">
+    <div class="slide-header">
+      <span class="slide-title">การกดอนุมัติผลแล็บโดยเจ้าหน้าที่ Lab (Lab Approval)</span>
+      <span class="slide-counter">19 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>สิทธิ์ Lab อนุมัติผล (✅):</strong> เจ้าหน้าที่ Lab มีสิทธิ์กดอนุมัติจบงานได้ทันทีเมื่อบันทึกผลครบทุกรายการ</li>
+        <li class="info-item"><strong>การเปลี่ยนสถานะ:</strong> สถานะเปลี่ยนเป็น Complete / Approved พร้อมประทับลายเซ็นดิจิทัลอัตโนมัติ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-05.png')">
+        <img src="images/รูปหน้าจอ WI-03-05.png" alt="WI-03-05 ปุ่มกดอนุมัติผลแล็บ">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 20: WI-03 PDF REPORT -->
+  <div class="slide" id="slide-20">
+    <div class="slide-header">
+      <span class="slide-title">การออกรายงาน A4 PDF (Certificate of Inspection)</span>
+      <span class="slide-counter">20 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>รายงานมาตรฐาน:</strong> ออกเอกสาร Certificate แบบพิมพ์มาตรฐาน A4 อัตโนมัติ (ไม่มีโลโก้บริษัท)</li>
+        <li class="info-item"><strong>องค์ประกอบ:</strong> ตารางผลการทดสอบ, ตราประทับสถานะ, ลายเซ็นดิจิทัล Lab & Admin</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-06.png')">
+        <img src="images/รูปหน้าจอ WI-03-06.png" alt="WI-03-06 เอกสารรายงาน A4 PDF">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 21: WI-03 STICKER PRINTING -->
+  <div class="slide" id="slide-21">
+    <div class="slide-header">
+      <span class="slide-title">การพิมพ์ป้ายสติกเกอร์ QC Label โดย Lab</span>
+      <span class="slide-counter">21 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>ป้ายติดภาชนะ:</strong> พิมพ์สติกเกอร์ติดภาชนะบรรจุวัตถุดิบ</li>
+        <li class="info-item"><strong>ข้อมูลบนสติกเกอร์:</strong> ชื่อสินค้า, Batch No., ผลการตรวจ, วันที่ตรวจ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-03-07.png')">
+        <img src="images/รูปหน้าจอ WI-03-07.png" alt="WI-03-07 ป้ายสติกเกอร์ QC Label">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 22: WI-04 ADMIN OVERVIEW -->
+  <div class="slide" id="slide-22">
+    <div class="slide-header">
+      <span class="slide-title">บทบาท Admin & ตารางการทำงานประจำวัน (Daily Check)</span>
+      <span class="slide-counter">22 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>1. ตรวจงาน Complete:</strong> เช็กใบแจ้งสถานะ Complete รอการอนุมัติขั้นสุดท้าย</li>
+        <li class="info-item"><strong>2. ตรวจคำขอแก้ไข:</strong> พิจารณาอนุมัติคำขอแก้ไขข้อมูลที่ Requester ยื่นเข้ามา</li>
+        <li class="info-item"><strong>3. ตรวจงานตกค้าง:</strong> ติดตามใบแจ้งสถานะ Pending ที่ค้างอยู่</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-01.png')">
+        <img src="images/รูปหน้าจอ WI-04-01.png" alt="WI-04-01 Dashboard Admin">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 23: WI-04 APPROVE & REJECT -->
+  <div class="slide" id="slide-23">
+    <div class="slide-header">
+      <span class="slide-title">การอนุมัติ (Approve) & ปฏิเสธผลการทดสอบ (Reject)</span>
+      <span class="slide-counter">23 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item">🟢 <strong>Approve:</strong> อนุมัติการทดสอบขั้นสุดท้าย เอกสารสมบูรณ์และประทับลายเซ็น Admin/Lab</li>
+        <li class="info-item">🔴 <strong>Reject:</strong> ปฏิเสธผลการทดสอบ กรณีพบข้อมูลไม่ถูกต้อง พร้อมระบุเหตุผลประกอบ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-02.png')">
+        <img src="images/รูปหน้าจอ WI-04-02.png" alt="WI-04-02 หน้าต่าง Approve & Reject">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 24: WI-04 REOPEN & BACKDATED -->
+  <div class="slide" id="slide-24">
+    <div class="slide-header">
+      <span class="slide-title">การ Reopen ใบแจ้ง & แก้ไขวันที่ย้อนหลัง</span>
+      <span class="slide-counter">24 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item">🔄 <strong>Reopen Request:</strong> ปลดล็อกใบแจ้งสถานะ Approved กลับมาเป็น Complete เพื่อปลดล็อกให้แก้ไข</li>
+        <li class="info-item">📅 <strong>Edit Inspection Date:</strong> สิทธิ์พิเศษของ Admin ในการแก้ไข Inspection Date ย้อนหลังตามความจริง</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-04.png')">
+        <img src="images/รูปหน้าจอ WI-04-04.png" alt="WI-04-04 ปุ่ม Reopen & แก้ไขวันที่">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 25: WI-04 DIGITAL SIGNATURE -->
+  <div class="slide" id="slide-25">
+    <div class="slide-header">
+      <span class="slide-title">การอัปโหลดและจัดการลายเซ็นดิจิทัล (Digital Signature)</span>
+      <span class="slide-counter">25 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>รูปแบบไฟล์:</strong> ไฟล์รูปภาพ .png ขนาดไม่เกิน 2MB พื้นหลังโปร่งใส (Transparent)</li>
+        <li class="info-item"><strong>การผูกกับ User:</strong> ลายเซ็นจะถูกผูกเข้ากับ User ID และประทับลงรายงาน PDF/สติกเกอร์ให้อัตโนมัติ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-06.png')">
+        <img src="images/รูปหน้าจอ WI-04-06.png" alt="WI-04-06 หน้าตั้งค่าลายเซ็นดิจิทัล">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 26: WI-04 USER MANAGEMENT -->
+  <div class="slide" id="slide-26">
+    <div class="slide-header">
+      <span class="slide-title">การจัดการบัญชีผู้ใช้งาน (User Management)</span>
+      <span class="slide-counter">26 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>เพิ่มผู้ใช้ใหม่:</strong> กำหนด Username, Password, ชื่อ-นามสกุล, แผนก และ Role</li>
+        <li class="info-item"><strong>การรีเซ็ตรหัสผ่าน:</strong> รีเซ็ตรหัสผ่านกรณีผู้ใช้งานลืมรหัสผ่านหรือเปลี่ยนตำแหน่ง</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-07.png')">
+        <img src="images/รูปหน้าจอ WI-04-07.png" alt="WI-04-07 ตารางจัดการผู้ใช้งาน">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 27: WI-04 EXCEL IMPORT -->
+  <div class="slide" id="slide-27">
+    <div class="slide-header">
+      <span class="slide-title">การนำเข้าข้อมูลย้อนหลังด้วย Excel (Excel Batch Import)</span>
+      <span class="slide-counter">27 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>ดาวน์โหลด Template:</strong> ใช้ไฟล์เทมเพลต Excel มาตรฐานที่ระบบกำหนด</li>
+        <li class="info-item"><strong>นำเข้าข้อมูล:</strong> อัปโหลดไฟล์ Excel เพื่อนำเข้าประวัติใบแจ้งและผลการทดสอบย้อนหลังเข้าฐานข้อมูล</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-08.png')">
+        <img src="images/รูปหน้าจอ WI-04-08.png" alt="WI-04-08 หน้านำเข้าข้อมูล Excel">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 28: WI-04 DATA EXPORT -->
+  <div class="slide" id="slide-28">
+    <div class="slide-header">
+      <span class="slide-title">การส่งออกข้อมูลรายงาน Excel / CSV (Data Export)</span>
+      <span class="slide-counter">28 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>ตัวกรองช่วงเวลา:</strong> เลือกกรองวันที่เริ่มต้น ถึง วันที่สิ้นสุด ที่ต้องการส่งออก</li>
+        <li class="info-item"><strong>ฟอร์แมตไฟล์:</strong> ส่งออกเป็นไฟล์ Excel (.xlsx) หรือ CSV สำหรับนำไปวิเคราะห์ข้อมูลต่อ</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-04-09.png')">
+        <img src="images/รูปหน้าจอ WI-04-09.png" alt="WI-04-09 หน้าต่างส่งออกข้อมูล Excel">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 29: WI-05 BASE OIL OVERVIEW -->
+  <div class="slide" id="slide-29">
+    <div class="slide-header">
+      <span class="slide-title">บทบาท Base Oil & สิทธิ์การใช้งานแบบ Read-Only</span>
+      <span class="slide-counter">29 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>สิทธิ์ Read-Only (🔒):</strong> เข้าดูผลการทดสอบและติดตามประวัติวัตถุดิบ Base Oil ได้อย่างเดียว</li>
+        <li class="info-item"><strong>ข้อห้าม:</strong> ไม่สามารถสร้าง, แก้ไข, ลบ, อนุมัติผล หรือพิมพ์สติกเกอร์ได้ เพื่อความปลอดภัย</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-05-01.png')">
+        <img src="images/รูปหน้าจอ WI-05-01.png" alt="WI-05-01 Sidebar สิทธิ์ Base Oil">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 30: WI-05 VIEW RESULTS -->
+  <div class="slide" id="slide-30">
+    <div class="slide-header">
+      <span class="slide-title">การเข้าดูผลการตรวจสอบวัตถุดิบ Base Oil</span>
+      <span class="slide-counter">30 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>ติดตามผล:</strong> ตรวจสอบสถานะผลแล็บวัตถุดิบกลุ่ม Base Oil ที่อนุมัติแล้ว</li>
+        <li class="info-item"><strong>การกรองข้อมูล:</strong> ค้นหาตาม Supplier, ช่วงวันที่รับ หรือเลขที่ใบแจ้ง</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-05-02.png')">
+        <img src="images/รูปหน้าจอ WI-05-02.png" alt="WI-05-02 ตารางผล Base Oil">
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 31: WI-05 AUDIT TRAIL -->
+  <div class="slide" id="slide-31">
+    <div class="slide-header">
+      <span class="slide-title">การค้นหาประวัติวัตถุดิบย้อนหลัง (Material Audit Trail)</span>
+      <span class="slide-counter">31 / 31</span>
+    </div>
+    <div class="slide-body">
+      <ul class="info-list">
+        <li class="info-item"><strong>ค้นหาด้วย Batch Number:</strong> พิมพ์เลข Batch เพื่อเรียกดูประวัติการทดสอบย้อนหลัง</li>
+      </ul>
+      <div class="img-box" onclick="openLightbox('images/รูปหน้าจอ WI-05-03.png')">
+        <img src="images/รูปหน้าจอ WI-05-03.png" alt="WI-05-03 หน้าประวัติ Audit Trail">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Navigation Controls Bar -->
+<div class="controls-bar">
+  <button class="btn-nav" id="btn-prev" onclick="prevSlide()">❮ ก่อนหน้า</button>
+  <div class="progress-bar-container">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+  <span id="slide-num" style="font-weight: 600; font-size: 0.95rem;">1 / 31</span>
+  <button class="btn-nav" id="btn-next" onclick="nextSlide()">ถัดไป ❯</button>
+</div>
+
+<!-- Lightbox Zoom Modal -->
+<div class="lightbox-modal" id="lightbox" onclick="closeLightbox()">
+  <img class="lightbox-content" id="lightbox-img" src="" alt="Zoomed Screenshot">
+</div>
+
+<script>
+  let currentSlide = 1;
+  const totalSlides = 31;
+
+  function updateSlideDisplay() {
+    document.querySelectorAll('.slide').forEach((slide, index) => {
+      if (index + 1 === currentSlide) {
+        slide.classList.add('active');
+      } else {
+        slide.classList.remove('active');
+      }
+    });
+
+    // Update Progress & Text
+    const progressPct = ((currentSlide - 1) / (totalSlides - 1)) * 100;
+    document.getElementById('progress-fill').style.width = progressPct + '%';
+    document.getElementById('slide-num').innerText = currentSlide + ' / ' + totalSlides;
+  }
+
+  function nextSlide() {
+    if (currentSlide < totalSlides) {
+      currentSlide++;
+      updateSlideDisplay();
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 1) {
+      currentSlide--;
+      updateSlideDisplay();
+    }
+  }
+
+  // Keyboard Arrow Navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') nextSlide();
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+  });
+
+  // Lightbox Zoom
+  function openLightbox(imgSrc) {
+    if (!imgSrc) return;
+    document.getElementById('lightbox-img').src = imgSrc;
+    document.getElementById('lightbox').classList.add('active');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('active');
+  }
+</script>
+
+</body>
+</html>

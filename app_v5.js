@@ -29,7 +29,8 @@ const App = (function () {
       startDate: '',
       endDate: '',
       page: 1,
-      pageSize: 20
+      pageSize: 20,
+      _hasSearched: false
     }
   };
 
@@ -43,6 +44,7 @@ const App = (function () {
     'request-edit': 'view-request-form',
     'request-detail': 'view-request-detail',
     history: 'view-history',
+    'data-management': 'view-data-management',
     'edit-requests': 'view-edit-requests',
     'daily-report': 'view-daily-report',
     signatures: 'view-signatures',
@@ -175,8 +177,11 @@ const App = (function () {
         closeCreateUserModal();
         closeChangePasswordModal();
       }
-      // Prevent Enter key from submitting forms unintentionally (except in textarea)
+      // Prevent Enter key from submitting forms unintentionally (except in textarea & login form)
       if (e.key === 'Enter' && e.target && e.target.tagName !== 'TEXTAREA') {
+        if (e.target.closest('#login-form') || e.target.closest('#history-filter-form') || e.target.closest('#filter-form')) {
+          return;
+        }
         e.preventDefault();
       }
     });
@@ -252,7 +257,12 @@ const App = (function () {
         navigate('dashboard');
         return;
       }
-      if (viewName === 'history' && !['admin', 'lab'].includes(state.currentUser.role)) {
+      if (viewName === 'history' && !['admin', 'lab', 'requester'].includes(state.currentUser.role)) {
+        showToast('คุณไม่มีสิทธิ์เข้าใช้งานเมนูนี้', 'error');
+        navigate('dashboard');
+        return;
+      }
+      if (viewName === 'data-management' && state.currentUser.role !== 'admin') {
         showToast('คุณไม่มีสิทธิ์เข้าใช้งานเมนูนี้', 'error');
         navigate('dashboard');
         return;
@@ -472,19 +482,21 @@ const App = (function () {
     const navHistory = document.getElementById('nav-history');
     const navEditRequests = document.getElementById('nav-edit-requests');
     const navDailyReport = document.getElementById('nav-daily-report');
+    const navDataManagement = document.getElementById('nav-data-management');
     const navSignatures = document.getElementById('setting-nav-signatures');
     const navUsers = document.getElementById('setting-nav-users');
     
     if (navDailyReport) navDailyReport.style.display = (!isBaseOil) ? 'block' : 'none';
     const navDrafts = document.getElementById('nav-drafts');
     
-    if (navHistory) navHistory.style.display = (isUserAdmin || isUserLab) ? 'block' : 'none';
+    if (navHistory) navHistory.style.display = (isUserAdmin || isUserLab || isRequester) ? 'block' : 'none';
     if (navEditRequests) {
       // Admin, Lab, Requester can see Edit Requests (everyone except Base Oil)
       navEditRequests.style.display = !isBaseOil ? 'block' : 'none';
     }
     if (navSignatures) navSignatures.style.display = isUserAdmin ? 'block' : 'none';
     if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
+    if (navDataManagement) navDataManagement.style.display = isUserAdmin ? 'block' : 'none';
 
     const navPush = document.getElementById('setting-nav-push');
     if (navPush) {
@@ -501,21 +513,18 @@ const App = (function () {
       }
     }
 
-    // Remove or show action buttons based on role
-    if (isBaseOil) {
-      // Physically remove buttons from DOM for Base Oil - they should never appear
-      ['btn-admin-import', 'btn-admin-export', 'btn-create-request', 'file-import-excel',
-       'btn-dashboard-create-request', 'btn-detail-modify', 'btn-detail-remove'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.remove();
-      });
-    } else {
-      if (exportBtn) exportBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
-      const importBtn = document.getElementById('btn-admin-import');
-      if (importBtn) importBtn.style.display = isUserAdmin ? 'inline-flex' : 'none';
-      const createBtn = document.getElementById('btn-create-request');
-      if (createBtn) createBtn.style.display = 'inline-flex';
-    }
+    // Show/hide action buttons based on role safely without removing DOM nodes
+    const exportBtnNode = document.getElementById('btn-admin-export');
+    const importBtnNode = document.getElementById('btn-admin-import');
+    const createBtnNode = document.getElementById('btn-create-request');
+    const dashCreateBtnNode = document.getElementById('btn-dashboard-create-request');
+    const detailModifyBtnNode = document.getElementById('btn-detail-modify');
+    const detailRemoveBtnNode = document.getElementById('btn-detail-remove');
+
+    if (createBtnNode) createBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
+    if (dashCreateBtnNode) dashCreateBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
+    if (detailModifyBtnNode) detailModifyBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
+    if (detailRemoveBtnNode) detailRemoveBtnNode.style.display = isUserAdmin ? 'inline-flex' : 'none';
     
     // Kick off async background update for drafts
     updateDraftCountsInBackground();
@@ -1800,6 +1809,13 @@ const App = (function () {
     document.getElementById('hist-start-date').value = state.historyFilters.startDate;
     document.getElementById('hist-end-date').value = state.historyFilters.endDate;
 
+    // If user hasn't clicked search yet, show prompt
+    if (!state.historyFilters._hasSearched) {
+      listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">กรุณาระบุเงื่อนไขและกดปุ่ม "ค้นหา" เพื่อดูประวัติวัตถุดิบ</td></tr>`;
+      renderPaginationControls({ containerId: 'history-pagination', page: 1, pageSize: state.historyFilters.pageSize || 20, totalCount: 0, onPageChange: 'App.setHistoryPage', onPageSizeChange: 'App.setHistoryPageSize' });
+      return;
+    }
+
     listBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดประวัติวัตถุดิบ...</td></tr>`;
 
     try {
@@ -1818,22 +1834,23 @@ const App = (function () {
         return;
       }
 
-      history.forEach(h => {
+      const paginatedItems = history;
+
+      paginatedItems.forEach(h => {
         const tr = document.createElement('tr');
         const formattedDate = formatThaiDate(h.request_date);
-        const formattedTime = h.request_time.slice(0, 5);
+        const formattedTime = (h.request_time && typeof h.request_time === 'string') ? `${h.request_time.slice(0, 5)} น.` : '';
         
         let resClass = 'result-process';
         if (h.test_result === 'Pass') resClass = 'result-pass';
         if (h.test_result === 'Fail') resClass = 'result-fail';
         if (h.test_result === 'Hold') resClass = 'result-hold';
 
-        const statusBadge = getStatusBadgeClass(h.status);
-        const s = (h.status || '').toLowerCase().trim();
+        const statusBadge = getStatusBadgeClass(h.status || 'Complete');
 
         // ตรวจสอบสิทธิ์พิมพ์จากผลการตรวจระดับรายการ (test_result) ไม่ใช่สถานะใบ Request
         let printBtnHtml = '';
-        if (state.currentUser && ['admin', 'lab'].includes(state.currentUser.role)) {
+        if (state.currentUser && ['admin', 'lab', 'requester'].includes(state.currentUser.role)) {
           const r = (h.test_result || '').toLowerCase().trim();
           const canPrint = (r === 'pass' || r === 'hold' || r === 'fail');
           if (canPrint) {
@@ -1856,13 +1873,20 @@ const App = (function () {
         if (h.inspection_date) {
             inspectionDateHtml = _formatRecDate(h.inspection_date);
         }
-        if (state.currentUser.role === 'admin') {
+        if (state.currentUser && state.currentUser.role === 'admin') {
             inspectionDateHtml += ` <button onclick="App.editInspectionDate('${h.item_id}', '${h.inspection_date || ''}')" style="background:none;border:none;cursor:pointer;color:var(--primary-color);" title="แก้ไขวันที่ตรวจสอบ">✏️</button>`;
         }
 
+        const reqNoDisplay = h.is_historical ? '<span style="color:#64748b; font-size:12px; font-weight:600;">HISTORICAL</span>' : `<strong>${h.request_no || '-'}/${h.request_year || ''}</strong>`;
+        const viewDetailBtn = (h.is_historical || !h.request_id || h.request_id === 'HISTORICAL') ? '' : `
+          <button class="btn-icon" onclick="App.navigate('request-detail', {id: '${h.request_id}'})" title="ดูรายละเอียดใบแจ้ง">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </button>
+        `;
+
         tr.innerHTML = `
-          <td style="white-space: nowrap;"><strong>${h.request_no}/${h.request_year}</strong></td>
-          <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
+          <td style="white-space: nowrap;">${reqNoDisplay}</td>
+          <td style="white-space: nowrap;">${formattedDate} ${formattedTime}</td>
           <td>${escapeHtml(h.product_name)}</td>
           <td style="white-space: nowrap;">
             <a href="#" style="font-weight:500;" onclick="App.traceBatch('${escapeHtml(h.batch_number)}'); return false;" title="คลิกดูประวัติทั้งหมดของ Batch นี้">
@@ -1873,12 +1897,10 @@ const App = (function () {
           <td style="white-space: nowrap;"><span class="badge ${resClass}">${h.test_result}</span></td>
           <td style="white-space: nowrap; text-align:center;">${inspectionDateHtml}</td>
           <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(h.item_comment || '')}</td>
-          <td style="white-space: nowrap;">${escapeHtml(h.requester_name)}</td>
-          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status}</span></td>
+          <td style="white-space: nowrap;">${escapeHtml(h.requester_name || '-')}</td>
+          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status || 'Complete'}</span></td>
           <td style="display: flex; justify-content: center; align-items: center; gap: 8px; white-space: nowrap;">
-            <button class="btn-icon" onclick="App.navigate('request-detail', {id: '${h.request_id}'})" title="ดูรายละเอียดใบแจ้ง">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-            </button>
+            ${viewDetailBtn}
             ${printBtnHtml}
           </td>
         `;
@@ -1900,7 +1922,7 @@ const App = (function () {
   }
 
   function handleHistoryFilter(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     state.historyFilters = {
       productName: document.getElementById('hist-product').value.trim(),
       batchNumber: document.getElementById('hist-batch').value.trim(),
@@ -1908,15 +1930,29 @@ const App = (function () {
       requestNo: document.getElementById('hist-request-no').value.trim(),
       testResult: document.getElementById('hist-result').value,
       startDate: document.getElementById('hist-start-date').value,
-      endDate: document.getElementById('hist-end-date').value
+      endDate: document.getElementById('hist-end-date').value,
+      page: 1,
+      pageSize: state.historyFilters.pageSize || 20,
+      _hasSearched: true
     };
     loadMaterialHistory();
   }
 
   function clearHistoryFilters() {
     state.historyFilters = {
-      productName: '', batchNumber: '', rmNo: '', requestNo: '', testResult: '', startDate: '', endDate: ''
+      productName: '', batchNumber: '', rmNo: '', requestNo: '', testResult: '', startDate: '', endDate: '',
+      page: 1,
+      pageSize: state.historyFilters.pageSize || 20,
+      _hasSearched: false
     };
+    // Clear inputs visually
+    document.getElementById('hist-product').value = '';
+    document.getElementById('hist-batch').value = '';
+    document.getElementById('hist-rm').value = '';
+    document.getElementById('hist-request-no').value = '';
+    document.getElementById('hist-result').value = '';
+    document.getElementById('hist-start-date').value = '';
+    document.getElementById('hist-end-date').value = '';
     loadMaterialHistory();
   }
 
@@ -1946,25 +1982,27 @@ const App = (function () {
       traceLogs.forEach(h => {
         const tr = document.createElement('tr');
         const formattedDate = formatThaiDate(h.request_date);
-        const formattedTime = h.request_time.slice(0, 5);
+        const formattedTime = (h.request_time && typeof h.request_time === 'string') ? `${h.request_time.slice(0, 5)} น.` : '';
 
         let resClass = 'result-process';
         if (h.test_result === 'Pass') resClass = 'result-pass';
         if (h.test_result === 'Fail') resClass = 'result-fail';
         if (h.test_result === 'Hold') resClass = 'result-hold';
 
-        const statusBadge = getStatusBadgeClass(h.status);
+        const statusBadge = getStatusBadgeClass(h.status || 'Complete');
+        const reqNoDisplay = h.is_historical ? '<span style="color:#64748b; font-size:12px; font-weight:600;">HISTORICAL</span>' : `<strong>${h.request_no || '-'}/${h.request_year || ''}</strong>`;
+        const viewLinkHtml = (h.is_historical || !h.request_id || h.request_id === 'HISTORICAL') ? '-' : `<a href="#" onclick="App.closeBatchTraceModal(); App.navigate('request-detail', {id: '${h.request_id}'}); return false;">ดูรายละเอียด &rarr;</a>`;
 
         tr.innerHTML = `
-          <td style="white-space: nowrap;"><strong>${h.request_no}/${h.request_year}</strong></td>
-          <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
+          <td style="white-space: nowrap;">${reqNoDisplay}</td>
+          <td style="white-space: nowrap;">${formattedDate} ${formattedTime}</td>
           <td>${escapeHtml(h.product_name)}</td>
           <td style="white-space: nowrap;">${h.rm_no ? `<code>${escapeHtml(h.rm_no)}</code>` : '<em style="color:var(--text-muted);">ว่าง</em>'}</td>
           <td style="white-space: nowrap;"><span class="badge ${resClass}">${h.test_result}</span></td>
-          <td style="white-space: nowrap;">${escapeHtml(h.requester_name)}</td>
-          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status}</span></td>
+          <td style="white-space: nowrap;">${escapeHtml(h.requester_name || '-')}</td>
+          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status || 'Complete'}</span></td>
           <td style="white-space: nowrap;">
-            <a href="#" onclick="App.closeBatchTraceModal(); App.navigate('request-detail', {id: '${h.request_id}'}); return false;">ดูรายละเอียด &rarr;</a>
+            ${viewLinkHtml}
           </td>
         `;
         tbody.appendChild(tr);
@@ -2110,12 +2148,34 @@ const App = (function () {
 
       const btnSys = document.getElementById('setting-btn-system');
       if (btnSys) btnSys.style.display = isUserAdmin ? 'block' : 'none';
+
+      const btnClearSample = document.getElementById('setting-btn-clear-sample');
+      if (btnClearSample) btnClearSample.style.display = isUserAdmin ? 'block' : 'none';
     }
   }
 
   function closeSettingsModal() {
     const modal = document.getElementById('modal-settings');
     if (modal) modal.classList.remove('open');
+  }
+
+  async function clearSampleData() {
+    closeSettingsModal();
+    try {
+      if (window.DB && typeof window.DB.getService === 'function' && window.DB.getService().clearSampleData) {
+        await window.DB.getService().clearSampleData();
+      } else {
+        localStorage.removeItem('lrms_local_requests');
+        localStorage.removeItem('lrms_local_items');
+        localStorage.removeItem('rmis_requests');
+        localStorage.removeItem('rmis_items');
+      }
+      showToast('ล้างข้อมูลใบแจ้งตัวอย่างสำเร็จ กรุณารีเฟรชหน้าจอ (F5)', 'success');
+      setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+      console.error(e);
+      showToast('เกิดข้อผิดพลาดในการล้างข้อมูล', 'error');
+    }
   }
 
   function openChangeOwnPasswordModal() {
@@ -2339,9 +2399,20 @@ const App = (function () {
   }
 
   // --- EXPORT TO EXCEL & CSV ---
+  function handleImportClick(e) {
+    if (e) e.preventDefault();
+    if (state.currentUser.role !== 'admin') {
+      showToast('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์นำเข้าข้อมูลได้', 'error');
+      return;
+    }
+    const fileInput = document.getElementById('file-import-excel');
+    if (fileInput) fileInput.click();
+  }
+
   async function handleImportExcel(event) {
     if (state.currentUser.role !== 'admin') {
-      showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถนำเข้าข้อมูลได้', 'error');
+      showToast('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์นำเข้าข้อมูลได้', 'error');
+      if (event && event.target) event.target.value = '';
       return;
     }
 
@@ -2478,8 +2549,8 @@ const App = (function () {
           const itemCommentVal = String(row['Item Comment'] || row['หมายเหตุรายการ'] || '').trim();
 
           requestGroups[reqRef].items.push({
-            product_name: pName || '-',
-            batch_number: bNo || '-',
+            product_name: pName || '',
+            batch_number: bNo || '',
             quantity: qtyVal || '',
             rm_no: rmVal || '',
             test_result: formattedResult, 
@@ -2513,17 +2584,66 @@ const App = (function () {
           });
         }
 
-        if (requestsToImport.length === 0) {
-          throw new Error('ไม่พบข้อมูลที่จัดกลุ่ม (ตรวจสอบคอลัมน์ "Request Ref")');
-        }
+        const getRowVal = (rowObj, fieldKeys) => {
+          if (!rowObj) return '';
+          const rowKeys = Object.keys(rowObj);
+          for (const key of rowKeys) {
+            const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]/gi, '');
+            for (const fk of fieldKeys) {
+              const cleanFk = fk.trim().toLowerCase().replace(/[^a-z0-9\u0E00-\u0E7F]/gi, '');
+              if (cleanKey === cleanFk) {
+                const val = rowObj[key];
+                return val !== undefined && val !== null ? String(val).trim() : '';
+              }
+            }
+          }
+          return '';
+        };
 
-        await window.DB.bulkImportRequests(requestsToImport, itemsToImport);
+        const historicalRecordsToImport = [];
+        rawData.forEach(row => {
+          const pName = getRowVal(row, ['product name', 'product', 'ชื่อสินค้า', 'ชื่อวัตถุดิบ', 'รายการวัตถุดิบ', 'สินค้า', 'item', 'product_name']);
+          const bNo = getRowVal(row, ['batch number', 'batch no', 'batch', 'batch_number', 'batch_no', 'หมายเลขล็อต', 'เลขล็อต', 'เลข batch', 'หมายเลข batch', 'lot', 'lot no', 'batch/lot']);
+          if (!pName && !bNo) return;
+
+          const rawDate = getRowVal(row, ['request date', 'date', 'วันที่', 'วันที่ตรวจ', 'receive date', 'inspection date', 'request_date', 'receive_date']);
+          const recDate = rawDate ? parseExcelDate(rawDate) : new Date().toISOString().slice(0, 10);
+          const rawResult = getRowVal(row, ['test result', 'result', 'ผลการทดสอบ', 'ผลการตรวจ', 'ผลแล็บ', 'test_result']);
+          let formattedResult = 'Pass';
+          if (rawResult.toUpperCase().includes('PASS') || rawResult.includes('ผ่าน')) formattedResult = 'Pass';
+          else if (rawResult.toUpperCase().includes('FAIL') || rawResult.includes('ไม่ผ่าน')) formattedResult = 'Fail';
+          else if (rawResult.toUpperCase().includes('HOLD') || rawResult.includes('ชะลอ')) formattedResult = 'Hold';
+
+          const dens15 = getRowVal(row, ['density@15c', 'density 15c', 'density_15c', 'density15c', 'den15']);
+          const dens30 = getRowVal(row, ['density@30c', 'density 30c', 'density_30c', 'density30c', 'den30']);
+
+          historicalRecordsToImport.push({
+            receive_date: recDate,
+            product_name: pName || '',
+            batch_number: bNo || '',
+            quantity: getRowVal(row, ['quantity', 'qty', 'ปริมาณ', 'จำนวน']),
+            rm_no: getRowVal(row, ['rm no', 'rm number', 'รหัสวัตถุดิบ', 'rm_no', 'rm']),
+            test_result: formattedResult,
+            density_15c: dens15,
+            density_30c: dens30,
+            item_comment: getRowVal(row, ['item comment', 'หมายเหตุรายการ', 'หมายเหตุ', 'comment', 'item_comment'])
+          });
+        });
+
+        if (requestsToImport.length > 0) {
+          await window.DB.bulkImportRequests(requestsToImport, itemsToImport);
+        }
+        if (historicalRecordsToImport.length > 0) {
+          await window.DB.bulkImportHistoricalRecords(historicalRecordsToImport);
+        }
         
-        showToast(`นำเข้าสำเร็จ ${requestsToImport.length} ใบแจ้ง (${itemsToImport.length} รายการ)`, 'success');
+        showToast(`นำเข้าประวัติย้อนหลังสำเร็จ ${historicalRecordsToImport.length} รายการ`, 'success');
         event.target.value = ''; 
         
         if (state.currentView === 'requests') {
           renderRequestsList();
+        } else if (state.currentView === 'history') {
+          loadMaterialHistory();
         }
       } catch (err) {
         console.error('Import Error:', err);
@@ -2537,7 +2657,7 @@ const App = (function () {
 
   function openExportModal() {
     if (state.currentUser.role !== 'admin') {
-      showToast('เฉพาะผู้ดูแลระบบเท่านั้นที่มีสิทธิ์ส่งออกข้อมูลได้', 'error');
+      showToast('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่มีสิทธิ์ส่งออกข้อมูลได้', 'error');
       return;
     }
     
@@ -4092,6 +4212,17 @@ const App = (function () {
     }
   }
 
+  async function clearAndReimportHistoricalData() {
+    if (!confirm('คุณต้องการล้างข้อมูลประวัติย้อนหลังเดิมเพื่อเลือกไฟล์ Excel และนำเข้าใหม่อีกครั้งใช่หรือไม่?')) return;
+    try {
+      await window.DB.clearHistoricalRecords();
+      showToast('ล้างข้อมูลย้อนหลังเดิมเรียบร้อยแล้ว กรุณากดปุ่ม "นำเข้าข้อมูลย้อนหลัง" เพื่อเลือกไฟล์ Excel ใหม่อีกครั้ง', 'info');
+      loadMaterialHistory();
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด: ' + e.message, 'danger');
+    }
+  }
+
   return {
     setRequestsPage,
     setRequestsPageSize,
@@ -4189,12 +4320,14 @@ const App = (function () {
         }, 500); // 0.5s buffer for font rendering
       };
     },
+
     editCurrentRequest,
     deleteCurrentRequest,
     deleteRequest,
     approveRequest,
     reopenRequest,
     rejectRequest,
+    clearAndReimportHistoricalData,
     exportPDF,
     generateDailyReportPDF,
     handleHistoryFilter,
@@ -4211,6 +4344,7 @@ const App = (function () {
     handleCreateUserSubmit,
     openSettingsModal,
     closeSettingsModal,
+    clearSampleData,
     openChangeOwnPasswordModal,
     closeChangeOwnPasswordModal,
     togglePwdVisibility,
@@ -4224,6 +4358,7 @@ const App = (function () {
     saveDatabaseConfig,
     handleConfigModeChange,
     handleImportExcel,
+    handleImportClick,
     exportRequestsExcel,
     openExportModal,
     closeExportModal,
