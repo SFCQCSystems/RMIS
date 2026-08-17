@@ -2984,9 +2984,16 @@ const App = (function () {
     const dateStr = dateInput.value;
 
     try {
-      const history = await window.DB.getMaterialHistory();
+      const filters = {
+        startDate: dateStr,
+        endDate: dateStr,
+        page: 1,
+        pageSize: 5000
+      };
+      const historyResult = await window.DB.getMaterialHistory(filters);
+      const historyData = historyResult.data || [];
       // Filter items for the selected date and exclude drafts, then sort by request_no ascending
-      const dateItems = history.filter(item => item.request_date === dateStr && item.status !== 'Draft')
+      const dateItems = historyData.filter(item => item.request_date === dateStr && item.request_status !== 'Draft')
                                .sort((a, b) => parseInt(a.request_no || 0) - parseInt(b.request_no || 0));
 
       const tbody = document.getElementById('print-daily-tbody');
@@ -3001,7 +3008,7 @@ const App = (function () {
           else if (item.test_result === 'FAIL') badgeColor = '#dc2626';
           else if (item.test_result === 'HOLD') badgeColor = '#ca8a04';
 
-          const displayResult = item.test_result || (item.status === 'Pending' || item.status === 'In Process' ? item.status : '');
+          const displayResult = item.test_result || (item.request_status === 'Pending' || item.request_status === 'In Process' ? item.request_status : '');
 
           const [year, month, day] = item.request_date.split('-');
           const reqDateFmt = `${day}/${month}/${year}`;
