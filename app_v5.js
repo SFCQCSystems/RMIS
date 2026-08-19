@@ -76,14 +76,27 @@ const App = (function () {
     // 4. Setup Resizable Columns
     initResizableColumns();
 
-    // 3. Attempt auto-login with existing session
+    // 5. Attempt auto-login with existing session
     try {
       const user = await window.DB.getCurrentUser();
       if (user) {
         state.currentUser = user;
         updateUIForUser();
         initRealtime();
-        navigate('dashboard');
+        
+        // Check hash for direct URL routing
+        const hash = window.location.hash.substring(1);
+        if (hash) {
+          if (hash.includes('?')) {
+            const [view, qs] = hash.split('?');
+            const params = Object.fromEntries(new URLSearchParams(qs));
+            navigate(view, params);
+          } else {
+            navigate(hash);
+          }
+        } else {
+          navigate('dashboard');
+        }
       } else {
         navigate('login');
       }
@@ -91,6 +104,25 @@ const App = (function () {
       console.error('Session retrieval failed, defaulting to Login screen:', e);
       navigate('login');
     }
+
+    // Listen for back/forward buttons
+    window.addEventListener('hashchange', () => {
+      if (!state.currentUser) return; // Prevent navigation if not logged in
+      const hash = window.location.hash.substring(1);
+      if (!hash) return navigate('dashboard');
+      
+      if (hash.includes('?')) {
+        const [view, qs] = hash.split('?');
+        const params = Object.fromEntries(new URLSearchParams(qs));
+        if (view !== state.currentView || (params.id && params.id !== state.currentRequestId)) {
+          navigate(view, params, true);
+        }
+      } else {
+        if (hash !== state.currentView) {
+          navigate(hash, {}, true);
+        }
+      }
+    });
   }
 
   // Set visual status indicator for database connection type
@@ -199,8 +231,17 @@ const App = (function () {
   }
 
   // --- ROUTING / VIEW NAVIGATOR ---
-  function navigate(viewName, params = {}) {
+  function navigate(viewName, params = {}, skipPushState = false) {
     console.log(`Navigating to: ${viewName}`, params);
+
+    // Update URL hash without triggering hashchange
+    if (!skipPushState && viewName !== 'login') {
+      const qs = new URLSearchParams(params).toString();
+      const newHash = qs ? `#${viewName}?${qs}` : `#${viewName}`;
+      if (window.location.hash !== newHash) {
+        window.history.pushState(null, '', newHash);
+      }
+    }
 
     // Handle split pane view for request-detail
     let actualViewName = viewName;
