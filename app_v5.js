@@ -643,7 +643,7 @@ const App = (function () {
     const endItem = Math.min(page * pageSize, totalCount);
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:10px 16px; background:var(--bg-secondary); border-top:1px solid var(--border-color); font-size:13px; color:var(--text-color);">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:4px 10px; background:var(--bg-secondary); border-top:1px solid var(--border-color); font-size:13px; color:var(--text-color);">
         <div style="display:flex; align-items:center; gap:8px;">
           <span>แสดง <strong>${startItem} - ${endItem}</strong> จากทั้งหมด <strong>${totalCount}</strong> รายการ</span>
           <span style="color:var(--text-muted);">|</span>
@@ -1340,6 +1340,7 @@ const App = (function () {
           // Submit Draft (Draft -> Pending)
           const submitted = await window.DB.submitDraft(state.currentRequestId, requestData, itemsData);
           showToast('ส่งใบแจ้งตรวจสอบเรียบร้อยแล้ว', 'success');
+          loadRequestsList();
           navigate('request-detail', { id: submitted.id });
         } else {
           // Update request (Admin/Lab)
@@ -1352,12 +1353,14 @@ const App = (function () {
             showToast('ตอบรับและบันทึกคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
           }
 
+          loadRequestsList();
           navigate('request-detail', { id: updated.id });
         }
       } else {
         // Create request directly
         const created = await window.DB.createRequest(requestData, itemsData);
         showToast('บันทึกใบแจ้งตรวจสอบส่งแล็บเรียบร้อยแล้ว', 'success');
+        loadRequestsList();
         navigate('request-detail', { id: created.id });
       }
     } catch (err) {
@@ -1777,6 +1780,7 @@ const App = (function () {
       try {
         await window.DB.deleteRequest(state.currentRequestId);
         showToast('ลบข้อมูลใบแจ้งตรวจสอบเรียบร้อยแล้ว', 'success');
+        loadRequestsList();
         navigate('requests');
       } catch (e) {
         console.error(e);
@@ -1971,7 +1975,8 @@ const App = (function () {
     modal.classList.add('open');
 
     try {
-      const traceLogs = await window.DB.getBatchHistory(batchNumber);
+      const result = await window.DB.getBatchHistory(batchNumber);
+      const traceLogs = result.data || result;
       tbody.innerHTML = '';
 
       if (traceLogs.length === 0) {
@@ -2921,6 +2926,7 @@ const App = (function () {
       const updated = await window.DB.approveRequest(state.currentRequestId);
       showToast('อนุมัติเอกสารสำเร็จ สถานะเปลี่ยนเป็น Approved', 'success');
       await loadRequestDetail(state.currentRequestId);
+      loadRequestsList();
     } catch (e) {
       console.error('approveRequest error:', e);
       showToast('ไม่สามารถอนุมัติได้: ' + e.message, 'error');
@@ -2941,6 +2947,7 @@ const App = (function () {
       await window.DB.reopenRequest(state.currentRequestId);
       showToast('Reopen เอกสารสำเร็จ', 'success');
       await loadRequestDetail(state.currentRequestId);
+      loadRequestsList();
     } catch (e) {
       console.error('reopenRequest error:', e);
       showToast('ไม่สามารถ Reopen ได้: ' + e.message, 'error');
@@ -2965,6 +2972,7 @@ const App = (function () {
       const updated = await window.DB.rejectRequest(state.currentRequestId);
       showToast('Reject ใบแจ้งเรียบร้อยแล้ว สถานะเปลี่ยนเป็น Rejected', 'success');
       await loadRequestDetail(state.currentRequestId);
+      loadRequestsList();
     } catch (e) {
       console.error('rejectRequest error:', e);
       showToast('ไม่สามารถ Reject ได้: ' + e.message, 'error');

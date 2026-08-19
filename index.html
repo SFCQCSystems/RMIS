@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ (RMIS)</title>
   <meta name="description" content="Raw Material Inspection System - ระบบจัดการใบแจ้งตรวจสอบห้องปฏิบัติการ สำหรับบริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด">
-  <link rel="stylesheet" href="style_v2.css?v=6">
+  <link rel="stylesheet" href="style_v2.css?v=8">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
   <link rel="icon" href="icons/icon-192.png">
@@ -255,7 +255,7 @@
 
           <div id="requests-split-layout" style="display: flex; flex-direction: column; gap: 0; flex: 1; overflow: hidden;">
             <!-- Top Pane -->
-            <div id="requests-master-pane" class="card" style="margin-bottom: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-top: 10px;">
+            <div id="requests-master-pane" class="card" style="margin-bottom: 0 !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 !important;">
               <div class="table-responsive" style="flex: 1; overflow-y: auto;">
                 <table class="table">
                   <thead style="position: sticky; top: 0; background: white; z-index: 1;">
@@ -278,12 +278,12 @@
             </div>
 
             <!-- Resizer Handle -->
-            <div id="pane-resizer" style="height: 8px; cursor: ns-resize; display: flex; justify-content: center; align-items: center; background-color: transparent; flex-shrink: 0; display: none;">
-            <div style="width: 40px; height: 4px; background-color: #cbd5e1; border-radius: 2px;"></div>
+            <div id="pane-resizer" style="height: 6px; cursor: ns-resize; display: flex; justify-content: center; align-items: center; background-color: var(--border-color); flex-shrink: 0; display: none;">
+              <div style="width: 40px; height: 2px; background-color: #94a3b8; border-radius: 1px;"></div>
             </div>
 
             <!-- Bottom Pane -->
-            <div id="requests-detail-pane" class="card" style="margin-bottom: 0; flex: 1; display: none; flex-direction: column; overflow: hidden; padding-top: 10px;">
+            <div id="requests-detail-pane" class="card" style="margin-bottom: 0 !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; flex: 1; display: none; flex-direction: column; overflow: hidden; padding: 10px 0 0 0 !important; border-top: none !important;">
               <div style="padding: 0 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <!-- Style matched to table headers (var(--text-muted), 600 weight, 14px typically) -->
                 <h1 style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin: 0; text-transform: uppercase;">รายละเอียดใบแจ้งตรวจสอบ</h1>

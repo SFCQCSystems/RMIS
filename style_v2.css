@@ -625,7 +625,8 @@ a:hover {
 
 .table th {
   background-color: #f8fafc;
-  padding: 16px 20px;
+  padding: 4px 8px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--secondary-color);
   border-bottom: 1px solid var(--border-color);
@@ -636,7 +637,8 @@ a:hover {
 }
 
 .table td {
-  padding: 16px 20px;
+  padding: 4px 8px;
+  font-size: 13px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
   vertical-align: middle;
@@ -1361,14 +1363,13 @@ body, input, select, textarea, button {
 .form-group label { display: block !important; margin-bottom: 6px !important; font-weight: 500 !important; font-size: 14px !important; color: var(--text-main) !important; }
 
 .data-table { width: 100% !important; border-collapse: separate !important; border-spacing: 0 !important; }
-.data-table th { background-color: var(--bg-app) !important; color: var(--text-muted) !important; font-weight: 600 !important; font-size: 13px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; padding: 12px 16px !important; border-bottom: 1px solid var(--border-color) !important; position: sticky !important; top: 0 !important; z-index: 10 !important; white-space: nowrap !important; }
-.data-table td { padding: 12px 16px !important; border-bottom: 1px solid var(--border-color) !important; font-size: 14px !important; vertical-align: middle !important; }
+.data-table th { background-color: var(--bg-app) !important; color: var(--text-muted) !important; font-weight: 600 !important; font-size: 12px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; padding: 4px 8px !important; border-bottom: 1px solid var(--border-color) !important; position: sticky !important; top: 0 !important; z-index: 10 !important; white-space: nowrap !important; }
+.data-table td { padding: 4px 8px !important; border-bottom: 1px solid var(--border-color) !important; font-size: 13px !important; vertical-align: middle !important; }
 .data-table tbody tr { background-color: white !important; transition: background-color var(--transition-fast) !important; }
 .data-table tbody tr:hover { background-color: #f8fafc !important; }
 .data-table tbody tr:nth-child(even) { background-color: #fdfdfd !important; }
 
 .card { background: white !important; border-radius: var(--radius-md) !important; box-shadow: var(--shadow-sm) !important; border: 1px solid var(--border-color) !important; padding: 24px !important; margin-bottom: 24px !important; }
-
 .modal-container { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-lg) !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; max-height: 90vh !important; }
 .modal-container > form { display: flex !important; flex-direction: column !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; }
 .modal-header { padding: 16px 24px !important; background: var(--bg-app) !important; border-bottom: 1px solid var(--border-color) !important; }
