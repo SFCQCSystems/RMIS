@@ -284,17 +284,42 @@
 
       // Overwrite items for this request: delete old, insert new
       const filteredItems = items.filter(item => String(item.request_id) !== String(id));
+      const oldItemsMap = {};
+      items.filter(item => String(item.request_id) === String(id)).forEach(i => oldItemsMap[i.id] = i);
+      
       const baseTime = Date.now();
-      const preparedItems = itemsData.map((item, idx) => ({
-        id: item.id || generateUUID(),
-        request_id: id,
-        product_name: item.product_name,
-        batch_number: item.batch_number,
-        quantity: item.quantity,
-        rm_no: item.rm_no || '',
-        test_result: item.test_result || 'In Process',
-        created_at: item.created_at || new Date(baseTime + idx * 100).toISOString()
-      }));
+      const localDate = new Date();
+      const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
+
+      const preparedItems = itemsData.map((item, idx) => {
+        const existing = item.id ? oldItemsMap[item.id] : null;
+        const oldResult = existing ? existing.test_result : 'In Process';
+        const newResult = item.test_result || 'In Process';
+        
+        let inspDate = null;
+        if (newResult !== 'In Process' && oldResult !== newResult) {
+            inspDate = localTodayStr;
+        } else if (newResult === 'In Process' && oldResult !== 'In Process') {
+            inspDate = null;
+        } else if (existing && existing.inspection_date) {
+            inspDate = existing.inspection_date;
+        }
+
+        return {
+          id: item.id || generateUUID(),
+          request_id: id,
+          product_name: item.product_name,
+          batch_number: item.batch_number,
+          quantity: item.quantity,
+          rm_no: item.rm_no || '',
+          test_result: newResult,
+          inspection_date: inspDate,
+          item_comment: item.item_comment || '',
+          density_15c: item.density_15c || '',
+          density_30c: item.density_30c || '',
+          created_at: item.created_at || (existing ? existing.created_at : new Date(baseTime + idx * 100).toISOString())
+        };
+      });
 
       // Update status logic
       let currentReq = requests[reqIndex];
@@ -1193,6 +1218,8 @@
            payload.inspection_date = localTodayStr;
         } else if (newResult === 'In Process' && oldResult !== 'In Process') {
            payload.inspection_date = null; // Clear if reverted to In Process
+        } else if (existing && existing.inspection_date) {
+           payload.inspection_date = existing.inspection_date;
         }
         
         return payload;
@@ -1939,6 +1966,9 @@
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
           if (onUpdate) onUpdate(payload.new, payload.old);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'request_items' }, payload => {
+          window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
           window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));

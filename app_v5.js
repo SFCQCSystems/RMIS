@@ -3468,6 +3468,28 @@ const App = (function () {
     playNotificationSound();
   }
 
+  // --- OS LEVEL NOTIFICATIONS ---
+  function showOSNotification(title, body) {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+              body: body,
+              icon: '/icons/icon-192x192.png',
+              badge: '/icons/icon-72x72.png',
+              vibrate: [200, 100, 200]
+            });
+          });
+        } else {
+          new Notification(title, { body: body });
+        }
+      } catch (e) {
+        console.error('OS Notification error:', e);
+      }
+    }
+  }
+
   // --- WEB PUSH NOTIFICATION HELPERS ---
   function urlB64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -3638,12 +3660,40 @@ const App = (function () {
             );
           }
         }
+
+        // Case 3: Notify Requester when Base Oil request is Complete/Approved
+        if (newRecord.need_base_oil_view === true) {
+          const wasNotComplete = oldRecord.status !== 'Complete' && oldRecord.status !== 'Approved';
+          const isNowComplete = newRecord.status === 'Complete' || newRecord.status === 'Approved';
+          
+          if (wasNotComplete && isNowComplete) {
+            if (role === 'requester' && newRecord.requester_id === state.currentUser.id) {
+              playNotificationSound();
+              showToast(
+                `<b>✅ ผลทดสอบ Base Oil ผ่านแล้ว!</b><br/>Request No. : ${newRecord.request_no || '-'}<br/>ตรวจสอบเสร็จสมบูรณ์`,
+                'success',
+                {
+                  duration: 10000,
+                  onClick: () => navigate('request-detail', { id: newRecord.id })
+                }
+              );
+              showOSNotification(
+                'ผลทดสอบ Base Oil ผ่านแล้ว! ✅', 
+                `Request No. : ${newRecord.request_no || '-'}\nตรวจสอบเสร็จสมบูรณ์`
+              );
+            }
+          }
+        }
       }
     );
   }
 
   // Bind init to window load event
   window.addEventListener('DOMContentLoaded', init);
+
+  window.addEventListener('request_item_updated', async (e) => {
+    // Intentionally left blank or handle other item updates if needed
+  });
 
   window.addEventListener('edit_request_inserted', async (e) => {
     const payload = e.detail;
