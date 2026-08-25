@@ -290,7 +290,7 @@
                 <div class="flex gap-10">
                   <button id="btn-detail-print" class="btn btn-secondary btn-sm" style="display:none; border-color:var(--primary-color); color:var(--primary-color);" onclick="App.exportPDF()">
                     <i data-lucide="printer"></i>
-                    พิมพ์รายงาน A4 (PDF)
+                    พิมพ์รายงาน
                   </button>
                   <button class="btn btn-primary btn-sm" id="btn-detail-modify" style="display:none !important;" onclick="App.editCurrentRequest()">
                     <i data-lucide="edit"></i>
@@ -580,7 +580,7 @@
               </div>
               <div class="card-footer" style="padding:20px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px;">
                 <button type="button" class="btn btn-secondary" onclick="App.navigate('requests')">ยกเลิก</button>
-                <button type="submit" id="btn-submit-request" class="btn btn-primary">Submit Request</button>
+                <button type="submit" id="btn-submit-request" class="btn btn-primary">ส่ง</button>
               </div>
             </div>
           </form>
@@ -1486,11 +1486,10 @@
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .then(reg => console.log('Service Worker registered', reg))
-        <button class="btn btn-secondary" onclick="App.closeStickerModal()">ยกเลิก</button>
-        <button class="btn btn-primary" onclick="App.confirmPrintSticker()">🖨 พิมพ์</button>
-      </div>
-    </div>
-  </div>
+          .catch(err => console.log('Service Worker registration failed', err));
+      });
+    }
+  </script>
 
   <!-- Settings Modal -->
   <div id="modal-settings" class="modal-overlay">

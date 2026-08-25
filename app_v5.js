@@ -1009,6 +1009,7 @@ const App = (function () {
       
       try {
         const details = await window.DB.getRequestDetail(requestId);
+        state.editingRecord = details; // เก็บไว้ใช้ตรวจสถานะตอนบันทึก
         
         customerInput.value = details.customer_name;
         requesterInput.value = details.requester_name;
@@ -1053,6 +1054,7 @@ const App = (function () {
     } else {
       titleEl.innerText = 'สร้างใบแจ้งตรวจสอบห้องปฏิบัติการ';
       requesterInput.value = state.currentUser.display_name;
+      state.editingRecord = null; // เคลียร์ state สำหรับสร้างใหม่
 
       const now = new Date();
       const pad = n => n.toString().padStart(2, '0');
@@ -1115,7 +1117,7 @@ const App = (function () {
         btn.id = 'btn-save-draft';
         btn.className = 'btn btn-secondary';
         btn.onclick = () => App.saveDraft();
-        btn.innerText = 'Save Draft';
+        btn.innerText = 'ร่าง';
         
         // Insert before Submit Request button
         const submitBtn = document.getElementById('btn-submit-request');
@@ -1126,6 +1128,21 @@ const App = (function () {
     } else {
       if (saveDraftBtn) {
         saveDraftBtn.remove();
+      }
+    }
+
+    // Dynamic submit button text based on edit mode and status
+    const submitBtn = document.getElementById('btn-submit-request');
+    if (submitBtn) {
+      if (!isEditMode) {
+        submitBtn.innerText = 'ส่ง';
+      } else {
+        const currentStatus = state.editingRecord?.status || 'Draft';
+        if (currentStatus === 'Draft') {
+          submitBtn.innerText = 'ส่ง';
+        } else {
+          submitBtn.innerText = 'บันทึก';
+        }
       }
     }
   }
@@ -1409,7 +1426,9 @@ const App = (function () {
       showToast('ไม่สามารถบันทึกข้อมูลได้: ' + err.message, 'error');
     } finally {
       isSaving = false;
-      showLoadingButton(e.submitter, false, 'Submit Request');
+      const originalText = (!state.currentRequestId) ? 'ส่ง' : 
+                           (state.editingRecord?.status === 'Draft' ? 'ส่ง' : 'บันทึก');
+      showLoadingButton(e.submitter, false, originalText);
     }
   }
 
@@ -1417,7 +1436,7 @@ const App = (function () {
     if (isSaving) return;
     isSaving = true;
     const btn = document.getElementById('btn-save-draft');
-    showLoadingButton(btn, true, 'Saving Draft...');
+    showLoadingButton(btn, true, 'กำลังร่าง...');
 
     try {
       const customerName = document.getElementById('form-customer').value.trim();
@@ -1476,7 +1495,7 @@ const App = (function () {
       showToast('ไม่สามารถบันทึกแบบร่างได้: ' + err.message, 'error');
     } finally {
       isSaving = false;
-      showLoadingButton(btn, false, 'Save Draft');
+      showLoadingButton(btn, false, 'ร่าง');
     }
   }
 
@@ -3609,83 +3628,25 @@ const App = (function () {
 
   function initRealtime() {
     if (!state.currentUser) return;
-    const role = state.currentUser.role;
-    
-    window.DB.setupRealtimeNotifications(
-      // onInsert (New Request)
-      async (newRecord) => {
-        if (newRecord.status === 'Draft') return;
-        if (role === 'admin' || role === 'lab') {
-          playNotificationSound();
-          const requesterName = await window.DB.fetchRequesterName(newRecord.requester_id);
-          showToast(
-            `<b>🔔 มีใบ Request ใหม่</b><br/>Request No. : ${newRecord.request_no || 'ยังไม่มี'}<br/>Customer : ${newRecord.customer_name || '-'}<br/>จาก : ${requesterName}`,
-            'info',
-            {
-              duration: 5000,
-              onClick: () => navigate('request-detail', { id: newRecord.id })
-            }
-          );
-        }
-      },
-      // onUpdate (Status changed to Pending OR Shared with Base Oil)
-      async (newRecord, oldRecord) => {
-        // Case 1: Draft -> Pending (Submitted)
-        if (oldRecord.status === 'Draft' && newRecord.status !== 'Draft') {
-          if (role === 'admin' || role === 'lab') {
-            playNotificationSound();
-            const requesterName = await window.DB.fetchRequesterName(newRecord.requester_id);
-            showToast(
-              `<b>🔔 มีใบ Request ใหม่</b><br/>Request No. : ${newRecord.request_no || 'ยังไม่มี'}<br/>Customer : ${newRecord.customer_name || '-'}<br/>จาก : ${requesterName}`,
-              'info',
-              {
-                duration: 5000,
-                onClick: () => navigate('request-detail', { id: newRecord.id })
-              }
-            );
-          }
-        }
-        
-        // Case 2: Shared with Base Oil
-        if (oldRecord.need_base_oil_view === false && newRecord.need_base_oil_view === true) {
-          if (role === 'base_oil') {
-            playNotificationSound();
-            showToast(
-              `<b>🔔 มีใบ Request ที่แชร์มายัง Base Oil</b><br/>Request No. : ${newRecord.request_no || 'ยังไม่มี'}`,
-              'info',
-              {
-                duration: 5000,
-                onClick: () => navigate('request-detail', { id: newRecord.id })
-              }
-            );
-          }
-        }
+    if (window._realtimeReady) return; // ป้องกันการเรียกซ้ำ
+    window._realtimeReady = true;
 
-        // Case 3: Notify Requester when Base Oil request is Complete/Approved
-        if (newRecord.need_base_oil_view === true) {
-          const wasNotComplete = oldRecord.status !== 'Complete' && oldRecord.status !== 'Approved';
-          const isNowComplete = newRecord.status === 'Complete' || newRecord.status === 'Approved';
-          
-          if (wasNotComplete && isNowComplete) {
-            if (role === 'requester' && newRecord.requester_id === state.currentUser.id) {
-              playNotificationSound();
-              showToast(
-                `<b>✅ ผลทดสอบ Base Oil ผ่านแล้ว!</b><br/>Request No. : ${newRecord.request_no || '-'}<br/>ตรวจสอบเสร็จสมบูรณ์`,
-                'success',
-                {
-                  duration: 10000,
-                  onClick: () => navigate('request-detail', { id: newRecord.id })
-                }
-              );
-              showOSNotification(
-                'ผลทดสอบ Base Oil ผ่านแล้ว! ✅', 
-                `Request No. : ${newRecord.request_no || '-'}\nตรวจสอบเสร็จสมบูรณ์`
-              );
-            }
-          }
+    const cfg = window.AppConfig.load();
+    const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+    client.channel('lrms-sound-only')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, (payload) => {
+        if (payload.new && payload.new.status !== 'Draft') {
+          playNotificationSound();
+          loadRequestsList();
         }
-      }
-    );
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, () => {
+        loadRequestsList();
+      })
+      .subscribe((status) => {
+        console.log('Realtime:', status);
+      });
   }
 
   // Bind init to window load event

@@ -1961,17 +1961,19 @@
       }
 
       this._realtimeChannel = client.channel('requests-realtime')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, payload => {
-          if (onInsert) onInsert(payload.new);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => {
+          if (payload.eventType === 'INSERT' && onInsert) onInsert(payload.new);
+          if (payload.eventType === 'UPDATE' && onUpdate) onUpdate(payload.new, payload.old);
         })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
-          if (onUpdate) onUpdate(payload.new, payload.old);
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'request_items' }, payload => {
+          if (payload.eventType === 'UPDATE') {
+            window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
+          }
         })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'request_items' }, payload => {
-          window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
-        })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
-          window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'edit_requests' }, payload => {
+          if (payload.eventType === 'INSERT') {
+            window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
+          }
         })
         .subscribe();
     },
@@ -2146,6 +2148,7 @@
     async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
     async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); },
     async savePushSubscription(subscription, role) { return this.getService().savePushSubscription(subscription, role); },
-    async deletePushSubscription(endpoint) { return this.getService().deletePushSubscription(endpoint); }
+    async deletePushSubscription(endpoint) { return this.getService().deletePushSubscription(endpoint); },
+    getSupabaseClient() { return getSupabaseClient(); }
   };
 })();
