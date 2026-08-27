@@ -83,6 +83,15 @@
       return session ? JSON.parse(session) : null;
     },
 
+    async getDraftCount() {
+      const requests = JSON.parse(localStorage.getItem('rmis_requests') || '[]');
+      return requests.filter(r => r.status === 'Draft').length;
+    },
+
+    async hasPendingEditRequest(requestId) {
+      const editRequests = JSON.parse(localStorage.getItem('rmis_edit_requests') || '[]');
+      return editRequests.some(er => String(er.request_id) === String(requestId) && er.status === 'Pending');
+    },
     async getRequests(filters = {}) {
       const currentUser = await this.getCurrentUser();
       if (!currentUser) throw new Error('Unauthenticated');
@@ -712,6 +721,18 @@
       localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
     },
 
+    async updateUserRole(userId, newRole) {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
+
+      const users = JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+      const userIndex = users.findIndex(u => u.id === userId);
+      if (userIndex === -1) throw new Error('ไม่พบผู้ใช้งาน');
+
+      users[userIndex].role = newRole;
+      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+    },
+
     // Change password for the currently logged-in user (any role)
     async changeOwnPassword(currentPassword, newPassword) {
       const currentUser = await this.getCurrentUser();
@@ -746,9 +767,30 @@
       return [];
     },
 
-    async saveSignature(userId, signatureUrl) {},
+    async saveSignature(userId, fileOrDataUrl) {
+      let finalData = fileOrDataUrl;
+      if (fileOrDataUrl instanceof File || fileOrDataUrl instanceof Blob) {
+        finalData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(fileOrDataUrl);
+        });
+      }
+      let sigs = JSON.parse(localStorage.getItem('rmis_signatures') || '{}');
+      sigs[userId] = {
+        signature_url: finalData,
+        updated_at: new Date().toISOString()
+      };
+      localStorage.setItem('rmis_signatures', JSON.stringify(sigs));
+      return finalData;
+    },
 
-    async deleteSignature(userId) {},
+    async deleteSignature(userId) {
+      let sigs = JSON.parse(localStorage.getItem('rmis_signatures') || '{}');
+      delete sigs[userId];
+      localStorage.setItem('rmis_signatures', JSON.stringify(sigs));
+    },
 
     async approveRequest(id) {
       const requests = JSON.parse(localStorage.getItem(LOCAL_REQUESTS_KEY) || '[]');
@@ -801,6 +843,32 @@
     async setupRealtimeNotifications(onInsert, onUpdate) {},
     async cleanupRealtimeNotifications() {},
     async fetchRequesterName(userId) { return 'Unknown'; },
+    async getDraftCount() {
+      const client = getSupabaseClient();
+      if (!client) return 0;
+      const { count, error } = await client
+        .from('requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Draft');
+      if (error) {
+        console.warn('Error fetching draft count:', error);
+        return 0;
+      }
+      return count || 0;
+    },
+
+    async hasPendingEditRequest(requestId) {
+      const client = getSupabaseClient();
+      if (!client || !requestId) return false;
+      const { data, error } = await client
+        .from('edit_requests')
+        .select('id')
+        .eq('request_id', requestId)
+        .eq('status', 'Pending')
+        .limit(1);
+      if (error || !data) return false;
+      return data.length > 0;
+    },
     async fetchEditRequests() { return []; },
     async createEditRequest(data) { return null; },
     async updateEditRequestStatus(id, status, actionedBy) { return false; },
@@ -919,6 +987,15 @@
       return window.LocalStorageDB.getCurrentUser();
     },
 
+    async getDraftCount() {
+      const requests = JSON.parse(localStorage.getItem('rmis_requests') || '[]');
+      return requests.filter(r => r.status === 'Draft').length;
+    },
+
+    async hasPendingEditRequest(requestId) {
+      const editRequests = JSON.parse(localStorage.getItem('rmis_edit_requests') || '[]');
+      return editRequests.some(er => String(er.request_id) === String(requestId) && er.status === 'Pending');
+    },
     async getRequests(filters = {}) {
       const client = getSupabaseClient();
       const currentUser = await this.getCurrentUser();
@@ -928,12 +1005,46 @@
       const pageSize = Math.max(1, parseInt(filters.pageSize) || 20);
 
       // Starting base query
+            // Explicit lightweight column selection: exclude heavy approved_signature_snapshot
       let query = client
         .from('requests')
         .select(`
-          *,
+          id,
+          request_no,
+          request_year,
+          request_date,
+          request_time,
+          customer_name,
+          po_number,
+          requester_id,
+          car_plate,
+          seal_no,
+          container_no,
+          notes,
+          lab_comments,
+          status,
+          need_base_oil_view,
+          approved,
+          approved_by,
+          approved_at,
+          approved_name,
+          approved_role,
+          created_at,
           profiles:requester_id (display_name),
-          request_items (*)
+          request_items (
+            id,
+            request_id,
+            product_name,
+            batch_number,
+            quantity,
+            rm_no,
+            test_result,
+            inspection_date,
+            item_comment,
+            density_15c,
+            density_30c,
+            created_at
+          )
         `, isPaginated ? { count: 'exact' } : undefined);
 
       // Handle Draft filtering
@@ -1543,9 +1654,9 @@
       // --- FALLBACK: Legacy Memory-Merge Logic (if View does not exist yet) ---
       let activeHistory = [];
       try {
-        const { data: rawItems, error: itemsErr } = await client.from('request_items').select('*');
+        const { data: rawItems, error: itemsErr } = await client.from('request_items').select('id, request_id, product_name, batch_number, quantity, rm_no, test_result, inspection_date, item_comment, density_15c, density_30c, created_at');
         if (!itemsErr && rawItems && rawItems.length > 0) {
-          const { data: rawReqs } = await client.from('requests').select('*').catch(() => ({ data: [] }));
+          const { data: rawReqs } = await client.from('requests').select('id, request_no, request_year, request_date, request_time, customer_name, status').catch(() => ({ data: [] }));
           const reqMap = {};
           (rawReqs || []).forEach(r => { reqMap[r.id] = r; });
 
@@ -1753,9 +1864,8 @@
 
     async createUser(username, password, displayName, role) {
       const client = getSupabaseClient();
-      const email = `${username.trim().toLowerCase()}@factory.local`;
+      const email = username.trim().toLowerCase() + '@factory.local';
 
-      // Create a secondary non-persisted client to register the user without logging the current Admin out
       const config = window.AppConfig.load();
       const tempClient = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
         auth: { persistSession: false }
@@ -1774,7 +1884,6 @@
 
       if (error) throw new Error(error.message);
 
-      // Return a profile mockup since trigger will run to create the record
       return {
         id: data.user.id,
         username: username,
@@ -1785,7 +1894,6 @@
 
     async updateUserPassword(userId, password) {
       const client = getSupabaseClient();
-      // Invoke postgres security definer function created in schema setup
       const { error } = await client.rpc('admin_update_user_password', {
         p_user_id: userId,
         p_new_password: password
@@ -1794,11 +1902,17 @@
       if (error) throw new Error(error.message);
     },
 
-    // Change password for the currently logged-in user via Supabase Auth
+    async updateUserRole(userId, newRole) {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
+      
+      const { error } = await client.from('profiles').update({ role: newRole }).eq('id', userId);
+      if (error) throw new Error(error.message);
+    },
+
     async changeOwnPassword(currentPassword, newPassword) {
       const client = getSupabaseClient();
-
-      // 1. Verify current password by attempting a fresh sign-in
       const { data: sessionData, error: sessionErr } = await client.auth.getSession();
       if (sessionErr || !sessionData.session) throw new Error('ไม่ได้เข้าสู่ระบบ');
 
@@ -1809,7 +1923,6 @@
       });
       if (signInErr) throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง กรุณาตรวจสอบใหม่');
 
-      // 2. Update password via Supabase Auth (secure, no direct DB write)
       const { error: updateErr } = await client.auth.updateUser({ password: newPassword });
       if (updateErr) throw new Error(updateErr.message);
     },
@@ -1846,18 +1959,62 @@
       }));
     },
 
-    async saveSignature(userId, signatureUrl) {
+    async saveSignature(userId, fileOrDataUrl) {
       const client = getSupabaseClient();
       const currentUser = await this.getCurrentUser();
+      if (!client) throw new Error('Database not connected');
+
+      let finalSignatureUrl = fileOrDataUrl;
+
+      // If a File or Blob object is passed, upload to Supabase Storage bucket 'signatures'
+      if (fileOrDataUrl instanceof File || fileOrDataUrl instanceof Blob) {
+        try {
+          const ext = fileOrDataUrl.name ? fileOrDataUrl.name.split('.').pop() : 'png';
+          const fileName = 'sig_' + userId + '_' + Date.now() + '.' + ext;
+          
+          const { error: uploadError } = await client.storage
+            .from('signatures')
+            .upload(fileName, fileOrDataUrl, {
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (uploadError) {
+            console.warn('Storage upload warning:', uploadError);
+          } else {
+            const { data: publicUrlData } = client.storage
+              .from('signatures')
+              .getPublicUrl(fileName);
+            if (publicUrlData && publicUrlData.publicUrl) {
+              finalSignatureUrl = publicUrlData.publicUrl;
+            }
+          }
+        } catch (storageEx) {
+          console.warn('Storage upload exception:', storageEx);
+        }
+      }
+
+      // If it is still a File/Blob (e.g. storage fallback), convert to base64
+      if (finalSignatureUrl instanceof File || finalSignatureUrl instanceof Blob) {
+        finalSignatureUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(finalSignatureUrl);
+        });
+      }
+
       const { error } = await client
         .from('user_signatures')
         .upsert({
           user_id: userId,
-          signature_url: signatureUrl,
+          signature_url: finalSignatureUrl,
           updated_at: new Date().toISOString(),
           created_by: currentUser ? currentUser.id : null
         }, { onConflict: 'user_id' });
+
       if (error) throw new Error(error.message);
+      return finalSignatureUrl;
     },
 
     async deleteSignature(userId) {
@@ -1960,22 +2117,22 @@
         client.removeChannel(this._realtimeChannel);
       }
 
-      this._realtimeChannel = client.channel('requests-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => {
-          if (payload.eventType === 'INSERT' && onInsert) onInsert(payload.new);
-          if (payload.eventType === 'UPDATE' && onUpdate) onUpdate(payload.new, payload.old);
+      this._realtimeChannel = client.channel('requests-realtime-channel')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, payload => {
+          if (onInsert) onInsert(payload.new);
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'request_items' }, payload => {
-          if (payload.eventType === 'UPDATE') {
-            window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
-          }
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
+          if (onUpdate) onUpdate(payload.new, payload.old);
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'edit_requests' }, payload => {
-          if (payload.eventType === 'INSERT') {
-            window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
-          }
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'request_items' }, payload => {
+          window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
         })
-        .subscribe();
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
+          window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
+        })
+        .subscribe((status) => {
+          console.log('Realtime notifications channel status:', status);
+        });
     },
 
     async cleanupRealtimeNotifications() {
@@ -1994,6 +2151,32 @@
       return data.display_name;
     },
 
+    async getDraftCount() {
+      const client = getSupabaseClient();
+      if (!client) return 0;
+      const { count, error } = await client
+        .from('requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Draft');
+      if (error) {
+        console.warn('Error fetching draft count:', error);
+        return 0;
+      }
+      return count || 0;
+    },
+
+    async hasPendingEditRequest(requestId) {
+      const client = getSupabaseClient();
+      if (!client || !requestId) return false;
+      const { data, error } = await client
+        .from('edit_requests')
+        .select('id')
+        .eq('request_id', requestId)
+        .eq('status', 'Pending')
+        .limit(1);
+      if (error || !data) return false;
+      return data.length > 0;
+    },
     async fetchEditRequests() {
       const client = getSupabaseClient();
       if (!client) throw new Error('Database not connected');
@@ -2026,14 +2209,17 @@
       return data[0];
     },
 
-    async updateEditRequestStatus(id, status, actionedBy) {
+    async updateEditRequestStatus(id, status, actionedBy, oldData = null, newData = null) {
       const client = getSupabaseClient();
       if (!client) throw new Error('Database not connected');
-      const { error } = await client.from('edit_requests').update({
+      const payload = {
         status: status,
         actioned_by: actionedBy,
         actioned_at: new Date().toISOString()
-      }).eq('id', id);
+      };
+      if (oldData) payload.old_data = oldData;
+      if (newData) payload.new_data = newData;
+      const { error } = await client.from('edit_requests').update(payload).eq('id', id);
       if (error) throw error;
       return true;
     },
@@ -2130,6 +2316,7 @@
     async getUsers() { return this.getService().getUsers(); },
     async createUser(username, password, displayName, role) { return this.getService().createUser(username, password, displayName, role); },
     async updateUserPassword(userId, password) { return this.getService().updateUserPassword(userId, password); },
+    async updateUserRole(userId, newRole) { return this.getService().updateUserRole(userId, newRole); },
     async changeOwnPassword(currentPassword, newPassword) { return this.getService().changeOwnPassword(currentPassword, newPassword); },
     async deleteUser(userId) { return this.getService().deleteUser(userId); },
     async getSignatures() { return this.getService().getSignatures(); },
@@ -2142,9 +2329,37 @@
     async setupRealtimeNotifications(onInsert, onUpdate) { return this.getService().setupRealtimeNotifications(onInsert, onUpdate); },
     async cleanupRealtimeNotifications() { return this.getService().cleanupRealtimeNotifications(); },
     async fetchRequesterName(userId) { return this.getService().fetchRequesterName(userId); },
+    async getDraftCount() {
+      const client = getSupabaseClient();
+      if (!client) return 0;
+      const { count, error } = await client
+        .from('requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Draft');
+      if (error) {
+        console.warn('Error fetching draft count:', error);
+        return 0;
+      }
+      return count || 0;
+    },
+
+    async hasPendingEditRequest(requestId) {
+      const client = getSupabaseClient();
+      if (!client || !requestId) return false;
+      const { data, error } = await client
+        .from('edit_requests')
+        .select('id')
+        .eq('request_id', requestId)
+        .eq('status', 'Pending')
+        .limit(1);
+      if (error || !data) return false;
+      return data.length > 0;
+    },
+    async getDraftCount() { return this.getService().getDraftCount(); },
+    async hasPendingEditRequest(requestId) { return this.getService().hasPendingEditRequest(requestId); },
     async fetchEditRequests() { return this.getService().fetchEditRequests(); },
     async createEditRequest(data) { return this.getService().createEditRequest(data); },
-    async updateEditRequestStatus(id, status, actionedBy) { return this.getService().updateEditRequestStatus(id, status, actionedBy); },
+    async updateEditRequestStatus(id, status, actionedBy, oldData = null, newData = null) { return this.getService().updateEditRequestStatus(id, status, actionedBy, oldData, newData); },
     async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
     async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); },
     async savePushSubscription(subscription, role) { return this.getService().savePushSubscription(subscription, role); },

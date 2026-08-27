@@ -471,6 +471,7 @@ const App = (function () {
 
   async function logout() {
     try {
+      window._realtimeReady = false;
       await window.DB.cleanupRealtimeNotifications();
       await window.DB.logout();
       showToast('ออกจากระบบเรียบร้อย', 'info');
@@ -564,8 +565,8 @@ const App = (function () {
 
     if (createBtnNode) createBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
     if (dashCreateBtnNode) dashCreateBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
-    if (detailModifyBtnNode) detailModifyBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
-    if (detailRemoveBtnNode) detailRemoveBtnNode.style.display = isUserAdmin ? 'inline-flex' : 'none';
+    if (detailModifyBtnNode) detailModifyBtnNode.style.setProperty('display', 'none', 'important');
+    if (detailRemoveBtnNode) detailRemoveBtnNode.style.setProperty('display', 'none', 'important');
     
     // Kick off async background update for drafts
     updateDraftCountsInBackground();
@@ -578,8 +579,7 @@ const App = (function () {
     if (!isRequester && !isAdmin) return;
 
     try {
-      const draftRequests = await window.DB.getRequests({ isDraft: true });
-      const draftCount = draftRequests.length;
+      const draftCount = await window.DB.getDraftCount();
       
       const sidebarDraftCount = document.getElementById('sidebar-draft-count');
       const draftStat = document.getElementById('stat-drafts');
@@ -1081,7 +1081,8 @@ const App = (function () {
     ];
 
     const isDraftStatus = statusSelect ? statusSelect.value === 'Draft' : false;
-    const readonlyForLabOrRequester = (isLab && !isAdmin) || (isBaseOil && !isAdmin) || (isRequester && !isDraftStatus);
+    const isFulfillingEdit = currentFulfillingEditRequestId !== null;
+    const readonlyForLabOrRequester = (isLab && !isAdmin && !isFulfillingEdit) || (isBaseOil && !isAdmin) || (isRequester && !isDraftStatus);
     nonLabInputs.forEach(input => {
       if (input) {
         if (isEditMode) {
@@ -1208,7 +1209,8 @@ const App = (function () {
     const isEditMode = state.currentRequestId !== null;
     const statusSelect = document.getElementById('form-status');
     const isDraftStatus = statusSelect ? statusSelect.value === 'Draft' : false;
-    const disableInputs = isEditMode && ((isLab && !isAdmin) || (isRequester && !isDraftStatus));
+    const isFulfillingEdit = currentFulfillingEditRequestId !== null;
+    const disableInputs = isEditMode && ((isLab && !isAdmin && !isFulfillingEdit) || (isRequester && !isDraftStatus));
     const showDelete = !disableInputs;
     const needBaseOilCheck = document.getElementById('form-need-base-oil');
     const isBaseOilChecked = needBaseOilCheck ? needBaseOilCheck.checked : false;
@@ -1397,6 +1399,7 @@ const App = (function () {
         if (isSubmittingDraft) {
           // Submit Draft (Draft -> Pending)
           const submitted = await window.DB.submitDraft(state.currentRequestId, requestData, itemsData);
+          playNotificationSound();
           showToast('ส่งใบแจ้งตรวจสอบเรียบร้อยแล้ว', 'success');
           loadRequestsList();
           navigate('request-detail', { id: submitted.id });
@@ -1406,9 +1409,12 @@ const App = (function () {
           showToast('แก้ไขข้อมูลใบแจ้งตรวจสอบเรียบร้อยแล้ว', 'success');
           
           if (currentFulfillingEditRequestId) {
-            await window.DB.updateEditRequestStatus(currentFulfillingEditRequestId, 'Approved', state.currentUser.id);
+            // Build simple old/new data objects for audit
+            const oldData = state.editingRecord ? { request: state.editingRecord, items: state.editingRecord.items } : null;
+            const newData = { request: requestData, items: itemsData };
+            await window.DB.updateEditRequestStatus(currentFulfillingEditRequestId, 'Completed', state.currentUser.id, oldData, newData);
             currentFulfillingEditRequestId = null;
-            showToast('ตอบรับและบันทึกคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
+            showToast('ดำเนินการตามคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
           }
 
           loadRequestsList();
@@ -1417,6 +1423,7 @@ const App = (function () {
       } else {
         // Create request directly
         const created = await window.DB.createRequest(requestData, itemsData);
+        playNotificationSound();
         showToast('บันทึกใบแจ้งตรวจสอบส่งแล็บเรียบร้อยแล้ว', 'success');
         loadRequestsList();
         navigate('request-detail', { id: created.id });
@@ -1657,7 +1664,26 @@ const App = (function () {
         if (editBtn) editBtn.style.setProperty('display', 'none', 'important');
         if (deleteBtn) deleteBtn.style.setProperty('display', 'none', 'important');
       } else {
-        if (editBtn) editBtn.style.setProperty('display', (isAdmin || isLab) ? 'inline-flex' : 'none', 'important');
+        if (editBtn) {
+          editBtn.style.setProperty('display', (isAdmin || isLab) ? 'inline-flex' : 'none', 'important');
+          // Update button text for Lab based on edit request status
+          if (isLab && !isAdmin) {
+            editBtn.innerHTML = '<i data-lucide="edit"></i> บันทึกผลทดสอบ / แก้ไข';
+            window.DB.hasPendingEditRequest(details.id).then(hasActiveEdit => {
+               if (hasActiveEdit) {
+                 editBtn.innerHTML = '✏️ แก้ไขข้อมูลตามคำขอ';
+                 editBtn.style.backgroundColor = '#f59e0b';
+                 editBtn.style.color = 'white';
+               } else {
+                 editBtn.style.backgroundColor = ''; // default
+                 editBtn.style.color = '';
+               }
+               if (window.lucide) window.lucide.createIcons();
+            }).catch(e => console.error(e));
+          } else {
+            editBtn.innerHTML = '<i data-lucide="edit"></i> แก้ไขข้อมูลใบแจ้ง';
+          }
+        }
         if (deleteBtn) deleteBtn.style.setProperty('display', isAdmin ? 'inline-flex' : 'none', 'important');
       }
 
@@ -1698,17 +1724,6 @@ const App = (function () {
             
             const dt = details.approved_at ? new Date(details.approved_at) : null;
             document.getElementById('approval-date-display').innerText = dt ? `${formatThaiDate(dt.toISOString().split('T')[0])} ${dt.toTimeString().slice(0, 5)} น.` : '-';
-            
-            const sigImg = document.getElementById('approval-signature-img');
-            const noSig = document.getElementById('approval-no-sig-text');
-            if (details.approved_signature_snapshot) {
-              sigImg.src = details.approved_signature_snapshot;
-              sigImg.style.display = 'block';
-              noSig.style.display = 'none';
-            } else {
-              sigImg.style.display = 'none';
-              noSig.style.display = 'block';
-            }
 
             document.getElementById('reopen-action-container').style.display = isAdmin ? 'block' : 'none';
 
@@ -1910,7 +1925,7 @@ const App = (function () {
         if (h.test_result === 'Fail') resClass = 'result-fail';
         if (h.test_result === 'Hold') resClass = 'result-hold';
 
-        const statusBadge = getStatusBadgeClass(h.status || 'Complete');
+        const statusBadge = getStatusBadgeClass(h.request_status || h.status || 'Complete');
 
         // ตรวจสอบสิทธิ์พิมพ์จากผลการตรวจระดับรายการ (test_result) ไม่ใช่สถานะใบ Request
         let printBtnHtml = '';
@@ -1962,7 +1977,7 @@ const App = (function () {
           <td style="white-space: nowrap; text-align:center;">${inspectionDateHtml}</td>
           <td style="color:#666; font-size:13px; max-width:150px; word-wrap:break-word;">${escapeHtml(h.item_comment || '')}</td>
           <td style="white-space: nowrap;">${escapeHtml(h.requester_name || '-')}</td>
-          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status || 'Complete'}</span></td>
+          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.request_status || h.status || 'Complete'}</span></td>
           <td style="display: flex; justify-content: center; align-items: center; gap: 8px; white-space: nowrap;">
             ${viewDetailBtn}
             ${printBtnHtml}
@@ -2054,7 +2069,7 @@ const App = (function () {
         if (h.test_result === 'Fail') resClass = 'result-fail';
         if (h.test_result === 'Hold') resClass = 'result-hold';
 
-        const statusBadge = getStatusBadgeClass(h.status || 'Complete');
+        const statusBadge = getStatusBadgeClass(h.request_status || h.status || 'Complete');
         const reqNoDisplay = h.is_historical ? '<span style="color:#64748b; font-size:12px; font-weight:600;">HISTORICAL</span>' : `<strong>${h.request_no || '-'}/${h.request_year || ''}</strong>`;
         const viewLinkHtml = (h.is_historical || !h.request_id || h.request_id === 'HISTORICAL') ? '-' : `<a href="#" onclick="App.closeBatchTraceModal(); App.navigate('request-detail', {id: '${h.request_id}'}); return false;">ดูรายละเอียด &rarr;</a>`;
 
@@ -2065,7 +2080,7 @@ const App = (function () {
           <td style="white-space: nowrap;">${h.rm_no ? `<code>${escapeHtml(h.rm_no)}</code>` : '<em style="color:var(--text-muted);">ว่าง</em>'}</td>
           <td style="white-space: nowrap;"><span class="badge ${resClass}">${h.test_result}</span></td>
           <td style="white-space: nowrap;">${escapeHtml(h.requester_name || '-')}</td>
-          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.status || 'Complete'}</span></td>
+          <td style="white-space: nowrap;"><span class="badge ${statusBadge}">${h.request_status || h.status || 'Complete'}</span></td>
           <td style="white-space: nowrap;">
             ${viewLinkHtml}
           </td>
@@ -2124,6 +2139,9 @@ const App = (function () {
           <td><span class="${roleBadgeClass}" style="text-transform:none;">${roleText}</span></td>
           <td>${createdDate}</td>
           <td style="text-align:center; display:flex; justify-content:center; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="App.openChangeRoleModal('${u.id}', '${escapeHtml(u.username)}', '${u.role}')" style="padding:4px 8px; ${isSelf ? 'opacity:0.3; cursor:not-allowed;' : ''}" ${isSelf ? 'disabled' : ''}>
+              เปลี่ยนสิทธิ์
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="App.openChangePasswordModal('${u.id}', '${escapeHtml(u.username)}')" style="padding:4px 8px;">
               เปลี่ยนรหัสผ่าน
             </button>
@@ -2189,6 +2207,42 @@ const App = (function () {
   }
 
   // --- SETTINGS MODAL (all roles) ---
+  // --- Change Role ---
+  function openChangeRoleModal(userId, username, currentRole) {
+    const modal = document.getElementById('modal-change-role');
+    if (modal) {
+      document.getElementById('change-role-form').reset();
+      document.getElementById('change-role-userid').value = userId;
+      document.getElementById('change-role-select').value = currentRole || 'requester';
+      document.getElementById('change-role-title').innerText = 'เปลี่ยนสิทธิ์ผู้ใช้: ' + username;
+      modal.classList.add('open');
+    }
+  }
+
+  function closeChangeRoleModal() {
+    const modal = document.getElementById('modal-change-role');
+    if (modal) modal.classList.remove('open');
+  }
+
+  async function handleChangeRoleSubmit(e) {
+    e.preventDefault();
+    const userId = document.getElementById('change-role-userid').value;
+    const newRole = document.getElementById('change-role-select').value;
+
+    try {
+      showLoadingButton(e.submitter, true, 'กำลังบันทึก...');
+      await window.DB.updateUserRole(userId, newRole);
+      showToast('เปลี่ยนสิทธิ์ผู้ใช้งานสำเร็จ', 'success');
+      closeChangeRoleModal();
+      loadUsersManager(); // Refresh the list
+    } catch (err) {
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการเปลี่ยนสิทธิ์: ' + err.message, 'error');
+    } finally {
+      showLoadingButton(e.submitter, false);
+    }
+  }
+
   function openSettingsModal() {
     // เปิด modal ก่อนเสมอ
     const modal = document.getElementById('modal-settings');
@@ -2800,63 +2854,59 @@ const App = (function () {
         return;
       }
 
-      // 2. Fetch details for each request to compile sub-items
+      // 2. Direct in-memory compilation without N+1 queries
       const flattenedData = [];
-      for (let r of requests) {
-        try {
-          const detail = await window.DB.getRequestDetail(r.id);
-          const items = detail.items || detail.request_items || [];
-          
-          if (items.length > 0) {
-            items.forEach(item => {
-              flattenedData.push({
-                'เลขที่ใบแจ้ง (Request No)': `${detail.request_no}/${detail.request_year}`,
-                'วันที่แจ้ง (Date)': detail.request_date,
-                'เวลาที่แจ้ง (Time)': detail.request_time,
-                'ชื่อลูกค้า (Customer)': detail.customer_name,
-                'ผู้แจ้ง (Requester)': detail.requester_name || '',
-                'ทะเบียนรถ (Car Plate)': detail.car_plate || '',
-                'หมายเลขซีล (Seal No)': detail.seal_no || '',
-                'หมายเลขตู้ (Container No)': detail.container_no || '',
-                'หมายเหตุ (Notes)': detail.notes || '',
-                'ความคิดเห็นห้องปฏิบัติการ (Lab Comments)': detail.lab_comments || '',
-                'สถานะใบแจ้ง (Request Status)': detail.status,
-                'ชื่อสินค้า (Product Name)': item.product_name || '',
-                'Batch Number': item.batch_number || item.batch_no || '',
-                'Quantity (จำนวน)': item.quantity || '',
-                'RM No.': item.rm_no || '',
-                'ผลการทดสอบ (Test Result)': item.test_result || '',
-                'Density@15C': item.density_15c || '',
-                'Density@30C': item.density_30c || ''
-              });
-            });
-          } else {
+      for (let detail of requests) {
+        const items = detail.request_items || detail.items || [];
+        const reqNoYear = (detail.request_no || '') + '/' + (detail.request_year || '');
+        const requesterName = detail.requester_name || (detail.profiles ? detail.profiles.display_name : '');
+        
+        if (items.length > 0) {
+          items.forEach(item => {
             flattenedData.push({
-              'เลขที่ใบแจ้ง (Request No)': `${detail.request_no}/${detail.request_year}`,
+              'เลขที่ใบแจ้ง (Request No)': reqNoYear,
               'วันที่แจ้ง (Date)': detail.request_date,
               'เวลาที่แจ้ง (Time)': detail.request_time,
               'ชื่อลูกค้า (Customer)': detail.customer_name,
-              'ผู้แจ้ง (Requester)': detail.requester_name || '',
+              'ผู้แจ้ง (Requester)': requesterName,
               'ทะเบียนรถ (Car Plate)': detail.car_plate || '',
               'หมายเลขซีล (Seal No)': detail.seal_no || '',
               'หมายเลขตู้ (Container No)': detail.container_no || '',
               'หมายเหตุ (Notes)': detail.notes || '',
               'ความคิดเห็นห้องปฏิบัติการ (Lab Comments)': detail.lab_comments || '',
               'สถานะใบแจ้ง (Request Status)': detail.status,
-              'ชื่อสินค้า (Product Name)': '',
-              'Batch Number': '',
-              'Quantity (จำนวน)': '',
-              'RM No.': '',
-              'ผลการทดสอบ (Test Result)': '',
-              'Density@15C': '',
-              'Density@30C': ''
+              'ชื่อสินค้า (Product Name)': item.product_name || '',
+              'Batch Number': item.batch_number || item.batch_no || '',
+              'Quantity (จำนวน)': item.quantity || '',
+              'RM No.': item.rm_no || '',
+              'ผลการทดสอบ (Test Result)': item.test_result || '',
+              'Density@15C': item.density_15c || '',
+              'Density@30C': item.density_30c || ''
             });
-          }
-        } catch (itemErr) {
-          console.warn(`Failed to fetch items for request ${r.request_no}:`, itemErr);
+          });
+        } else {
+          flattenedData.push({
+            'เลขที่ใบแจ้ง (Request No)': reqNoYear,
+            'วันที่แจ้ง (Date)': detail.request_date,
+            'เวลาที่แจ้ง (Time)': detail.request_time,
+            'ชื่อลูกค้า (Customer)': detail.customer_name,
+            'ผู้แจ้ง (Requester)': requesterName,
+            'ทะเบียนรถ (Car Plate)': detail.car_plate || '',
+            'หมายเลขซีล (Seal No)': detail.seal_no || '',
+            'หมายเลขตู้ (Container No)': detail.container_no || '',
+            'หมายเหตุ (Notes)': detail.notes || '',
+            'ความคิดเห็นห้องปฏิบัติการ (Lab Comments)': detail.lab_comments || '',
+            'สถานะใบแจ้ง (Request Status)': detail.status,
+            'ชื่อสินค้า (Product Name)': '',
+            'Batch Number': '',
+            'Quantity (จำนวน)': '',
+            'RM No.': '',
+            'ผลการทดสอบ (Test Result)': '',
+            'Density@15C': '',
+            'Density@30C': ''
+          });
         }
       }
-
       // 3. Perform export based on selected format
       if (format === 'excel') {
         await ensureXLSXLoaded();
@@ -3143,8 +3193,18 @@ const App = (function () {
     document.body.classList.remove('print-mode-daily');
     document.body.classList.add('print-mode-detail');
     
-    // Trigger browser native print dialog (Print Preview)
-    window.print();
+    // Temporarily change document title to ensure correct PDF filename
+    const originalTitle = document.title;
+    const requestNoText = reqNoEl.innerText.trim().replace(/\//g, '-');
+    document.title = `Request_${requestNoText}`;
+    
+    // Allow DOM to update before triggering print dialog
+    setTimeout(() => {
+      window.print();
+      
+      // Restore title
+      document.title = originalTitle;
+    }, 300);
   }
 
   // --- LAB SIGNATURES MANAGER ---
@@ -3230,20 +3290,20 @@ const App = (function () {
     }
 
     const file = fileInput.files[0];
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-      const dataUrl = e.target.result;
-      try {
-        await window.DB.saveSignature(userId, dataUrl);
-        showToast('บันทึกลายเซ็นเรียบร้อยแล้ว', 'success');
-        closeSignatureModal();
-        loadSignaturesManager();
-      } catch (err) {
-        console.error(err);
-        showToast('ไม่สามารถบันทึกลายเซ็นได้: ' + err.message, 'error');
-      }
-    };
-    reader.readAsDataURL(file);
+    const btn = document.querySelector('#modal-upload-signature .btn-primary');
+    
+    try {
+      if (btn) { btn.disabled = true; btn.innerText = 'กำลังอัปโหลด...'; }
+      await window.DB.saveSignature(userId, file);
+      showToast('บันทึกลายเซ็นลง Cloud Storage เรียบร้อยแล้ว', 'success');
+      closeSignatureModal();
+      loadSignaturesManager();
+    } catch (err) {
+      console.error(err);
+      showToast('ไม่สามารถบันทึกลายเซ็นได้: ' + err.message, 'error');
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerText = 'บันทึกลายเซ็น'; }
+    }
   }
 
   async function deleteSignatureConfirm(userId, displayName) {
@@ -3400,6 +3460,19 @@ const App = (function () {
   // --- REALTIME NOTIFICATIONS ---
   let audioCtx = null;
   let isPlayingSound = false;
+
+  // Auto-unlock AudioContext on first user interaction anywhere on the page
+  function unlockAudioContext() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('click', unlockAudioContext, { once: true });
+  document.addEventListener('keydown', unlockAudioContext, { once: true });
+  document.addEventListener('touchstart', unlockAudioContext, { once: true });
 
   function playNotificationSound() {
     const config = window.AppConfig.load();
@@ -3628,25 +3701,25 @@ const App = (function () {
 
   function initRealtime() {
     if (!state.currentUser) return;
-    if (window._realtimeReady) return; // ป้องกันการเรียกซ้ำ
+    if (window._realtimeReady) return; // ป้องกันการเชื่อมต่อซ้ำ
     window._realtimeReady = true;
 
-    const cfg = window.AppConfig.load();
-    const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-
-    client.channel('lrms-sound-only')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, (payload) => {
-        if (payload.new && payload.new.status !== 'Draft') {
+    window.DB.setupRealtimeNotifications(
+      (newReq) => {
+        if (newReq && newReq.status !== 'Draft') {
           playNotificationSound();
+          showToast(`🔔 <b>มีใบแจ้งตรวจสอบใหม่:</b> ${newReq.request_no || ''}/${newReq.request_year || ''} (${newReq.customer_name || ''})`, 'info', { duration: 8000 });
           loadRequestsList();
         }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, () => {
+      },
+      (newReq, oldReq) => {
+        if (newReq && oldReq && oldReq.status === 'Draft' && newReq.status !== 'Draft') {
+          playNotificationSound();
+          showToast(`🔔 <b>มีการส่งใบแจ้งตรวจสอบ:</b> ${newReq.request_no || ''}/${newReq.request_year || ''} (${newReq.customer_name || ''})`, 'info', { duration: 8000 });
+        }
         loadRequestsList();
-      })
-      .subscribe((status) => {
-        console.log('Realtime:', status);
-      });
+      }
+    );
   }
 
   // Bind init to window load event
@@ -4037,16 +4110,17 @@ const App = (function () {
       const customerName = req.customer_name || '-';
       const productName = (req.request_items && req.request_items.length > 0) ? req.request_items.map(i => i.product_name).join(', ') : '-';
       
-      const statusBadge = er.status === 'Approved' 
-        ? '<span class="badge approved" style="background:#10b981; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">ดำเนินการแล้ว</span>' 
-        : '<span class="badge pending" style="background:#f59e0b; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">รอดำเนินการ</span>';
+      let statusBadge = '<span class="badge pending" style="background:#f59e0b; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">รอดำเนินการ</span>';
+      if (er.status === 'Approved' || er.status === 'Completed') {
+        statusBadge = '<span class="badge approved" style="background:#10b981; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">ดำเนินการแล้ว</span>';
+      }
       
       const createdDate = new Date(er.created_at).toLocaleString('th-TH');
       const actionedDate = er.actioned_at ? new Date(er.actioned_at).toLocaleString('th-TH') : '-';
       
       let actionHtml = '';
-      if (isAdmin && er.status === 'Pending') {
-        actionHtml += `<button class="btn btn-sm btn-primary" onclick="App.fulfillEditRequest('${er.id}', '${er.request_id}')">เปิดใบ Request</button>`;
+      if ((isAdmin || role === 'lab') && er.status === 'Pending') {
+        actionHtml += `<button class="btn btn-sm btn-primary" onclick="App.fulfillEditRequest('${er.id}', '${er.request_id}')">✏️ แก้ไขข้อมูลตามคำขอ</button>`;
       }
       if (isAdmin) {
         actionHtml += `<button class="btn btn-sm" style="background:#ef4444;color:white;margin-left:5px;" onclick="App.deleteEditRequest('${er.id}')">ลบ</button>`;
@@ -4417,6 +4491,9 @@ const App = (function () {
     togglePwdVisibility,
     handleChangeOwnPasswordSubmit,
     openChangePasswordModal,
+    closeChangeRoleModal,
+    openChangeRoleModal,
+    handleChangeRoleSubmit,
     closeChangePasswordModal,
     handleChangePasswordSubmit,
     deleteUserAccount,
