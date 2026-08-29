@@ -12,6 +12,105 @@
   
   <!-- Supabase CDN (Required for auth & database) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Notification Dropdown and Badge Styles -->
+  <style>
+    .notif-dropdown-wrapper { position: relative; }
+    .btn-notif-bell {
+      background: none;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      padding: 7px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-color, #475569);
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .btn-notif-bell:hover {
+      background-color: var(--bg-hover, rgba(0,0,0,0.05));
+      color: var(--primary-color, #0284c7);
+    }
+    .notif-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: #ef4444;
+      color: white;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      min-width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .notif-panel {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 42px;
+      width: 360px;
+      max-width: calc(100vw - 24px);
+      background: #ffffff;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+      z-index: 9999;
+      overflow: hidden;
+    }
+    .notif-panel.open {
+      display: block;
+      animation: notifSlideDown 0.2s ease-out;
+    }
+    .notif-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      transition: background-color 0.15s;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .notif-item:hover { background-color: #f8fafc; }
+    .notif-item.unread { background-color: #f0f9ff; }
+    .notif-item.unread:hover { background-color: #e0f2fe; }
+    .notif-item-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+    .notif-item-content { flex: 1; min-width: 0; }
+    .notif-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .notif-item-desc {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .notif-item-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .notif-unread-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #0284c7;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+    @keyframes notifSlideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
 
@@ -109,7 +208,34 @@
           </button>
           <h2 id="topbar-title" style="font-size: 18px; font-weight: 600;">ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ</h2>
         </div>
-        <div class="navbar-right">
+        <div class="navbar-right" style="display: flex; align-items: center; gap: 12px;">
+          <!-- Notification Bell & Panel Dropdown -->
+          <div class="notif-dropdown-wrapper" id="notif-dropdown-wrapper">
+            <button id="btn-notif-bell" class="btn-notif-bell" onclick="App.toggleNotificationPanel(event)" title="การแจ้งเตือน">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span id="notif-badge-count" class="notif-badge" style="display: none;">0</span>
+            </button>
+            
+            <!-- Notification Dropdown Panel -->
+            <div id="notif-panel" class="notif-panel">
+              <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color, #e2e8f0); display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <div style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; color: #1e293b;">
+                  <span>การแจ้งเตือน</span>
+                  <span id="notif-panel-unread-tag" style="font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 1px 6px; border-radius: 10px; display: none; font-weight: 600;">0 ใหม่</span>
+                </div>
+                <button onclick="App.markAllNotificationsAsRead()" style="background: none; border: none; color: #0284c7; font-size: 11px; cursor: pointer; padding: 0; font-weight: 500;">อ่านทั้งหมดแล้ว</button>
+              </div>
+              <div id="notif-list-container" style="max-height: 360px; overflow-y: auto;">
+                <div style="padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 13px;">
+                  ไม่มีการแจ้งเตือน
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Connection Status Indicator -->
           <div id="conn-status-badge" style="font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
             <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#10b981;"></span>
@@ -1497,8 +1623,8 @@
     }
   </script>
 
-  <script src="config.js?v=115"></script>
-  <script src="dbService.js?v=115"></script>
-  <script src="app_v5.js?v=115"></script>
+  <script src="config.js?v=123"></script>
+  <script src="dbService.js?v=123"></script>
+  <script src="app_v5.js?v=123"></script>
 </body>
 </html>

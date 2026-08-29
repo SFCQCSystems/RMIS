@@ -471,7 +471,7 @@ const App = (function () {
 
   async function logout() {
     try {
-      window._realtimeReady = false;
+      NotificationService.cleanup();
       await window.DB.cleanupRealtimeNotifications();
       await window.DB.logout();
       showToast('ออกจากระบบเรียบร้อย', 'info');
@@ -1148,42 +1148,6 @@ const App = (function () {
     }
   }
 
-  let draggedRow = null;
-
-  function initRowDragAndDrop(tr) {
-    tr.setAttribute('draggable', 'true');
-    tr.style.cursor = 'grab';
-
-    tr.addEventListener('dragstart', (e) => {
-      draggedRow = tr;
-      tr.style.opacity = '0.5';
-      tr.style.outline = '2px dashed #0284c7';
-      tr.style.background = '#e0f2fe';
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', tr.id);
-    });
-
-    tr.addEventListener('dragend', () => {
-      tr.style.opacity = '1';
-      tr.style.outline = 'none';
-      tr.style.background = '';
-      draggedRow = null;
-    });
-
-    tr.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      if (!draggedRow || draggedRow === tr) return;
-
-      const rect = tr.getBoundingClientRect();
-      const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
-      const tbody = document.getElementById('form-items-tbody');
-      if (tbody) {
-        tbody.insertBefore(draggedRow, next ? tr.nextSibling : tr);
-      }
-    });
-  }
-
   function addFormItemRow(item = {}) {
     const tbody = document.getElementById('form-items-tbody');
     const rowId = 'item-row-' + Math.random().toString(36).slice(2, 9);
@@ -1217,11 +1181,8 @@ const App = (function () {
 
     tr.innerHTML = `
       <td>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="cursor:grab; color:#94a3b8; font-size:16px; user-select:none;" title="กดลากเพื่อเปลี่ยนลำดับ (Drag to Reorder)">⠿</span>
-          <input type="hidden" class="item-form-id" value="${id}">
-          <input type="text" class="item-form-name" required placeholder="เช่น Hydraulic Oil AW 68" value="${escapeHtml(name)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''} style="flex:1;">
-        </div>
+        <input type="hidden" class="item-form-id" value="${id}">
+        <input type="text" class="item-form-name" required placeholder="เช่น Hydraulic Oil AW 68" value="${escapeHtml(name)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''}>
       </td>
       <td>
         <input type="text" class="item-form-batch" required placeholder="เช่น B-260510-1" value="${escapeHtml(batch)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''}>
@@ -1258,17 +1219,6 @@ const App = (function () {
       </td>
     `;
     tbody.appendChild(tr);
-    initRowDragAndDrop(tr);
-  }
-
-  function moveFormItemRow(rowId, direction) {
-    const row = document.getElementById(rowId);
-    if (!row) return;
-    if (direction === -1 && row.previousElementSibling) {
-      row.parentNode.insertBefore(row, row.previousElementSibling);
-    } else if (direction === 1 && row.nextElementSibling) {
-      row.parentNode.insertBefore(row.nextElementSibling, row);
-    }
   }
 
   function removeFormItemRow(rowId) {
@@ -3457,107 +3407,265 @@ const App = (function () {
       .replace(/'/g, "&#039;");
   }
 
-  // --- REALTIME NOTIFICATIONS ---
-  let audioCtx = null;
-  let isPlayingSound = false;
+  // ============================================================
+  // NOTIFICATION AUDIO SERVICE
+  // Architecture: Web Audio API (primary) + In-memory WAV fallback
+  // ============================================================
+  const NotificationAudioService = (function () {
+    let audioCtx = null;
+    let isPlaying = false;
+    let isUnlocked = false;
+    let cachedBlobUrl = null;
+    let fallbackAudio = null;
+    let keepAliveTimer = null;
 
-  // Auto-unlock AudioContext on first user interaction anywhere on the page
-  function unlockAudioContext() {
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
+    // Generate in-memory WAV chime blob URL (0 network bandwidth, 100% offline & mobile reliable)
+    function generateChimeWavBlobUrl() {
+      if (cachedBlobUrl) return cachedBlobUrl;
+      try {
+        const sampleRate = 22050;
+        const duration = 1.4;
+        const numSamples = Math.floor(sampleRate * duration);
+        const buffer = new ArrayBuffer(44 + numSamples * 2);
+        const view = new DataView(buffer);
+        function writeStr(off, str) {
+          for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i));
+        }
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + numSamples * 2, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, 1, true); // Mono
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, 'data');
+        view.setUint32(40, numSamples * 2, true);
+
+        const notes = [
+          { freq: 659.25, start: 0.00, dur: 0.9 }, // E5
+          { freq: 880.00, start: 0.15, dur: 1.0 }, // A5
+          { freq: 1108.73, start: 0.30, dur: 1.1 } // C#6
+        ];
+        for (let i = 0; i < numSamples; i++) {
+          const t = i / sampleRate;
+          let s = 0;
+          notes.forEach(n => {
+            if (t >= n.start && t < n.start + n.dur) {
+              const env = Math.exp(-3.5 * (t - n.start));
+              s += (Math.sin(2 * Math.PI * n.freq * t) * 0.7 +
+                    Math.sin(4 * Math.PI * n.freq * t) * 0.15) * env * 0.35;
+            }
+          });
+          s = Math.max(-1, Math.min(1, s));
+          view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        cachedBlobUrl = URL.createObjectURL(blob);
+
+        fallbackAudio = new Audio(cachedBlobUrl);
+        fallbackAudio.volume = 0.8;
+        fallbackAudio.preload = 'auto';
+
+        return cachedBlobUrl;
+      } catch (e) {
+        console.warn('[NotificationAudioService] WAV generator exception:', e);
+        return null;
       }
-    } catch (e) {}
-  }
-  document.addEventListener('click', unlockAudioContext, { once: true });
-  document.addEventListener('keydown', unlockAudioContext, { once: true });
-  document.addEventListener('touchstart', unlockAudioContext, { once: true });
+    }
 
-  function playNotificationSound() {
-    const config = window.AppConfig.load();
-    if (config.soundEnabled === false) return; // Silent if disabled
-    
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function unlock() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!audioCtx && AudioContextClass) {
+          audioCtx = new AudioContextClass();
+          console.log('[NotificationAudioService] AudioContext created, state:', audioCtx.state);
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().then(() => {
+            console.log('[NotificationAudioService] AudioContext resumed, state:', audioCtx.state);
+            if (audioCtx.state === 'running') {
+              isUnlocked = true;
+              try {
+                const buf = audioCtx.createBuffer(1, 1, 22050);
+                const src = audioCtx.createBufferSource();
+                src.buffer = buf;
+                src.connect(audioCtx.destination);
+                src.start(0);
+              } catch (_) {}
+            }
+          }).catch(err => {
+            console.warn('[NotificationAudioService] Resume failed:', err);
+          });
+        } else if (audioCtx && audioCtx.state === 'running') {
+          isUnlocked = true;
+        }
+      } catch (e) {
+        console.warn('[NotificationAudioService] unlock error:', e);
+      }
+    }
+
+    function keepAlive() {
+      if (!audioCtx) return;
       if (audioCtx.state === 'suspended') {
         audioCtx.resume().then(() => {
-          if (audioCtx.state === 'suspended') {
-            showToast('กรุณาคลิกที่หน้าเว็บ 1 ครั้ง เพื่อเปิดใช้งานเสียงแจ้งเตือน', 'warning', { duration: 5000 });
-            return;
-          }
-          triggerMelody();
-        });
-      } else {
-        triggerMelody();
+          if (audioCtx.state === 'running') isUnlocked = true;
+        }).catch(() => {});
       }
-    } catch (e) {
-      console.warn("Audio play failed:", e);
+      if (audioCtx.state === 'running') {
+        try {
+          const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+          const src = audioCtx.createBufferSource();
+          src.buffer = buf;
+          src.connect(audioCtx.destination);
+          src.start(0);
+        } catch (_) {}
+      }
     }
-  }
 
-  function triggerMelody() {
-    if (!audioCtx || isPlayingSound) return;
-    isPlayingSound = true;
-    
-    const time = audioCtx.currentTime;
-    const masterGain = audioCtx.createGain();
-    masterGain.connect(audioCtx.destination);
-    masterGain.gain.value = 0.6; // Master volume
+    function triggerMelody() {
+      if (!audioCtx || audioCtx.state !== 'running') {
+        playFallback();
+        return;
+      }
+      if (isPlaying) return;
+      isPlaying = true;
+      console.log('[NotificationAudioService] Playing Web Audio chime');
 
-    // MS Teams style positive/soft corporate chime (A Major Arpeggio)
-    // Fast consecutive notes that ring over each other
-    const notes = [
-      { freq: 659.25,  start: 0.00, duration: 1.0 }, // E5
-      { freq: 880.00,  start: 0.15, duration: 1.2 }, // A5
-      { freq: 1108.73, start: 0.30, duration: 1.5 }  // C#6
-    ];
+      try {
+        const time = audioCtx.currentTime;
+        const masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+        masterGain.gain.value = 0.6;
 
-    notes.forEach((note) => {
-      // 1. Sine Wave (The soft body of the bell)
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(note.freq, time + note.start);
-      
-      gain.gain.setValueAtTime(0, time + note.start);
-      gain.gain.linearRampToValueAtTime(0.6, time + note.start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + note.start + note.duration);
-      
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.start(time + note.start);
-      osc.stop(time + note.start + note.duration);
+        const notes = [
+          { freq: 659.25,  start: 0.00, duration: 1.0 }, // E5
+          { freq: 880.00,  start: 0.15, duration: 1.2 }, // A5
+          { freq: 1108.73, start: 0.30, duration: 1.5 }  // C#6
+        ];
 
-      // 2. Triangle Wave (The glassy "strike" of the bell)
-      const oscTri = audioCtx.createOscillator();
-      const gainTri = audioCtx.createGain();
-      oscTri.type = 'triangle';
-      oscTri.frequency.setValueAtTime(note.freq, time + note.start);
-      
-      gainTri.gain.setValueAtTime(0, time + note.start);
-      gainTri.gain.linearRampToValueAtTime(0.15, time + note.start + 0.01); // Quick sharp attack
-      gainTri.gain.exponentialRampToValueAtTime(0.001, time + note.start + 0.3); // Quick decay
-      
-      oscTri.connect(gainTri);
-      gainTri.connect(masterGain);
-      oscTri.start(time + note.start);
-      oscTri.stop(time + note.start + 0.4);
-    });
+        notes.forEach(note => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(note.freq, time + note.start);
+          gain.gain.setValueAtTime(0, time + note.start);
+          gain.gain.linearRampToValueAtTime(0.6, time + note.start + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + note.start + note.duration);
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(time + note.start);
+          osc.stop(time + note.start + note.duration);
 
-    // Unlock sound player after sounds finish ringing
-    setTimeout(() => {
-      isPlayingSound = false;
-    }, 1800);
+          const oscTri = audioCtx.createOscillator();
+          const gainTri = audioCtx.createGain();
+          oscTri.type = 'triangle';
+          oscTri.frequency.setValueAtTime(note.freq, time + note.start);
+          gainTri.gain.setValueAtTime(0, time + note.start);
+          gainTri.gain.linearRampToValueAtTime(0.15, time + note.start + 0.01);
+          gainTri.gain.exponentialRampToValueAtTime(0.001, time + note.start + 0.3);
+          oscTri.connect(gainTri);
+          gainTri.connect(masterGain);
+          oscTri.start(time + note.start);
+          oscTri.stop(time + note.start + 0.4);
+        });
+      } catch (ex) {
+        console.warn('[NotificationAudioService] Web Audio oscillator error:', ex);
+        isPlaying = false;
+        playFallback();
+        return;
+      }
+
+      setTimeout(() => { isPlaying = false; }, 1800);
+    }
+
+    function playFallback() {
+      if (isPlaying) return;
+      isPlaying = true;
+      console.log('[NotificationAudioService] Playing HTML Audio fallback');
+      try {
+        if (!fallbackAudio) generateChimeWavBlobUrl();
+        if (fallbackAudio) {
+          fallbackAudio.currentTime = 0;
+          const playPromise = fallbackAudio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(err => console.warn('[NotificationAudioService] Fallback audio rejected:', err.name));
+          }
+        }
+      } catch (e) {
+        console.warn('[NotificationAudioService] Fallback error:', e);
+      }
+      setTimeout(() => { isPlaying = false; }, 1800);
+    }
+
+    function play() {
+      const config = window.AppConfig ? window.AppConfig.load() : {};
+      if (config && config.soundEnabled === false) {
+        console.log('[NotificationAudioService] Sound disabled in settings');
+        return;
+      }
+
+      console.log('[NotificationAudioService] Sound requested — audioCtx state:', audioCtx ? audioCtx.state : 'null', 'unlocked:', isUnlocked);
+
+      if (isPlaying) return;
+
+      if (audioCtx && audioCtx.state === 'running') {
+        triggerMelody();
+        return;
+      }
+
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          if (audioCtx.state === 'running') {
+            isUnlocked = true;
+            triggerMelody();
+          } else {
+            playFallback();
+          }
+        }).catch(() => {
+          playFallback();
+        });
+        return;
+      }
+
+      playFallback();
+    }
+
+    function testSound() {
+      unlock();
+      setTimeout(() => play(), 50);
+    }
+
+    function init() {
+      generateChimeWavBlobUrl();
+      ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+        document.addEventListener(evt, () => {
+          if (!isUnlocked) unlock();
+        }, { passive: true });
+      });
+      if (!keepAliveTimer) {
+        keepAliveTimer = setInterval(keepAlive, 20000);
+      }
+    }
+
+    return {
+      init,
+      unlock,
+      play,
+      testSound,
+      isReady: () => isUnlocked && audioCtx && audioCtx.state === 'running'
+    };
+  })();
+
+  function playNotificationSound() {
+    NotificationAudioService.play();
   }
 
   function testNotificationSound() {
-    const config = window.AppConfig.load();
-    if (config.soundEnabled === false) {
-      showToast('กรุณาเปิดสวิตช์ "เปิดเสียงแจ้งเตือนระบบ" ก่อนทำการทดสอบ', 'warning');
-      return;
-    }
-    playNotificationSound();
+    NotificationAudioService.testSound();
   }
 
   // --- OS LEVEL NOTIFICATIONS ---
@@ -3699,58 +3807,364 @@ const App = (function () {
     }
   }
 
-  function initRealtime() {
-    if (!state.currentUser) return;
-    if (window._realtimeReady) return; // ป้องกันการเชื่อมต่อซ้ำ
-    window._realtimeReady = true;
+  // ============================================================
+  // NOTIFICATION SERVICE
+  // Manages state, deduplication, Realtime subscriptions, role filters & UI
+  // ============================================================
+  const NotificationService = (function () {
+    let currentUser = null;
+    let realtimeChannel = null;
+    let notifications = [];
+    const processedEvents = new Map(); // key -> timestamp
 
-    window.DB.setupRealtimeNotifications(
-      (newReq) => {
-        if (newReq && newReq.status !== 'Draft') {
-          playNotificationSound();
-          showToast(`🔔 <b>มีใบแจ้งตรวจสอบใหม่:</b> ${newReq.request_no || ''}/${newReq.request_year || ''} (${newReq.customer_name || ''})`, 'info', { duration: 8000 });
-          loadRequestsList();
-        }
-      },
-      (newReq, oldReq) => {
-        if (newReq && oldReq && oldReq.status === 'Draft' && newReq.status !== 'Draft') {
-          playNotificationSound();
-          showToast(`🔔 <b>มีการส่งใบแจ้งตรวจสอบ:</b> ${newReq.request_no || ''}/${newReq.request_year || ''} (${newReq.customer_name || ''})`, 'info', { duration: 8000 });
-        }
-        loadRequestsList();
+    function getStorageKey() {
+      return currentUser ? `rmis_notifications_${currentUser.id}` : 'rmis_notifications_guest';
+    }
+
+    function loadPersisted() {
+      try {
+        const stored = localStorage.getItem(getStorageKey());
+        notifications = stored ? JSON.parse(stored) : [];
+        if (!Array.isArray(notifications)) notifications = [];
+      } catch (e) {
+        notifications = [];
       }
-    );
+    }
+
+    function savePersisted() {
+      try {
+        if (notifications.length > 50) notifications = notifications.slice(0, 50);
+        localStorage.setItem(getStorageKey(), JSON.stringify(notifications));
+      } catch (e) {}
+    }
+
+    function isDuplicate(eventKey) {
+      const now = Date.now();
+      // Clean keys older than 10 minutes
+      for (const [k, time] of processedEvents.entries()) {
+        if (now - time > 600000) processedEvents.delete(k);
+      }
+      if (processedEvents.has(eventKey)) return true;
+      processedEvents.set(eventKey, now);
+      return false;
+    }
+
+    function getUnreadCount() {
+      return notifications.filter(n => !n.isRead).length;
+    }
+
+    function updateUI() {
+      const count = getUnreadCount();
+      const badge = document.getElementById('notif-badge-count');
+      const unreadTag = document.getElementById('notif-panel-unread-tag');
+      if (badge) {
+        badge.innerText = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'inline-flex' : 'none';
+      }
+      if (unreadTag) {
+        unreadTag.innerText = `${count} ใหม่`;
+        unreadTag.style.display = count > 0 ? 'inline-block' : 'none';
+      }
+      renderList();
+    }
+
+    function formatTimeAgo(isoString) {
+      if (!isoString) return '';
+      const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+      if (diff < 60) return 'เมื่อสักครู่';
+      if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)} ชั่วโมงที่แล้ว`;
+      return `${Math.floor(diff / 86400)} วันที่แล้ว`;
+    }
+
+    function renderList() {
+      const container = document.getElementById('notif-list-container');
+      if (!container) return;
+
+      if (notifications.length === 0) {
+        container.innerHTML = `
+          <div style="padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 13px;">
+            ไม่มีการแจ้งเตือน
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = notifications.map(n => `
+        <div class="notif-item ${n.isRead ? '' : 'unread'}" onclick="App.handleNotificationClick('${n.id}', '${n.type}', '${n.requestId || ''}')">
+          <div class="notif-item-icon">${n.icon || '🔔'}</div>
+          <div class="notif-item-content">
+            <div class="notif-item-title">${escapeHtml(n.title)}</div>
+            <div class="notif-item-desc">${escapeHtml(n.message)}</div>
+            <div class="notif-item-time">${formatTimeAgo(n.createdAt)}</div>
+          </div>
+          ${n.isRead ? '' : '<div class="notif-unread-dot"></div>'}
+        </div>
+      `).join('');
+    }
+
+    function createNotification(data) {
+      console.log('[NotificationService] Creating notification:', data.title);
+      const notif = {
+        id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        title: data.title,
+        message: data.message,
+        type: data.type || 'request',
+        requestId: data.requestId || null,
+        icon: data.icon || '🔔',
+        createdAt: new Date().toISOString(),
+        isRead: false
+      };
+
+      notifications.unshift(notif);
+      savePersisted();
+      updateUI();
+
+      // Play Sound
+      NotificationAudioService.play();
+
+      // Trigger OS Push / Notification if granted
+      showOSNotification(data.title, data.message);
+    }
+
+    function handleRealtimeEvent(table, eventType, newRow, oldRow) {
+      if (!currentUser) return;
+      const role = (currentUser.role || '').toLowerCase();
+      console.log(`[NotificationService] Event: ${table} ${eventType}`, newRow);
+
+      if (table === 'requests') {
+        if (eventType === 'INSERT') {
+          if (!newRow || newRow.status === 'Draft') return;
+          const dedupKey = `req_insert_${newRow.id}`;
+          if (isDuplicate(dedupKey)) return;
+
+          const reqNoYear = `${newRow.request_no || ''}/${newRow.request_year || ''}`;
+          const cust = newRow.customer_name || '';
+
+          if (role === 'admin' || role === 'lab') {
+            createNotification({
+              title: `ใบแจ้งตรวจสอบใหม่: ${reqNoYear}`,
+              message: `ลูกค้า: ${cust}`,
+              type: 'request',
+              requestId: newRow.id,
+              icon: '📋'
+            });
+            loadRequestsList();
+          } else if (role === 'base_oil' && newRow.need_base_oil_view) {
+            createNotification({
+              title: `ใบแจ้งตรวจสอบ Base Oil: ${reqNoYear}`,
+              message: `ลูกค้า: ${cust}`,
+              type: 'request',
+              requestId: newRow.id,
+              icon: '🛢️'
+            });
+            loadRequestsList();
+          }
+        } else if (eventType === 'UPDATE') {
+          if (!newRow) return;
+
+          // Draft submitted -> Pending
+          if (oldRow && oldRow.status === 'Draft' && newRow.status !== 'Draft') {
+            const dedupKey = `req_submit_${newRow.id}`;
+            if (isDuplicate(dedupKey)) return;
+
+            const reqNoYear = `${newRow.request_no || ''}/${newRow.request_year || ''}`;
+            const cust = newRow.customer_name || '';
+
+            if (role === 'admin' || role === 'lab') {
+              createNotification({
+                title: `ส่งใบแจ้งตรวจสอบ: ${reqNoYear}`,
+                message: `ลูกค้า: ${cust}`,
+                type: 'request',
+                requestId: newRow.id,
+                icon: '📋'
+              });
+            }
+            loadRequestsList();
+          }
+
+          // 1. Broadcast Approval Notification to ALL Requesters
+          const isApprovedNow = (newRow.status === 'Approved' || newRow.approved === true);
+          const wasApprovedBefore = oldRow ? (oldRow.status === 'Approved' || oldRow.approved === true) : false;
+
+          if (isApprovedNow && !wasApprovedBefore) {
+            if (role === 'requester') {
+              const dedupKey = `req_approved_${newRow.id}`;
+              if (!isDuplicate(dedupKey)) {
+                const reqNoYear = `${newRow.request_no || ''}/${newRow.request_year || ''}`;
+                const cust = newRow.customer_name ? ` (${newRow.customer_name})` : '';
+                createNotification({
+                  title: 'ใบแจ้งตรวจสอบได้รับการอนุมัติแล้ว',
+                  message: `ใบแจ้งตรวจสอบเลขที่ ${reqNoYear}${cust} ได้รับการอนุมัติแล้ว`,
+                  type: 'request',
+                  requestId: newRow.id,
+                  icon: '✅'
+                });
+                loadRequestsList();
+              }
+            }
+          } else if (role === 'requester') {
+            // Silently refresh list for other status changes without creating noise
+            loadRequestsList();
+          }
+        }
+      } else if (table === 'edit_requests') {
+        if (eventType === 'INSERT') {
+          if (!newRow || newRow.status !== 'Pending') return;
+          const dedupKey = `edit_insert_${newRow.id}`;
+          if (isDuplicate(dedupKey)) return;
+
+          if (role === 'admin') {
+            createNotification({
+              title: `มีคำขอแก้ไขข้อมูลใหม่`,
+              message: `เหตุผล: ${newRow.reason || '-'}`,
+              type: 'edit_request',
+              requestId: newRow.request_id,
+              icon: '📝'
+            });
+            if (document.getElementById('view-edit-requests') && document.getElementById('view-edit-requests').style.display !== 'none') {
+              loadEditRequests();
+            }
+          }
+        } else if (eventType === 'UPDATE') {
+          if (!newRow) return;
+          if (newRow.requester_id === currentUser.id && oldRow && oldRow.status !== newRow.status) {
+            const dedupKey = `edit_status_${newRow.id}_${newRow.status}`;
+            if (isDuplicate(dedupKey)) return;
+
+            let statusThai = (newRow.status === 'Approved' || newRow.status === 'Completed') ? 'อนุมัติแล้ว' : 'ถูกปฏิเสธ';
+            createNotification({
+              title: `คำขอแก้ไขข้อมูล: ${statusThai}`,
+              message: `สถานะคำขอแก้ไขเปลี่ยนเป็น ${newRow.status}`,
+              type: 'edit_request',
+              requestId: newRow.request_id,
+              icon: (newRow.status === 'Completed' || newRow.status === 'Approved') ? '✅' : '❌'
+            });
+          }
+        }
+      }
+    }
+
+    function subscribe(user) {
+      currentUser = user;
+      loadPersisted();
+      updateUI();
+
+      const client = window.DB ? window.DB.getSupabaseClient() : null;
+      if (!client) return;
+
+      if (realtimeChannel) {
+        client.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+
+      console.log('[NotificationService] Subscribing to Supabase Realtime channel rmis-notifications-channel');
+      realtimeChannel = client.channel('rmis-notifications-channel')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, payload => {
+          handleRealtimeEvent('requests', 'INSERT', payload.new, null);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
+          handleRealtimeEvent('requests', 'UPDATE', payload.new, payload.old);
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
+          handleRealtimeEvent('edit_requests', 'INSERT', payload.new, null);
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'edit_requests' }, payload => {
+          handleRealtimeEvent('edit_requests', 'UPDATE', payload.new, payload.old);
+        })
+        .subscribe((status) => {
+          console.log('[NotificationService] Channel status:', status);
+        });
+    }
+
+    function unsubscribe() {
+      if (realtimeChannel) {
+        const client = window.DB ? window.DB.getSupabaseClient() : null;
+        if (client) client.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+    }
+
+    function markAsRead(id) {
+      const item = notifications.find(n => n.id === id);
+      if (item) {
+        item.isRead = true;
+        savePersisted();
+        updateUI();
+      }
+    }
+
+    function markAllAsRead() {
+      notifications.forEach(n => n.isRead = true);
+      savePersisted();
+      updateUI();
+    }
+
+    function togglePanel(e) {
+      if (e) e.stopPropagation();
+      const panel = document.getElementById('notif-panel');
+      if (panel) {
+        panel.classList.toggle('open');
+        if (panel.classList.contains('open')) {
+          renderList();
+        }
+      }
+    }
+
+    function closePanel() {
+      const panel = document.getElementById('notif-panel');
+      if (panel) panel.classList.remove('open');
+    }
+
+    function handleItemClick(id, type, requestId) {
+      markAsRead(id);
+      closePanel();
+      if (type === 'request' && requestId) {
+        navigate('request-detail', { id: requestId });
+      } else if (type === 'edit_request') {
+        navigate('edit-requests');
+      }
+    }
+
+    // Close panel on outside click
+    document.addEventListener('click', (e) => {
+      const wrapper = document.getElementById('notif-dropdown-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        closePanel();
+      }
+    });
+
+    return {
+      initialize: (user) => {
+        NotificationAudioService.init();
+        subscribe(user);
+      },
+      subscribe,
+      unsubscribe,
+      cleanup: () => {
+        unsubscribe();
+        currentUser = null;
+        notifications = [];
+        updateUI();
+      },
+      createNotification,
+      markAsRead,
+      markAllAsRead,
+      togglePanel,
+      closePanel,
+      handleItemClick,
+      getUnreadCount
+    };
+  })();
+
+  function initRealtime() {
+    if (state.currentUser) {
+      NotificationService.initialize(state.currentUser);
+    }
   }
 
   // Bind init to window load event
   window.addEventListener('DOMContentLoaded', init);
-
-  window.addEventListener('request_item_updated', async (e) => {
-    // Intentionally left blank or handle other item updates if needed
-  });
-
-  window.addEventListener('edit_request_inserted', async (e) => {
-    const payload = e.detail;
-    const role = state.currentUser?.role;
-    if (role === 'admin' && payload.status === 'Pending') {
-      const requesterName = await window.DB.fetchRequesterName(payload.requester_id);
-      playNotificationSound();
-      showToast(
-        `<b>📝 มีคำขอแก้ไขข้อมูลใหม่</b><br/>จาก: ${requesterName}<br/>เหตุผล: ${payload.reason}`,
-        'info',
-        {
-          duration: 10000,
-          onClick: () => {
-            navigate('edit-requests');
-          }
-        }
-      );
-      // Auto refresh if already on edit-requests view
-      if (document.getElementById('view-edit-requests').style.display !== 'none') {
-        loadEditRequests();
-      }
-    }
-  });
 
   // Expose module APIs
   // --- STICKER PRINTING HELPERS ---
@@ -4379,10 +4793,14 @@ const App = (function () {
     clearFilters,
     addFormItemRow,
     removeFormItemRow,
-    moveFormItemRow,
     editCurrentRequest,
     handleRequestFormSubmit,
     testNotificationSound,
+    toggleNotificationPanel: (e) => NotificationService.togglePanel(e),
+    markAllNotificationsAsRead: () => NotificationService.markAllAsRead(),
+    handleNotificationClick: (id, type, reqId) => NotificationService.handleItemClick(id, type, reqId),
+    NotificationService,
+    NotificationAudioService,
     openStickerPreview,
     openStickerPreviewDirect,
     closeStickerModal,

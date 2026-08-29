@@ -2110,29 +2110,7 @@
 
     // --- REALTIME NOTIFICATIONS ---
     async setupRealtimeNotifications(onInsert, onUpdate) {
-      const client = getSupabaseClient();
-      if (!client) return;
-
-      if (this._realtimeChannel) {
-        client.removeChannel(this._realtimeChannel);
-      }
-
-      this._realtimeChannel = client.channel('requests-realtime-channel')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, payload => {
-          if (onInsert) onInsert(payload.new);
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, payload => {
-          if (onUpdate) onUpdate(payload.new, payload.old);
-        })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'request_items' }, payload => {
-          window.dispatchEvent(new CustomEvent('request_item_updated', { detail: { new: payload.new, old: payload.old } }));
-        })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'edit_requests' }, payload => {
-          window.dispatchEvent(new CustomEvent('edit_request_inserted', { detail: payload.new }));
-        })
-        .subscribe((status) => {
-          console.log('Realtime notifications channel status:', status);
-        });
+      // Legacy wrapper — all notifications are now centrally managed by NotificationService
     },
 
     async cleanupRealtimeNotifications() {
