@@ -15,6 +15,99 @@
     });
   }
 
+  // --- CLOUD TIME SYNCHRONIZATION ENGINE ---
+  let serverTimeOffsetMs = 0;
+  let isTimeSynced = false;
+
+  async function syncServerTime() {
+    try {
+      const start = Date.now();
+      // Fast, lightweight, zero-body, open-CORS Cloudflare edge time check
+      const res = await fetch('https://cloudflare.com/cdn-cgi/trace', { cache: 'no-store' });
+      if (res.ok) {
+        const text = await res.text();
+        const match = text.match(/ts=(\d+(\.\d+)?)/);
+        if (match) {
+          const latency = Math.round((Date.now() - start) / 2);
+          const serverUnixMs = (parseFloat(match[1]) * 1000) + latency;
+          serverTimeOffsetMs = serverUnixMs - Date.now();
+          isTimeSynced = true;
+          window.serverTimeOffset = serverTimeOffsetMs;
+          console.log(`[TimeSync] Cloud time synced! Offset: ${serverTimeOffsetMs}ms (${Math.round(serverTimeOffsetMs / 1000)}s)`);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('[TimeSync] Primary cloud time sync error, trying Supabase fallback:', e);
+    }
+
+    // Fallback: Supabase HEAD request
+    try {
+      const config = (window.AppConfig && window.AppConfig.load) ? window.AppConfig.load() : {};
+      const url = config.supabaseUrl;
+      if (url) {
+        const start = Date.now();
+        const res = await fetch(url + '/rest/v1/', { method: 'HEAD', cache: 'no-store' });
+        const dateHeader = res.headers.get('date');
+        if (dateHeader) {
+          const latency = Math.round((Date.now() - start) / 2);
+          const serverUnixMs = new Date(dateHeader).getTime() + latency;
+          serverTimeOffsetMs = serverUnixMs - Date.now();
+          isTimeSynced = true;
+          window.serverTimeOffset = serverTimeOffsetMs;
+          console.log(`[TimeSync] Supabase time synced! Offset: ${serverTimeOffsetMs}ms`);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[TimeSync] Supabase time fallback error:', err);
+    }
+    return false;
+  }
+
+  function getTrueNow() {
+    return new Date(Date.now() + serverTimeOffsetMs);
+  }
+
+  function getBangkokDateTime(customDate = null) {
+    const targetDate = customDate || getTrueNow();
+    try {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(targetDate);
+      const getPart = type => parts.find(p => p.type === type)?.value || '00';
+      const dateStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+      const timeStr = `${getPart('hour')}:${getPart('minute')}`;
+      const yearInt = parseInt(getPart('year'), 10);
+      return { dateStr, timeStr, yearInt, trueNow: targetDate };
+    } catch (e) {
+      const pad = n => n.toString().padStart(2, '0');
+      const dateStr = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
+      const timeStr = `${pad(targetDate.getHours())}:${pad(targetDate.getMinutes())}`;
+      return { dateStr, timeStr, yearInt: targetDate.getFullYear(), trueNow: targetDate };
+    }
+  }
+
+  // Trigger immediate sync and periodic refresh
+  syncServerTime();
+  setInterval(syncServerTime, 15 * 60 * 1000);
+
+  window.TimeSync = {
+    syncServerTime,
+    getTrueNow,
+    getBangkokDateTime,
+    getOffset: () => serverTimeOffsetMs,
+    isSynced: () => isTimeSynced
+  };
+
   // Pre-seeded database values
   const defaultUsers = [
     { id: 'u-admin-1', username: 'admin', password: 'admin1234', display_name: 'สมชาย แอดมิน (ฝ่ายควบคุมคุณภาพ)', role: 'admin', created_at: new Date('2026-01-01T08:00:00Z').toISOString() },
@@ -1220,8 +1313,8 @@
           notes: requestData.notes || '',
           lab_comments: requestData.lab_comments || '',
           status: requestData.status || 'Pending',
-          request_date: requestData.request_date || new Date().toISOString().split('T')[0],
-          request_time: requestData.request_time || new Date().toTimeString().split(' ')[0]
+          request_date: requestData.request_date || getBangkokDateTime().dateStr,
+          request_time: requestData.request_time || getBangkokDateTime().timeStr
         })
         .select()
         .single();
@@ -1298,10 +1391,7 @@
       const existingMap = {};
       (currentItems || []).forEach(i => existingMap[i.id] = i);
       
-      const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD local timezone approximation is fine for UTC here if not critical, but let's do local time
-      // Better local date string:
-      const localDate = new Date();
-      const localTodayStr = localDate.getFullYear() + '-' + String(localDate.getMonth() + 1).padStart(2, '0') + '-' + String(localDate.getDate()).padStart(2, '0');
+      const localTodayStr = getBangkokDateTime().dateStr;
 
       // Prepare upsert items with sequential created_at to guarantee order preservation
       const baseTime = Date.now();

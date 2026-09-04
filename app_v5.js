@@ -343,13 +343,13 @@ const App = (function () {
     const loginScreen = document.getElementById('login-screen');
 
     if (viewName === 'login') {
-      if (shell) shell.style.display = 'none';
-      if (loginScreen) loginScreen.style.display = 'flex';
+      if (shell) shell.style.setProperty('display', 'none', 'important');
+      if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
       state.currentUser = null;
       state.currentRequestId = null;
     } else {
-      if (loginScreen) loginScreen.style.display = 'none';
-      if (shell) shell.style.display = 'flex';
+      if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
+      if (shell) shell.style.setProperty('display', 'flex', 'important');
     }
 
     state.currentView = viewName;
@@ -1056,15 +1056,18 @@ const App = (function () {
       requesterInput.value = state.currentUser.display_name;
       state.editingRecord = null; // เคลียร์ state สำหรับสร้างใหม่
 
-      const now = new Date();
-      const pad = n => n.toString().padStart(2, '0');
-      const localDate = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-      const localTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const { dateStr: trueDate, timeStr: trueTime } = (window.TimeSync && window.TimeSync.getBangkokDateTime) 
+        ? window.TimeSync.getBangkokDateTime() 
+        : (() => {
+            const now = new Date();
+            const pad = n => n.toString().padStart(2, '0');
+            return { dateStr: `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`, timeStr: `${pad(now.getHours())}:${pad(now.getMinutes())}` };
+          })();
 
       const dateInput = document.getElementById('form-request-date');
       const timeInput = document.getElementById('form-request-time');
-      if (dateInput) dateInput.value = localDate;
-      if (timeInput) timeInput.value = localTime;
+      if (dateInput) dateInput.value = trueDate;
+      if (timeInput) timeInput.value = trueTime;
 
       if (adminNoBlock) adminNoBlock.style.display = 'none';
       if (formReqNo) { formReqNo.required = false; formReqNo.value = ''; }
@@ -1299,13 +1302,16 @@ const App = (function () {
 
     const poNumber = document.getElementById('form-po-number');
     const needBaseOilCheck = document.getElementById('form-need-base-oil');
-    const now = new Date();
-    const pad = n => n.toString().padStart(2, '0');
-    const localDateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-    const localTimeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const { dateStr: trueDateStr, timeStr: trueTimeStr } = (window.TimeSync && window.TimeSync.getBangkokDateTime)
+      ? window.TimeSync.getBangkokDateTime()
+      : (() => {
+          const now = new Date();
+          const pad = n => n.toString().padStart(2, '0');
+          return { dateStr: `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`, timeStr: `${pad(now.getHours())}:${pad(now.getMinutes())}` };
+        })();
 
-    const requestDate = document.getElementById('form-request-date').value || localDateStr;
-    const requestTime = document.getElementById('form-request-time').value || localTimeStr;
+    const requestDate = document.getElementById('form-request-date').value || trueDateStr;
+    const requestTime = document.getElementById('form-request-time').value || trueTimeStr;
 
     const statusSelect = document.getElementById('form-status');
     const requestData = {
@@ -1435,8 +1441,8 @@ const App = (function () {
         container_no: containerNo,
         notes: notes,
         status: 'Draft',
-        request_date: document.getElementById('form-request-date').value,
-        request_time: document.getElementById('form-request-time').value
+        request_date: document.getElementById('form-request-date').value || (window.TimeSync ? window.TimeSync.getBangkokDateTime().dateStr : new Date().toISOString().slice(0, 10)),
+        request_time: document.getElementById('form-request-time').value || (window.TimeSync ? window.TimeSync.getBangkokDateTime().timeStr : new Date().toTimeString().slice(0, 5))
       };
 
       if (state.currentRequestId) {
@@ -3672,17 +3678,24 @@ const App = (function () {
   function showOSNotification(title, body) {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
+        const iconPath = './icons/icon-192.png';
+        const notifOptions = {
+          body: body,
+          icon: iconPath,
+          badge: iconPath,
+          vibrate: [200, 100, 200, 100, 200],
+          tag: 'rmis-approval-' + Date.now(),
+          renotify: true
+        };
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification(title, {
-              body: body,
-              icon: '/icons/icon-192x192.png',
-              badge: '/icons/icon-72x72.png',
-              vibrate: [200, 100, 200]
-            });
+            registration.showNotification(title, notifOptions);
+          }).catch(err => {
+            console.warn('ServiceWorker showNotification error:', err);
+            new Notification(title, notifOptions);
           });
         } else {
-          new Notification(title, { body: body });
+          new Notification(title, notifOptions);
         }
       } catch (e) {
         console.error('OS Notification error:', e);
@@ -3983,28 +3996,102 @@ const App = (function () {
             loadRequestsList();
           }
 
-          // 1. Broadcast Approval Notification to ALL Requesters
+          // 1. Broadcast Approval Notification (To Requester and Base Oil)
           const isApprovedNow = (newRow.status === 'Approved' || newRow.approved === true);
           const wasApprovedBefore = oldRow ? (oldRow.status === 'Approved' || oldRow.approved === true) : false;
 
           if (isApprovedNow && !wasApprovedBefore) {
-            if (role === 'requester') {
-              const dedupKey = `req_approved_${newRow.id}`;
-              if (!isDuplicate(dedupKey)) {
-                const reqNoYear = `${newRow.request_no || ''}/${newRow.request_year || ''}`;
-                const cust = newRow.customer_name ? ` (${newRow.customer_name})` : '';
-                createNotification({
-                  title: 'ใบแจ้งตรวจสอบได้รับการอนุมัติแล้ว',
-                  message: `ใบแจ้งตรวจสอบเลขที่ ${reqNoYear}${cust} ได้รับการอนุมัติแล้ว`,
-                  type: 'request',
-                  requestId: newRow.id,
-                  icon: '✅'
-                });
-                loadRequestsList();
+            const dedupKey = `req_approved_${newRow.id}`;
+            if (!isDuplicate(dedupKey)) {
+              const reqNoYear = `${newRow.request_no || ''}/${newRow.request_year || ''}`;
+              const cust = newRow.customer_name ? ` (${newRow.customer_name})` : '';
+
+              if (role === 'base_oil' && newRow.need_base_oil_view) {
+                // Fetch product names for Base Oil notification
+                let productName = newRow.customer_name || '-';
+                if (window.DB && window.DB.getRequestDetail) {
+                  window.DB.getRequestDetail(newRow.id).then(details => {
+                    if (details && details.items && details.items.length > 0) {
+                      productName = details.items.map(i => i.product_name).filter(Boolean).join(', ');
+                    }
+                    createNotification({
+                      title: 'RMIS: ผลทดสอบ Base Oil ผ่าน ✅',
+                      message: `สินค้า: ${productName} | ทะเบียน: ${newRow.car_plate || '-'}`,
+                      type: 'request',
+                      requestId: newRow.id,
+                      icon: '✅'
+                    });
+                    loadRequestsList();
+                  }).catch(() => {
+                    createNotification({
+                      title: 'RMIS: ผลทดสอบ Base Oil ผ่าน ✅',
+                      message: `สินค้า: ${productName} | ทะเบียน: ${newRow.car_plate || '-'}`,
+                      type: 'request',
+                      requestId: newRow.id,
+                      icon: '✅'
+                    });
+                    loadRequestsList();
+                  });
+                } else {
+                  createNotification({
+                    title: 'RMIS: ผลทดสอบ Base Oil ผ่าน ✅',
+                    message: `สินค้า: ${productName} | ทะเบียน: ${newRow.car_plate || '-'}`,
+                    type: 'request',
+                    requestId: newRow.id,
+                    icon: '✅'
+                  });
+                  loadRequestsList();
+                }
+              } else if (role === 'requester') {
+                if (newRow.need_base_oil_view) {
+                  let productName = newRow.customer_name || '-';
+                  if (window.DB && window.DB.getRequestDetail) {
+                    window.DB.getRequestDetail(newRow.id).then(details => {
+                      if (details && details.items && details.items.length > 0) {
+                        productName = details.items.map(i => i.product_name).filter(Boolean).join(', ');
+                      }
+                      createNotification({
+                        title: 'RMIS: ผลทดสอบ Base Oil ผ่าน ✅',
+                        message: `สินค้า: ${productName} | ทะเบียน: ${newRow.car_plate || '-'}`,
+                        type: 'request',
+                        requestId: newRow.id,
+                        icon: '✅'
+                      });
+                      loadRequestsList();
+                    }).catch(() => {
+                      createNotification({
+                        title: 'ใบแจ้งตรวจสอบได้รับการอนุมัติแล้ว',
+                        message: `ใบแจ้งตรวจสอบเลขที่ ${reqNoYear}${cust} ได้รับการอนุมัติแล้ว`,
+                        type: 'request',
+                        requestId: newRow.id,
+                        icon: '✅'
+                      });
+                      loadRequestsList();
+                    });
+                  } else {
+                    createNotification({
+                      title: 'RMIS: ผลทดสอบ Base Oil ผ่าน ✅',
+                      message: `สินค้า: ${productName} | ทะเบียน: ${newRow.car_plate || '-'}`,
+                      type: 'request',
+                      requestId: newRow.id,
+                      icon: '✅'
+                    });
+                    loadRequestsList();
+                  }
+                } else {
+                  createNotification({
+                    title: 'ใบแจ้งตรวจสอบได้รับการอนุมัติแล้ว',
+                    message: `ใบแจ้งตรวจสอบเลขที่ ${reqNoYear}${cust} ได้รับการอนุมัติแล้ว`,
+                    type: 'request',
+                    requestId: newRow.id,
+                    icon: '✅'
+                  });
+                  loadRequestsList();
+                }
               }
             }
-          } else if (role === 'requester') {
-            // Silently refresh list for other status changes without creating noise
+          } else if (role === 'requester' || role === 'base_oil') {
+            // Silently refresh list for other status changes (e.g. Complete) without sending mobile notification
             loadRequestsList();
           }
         }
