@@ -3116,6 +3116,9 @@ const App = (function () {
       document.body.classList.remove('print-mode-detail');
       document.body.classList.add('print-mode-daily');
       
+      const shell = document.getElementById('app-shell');
+      if (shell) shell.style.setProperty('display', 'none', 'important');
+      
       // Allow DOM to update before triggering print dialog
       setTimeout(() => {
         window.print();
@@ -3149,6 +3152,9 @@ const App = (function () {
     document.body.classList.remove('print-mode-daily');
     document.body.classList.add('print-mode-detail');
     
+    const shell = document.getElementById('app-shell');
+    if (shell) shell.style.setProperty('display', 'none', 'important');
+    
     // Temporarily change document title to ensure correct PDF filename
     const originalTitle = document.title;
     const requestNoText = reqNoEl.innerText.trim().replace(/\//g, '-');
@@ -3162,6 +3168,15 @@ const App = (function () {
       document.title = originalTitle;
     }, 300);
   }
+
+  // Clean up print classes automatically after print dialog closes
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('print-mode-detail', 'print-mode-daily');
+    const shell = document.getElementById('app-shell');
+    if (shell && state.currentUser) {
+      shell.style.setProperty('display', 'flex', 'important');
+    }
+  });
 
   // --- LAB SIGNATURES MANAGER ---
   async function loadSignaturesManager() {

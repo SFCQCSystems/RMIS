@@ -118,7 +118,7 @@
       display: none;
     }
 
-    @media (max-width: 768px) {
+    @media screen and (max-width: 768px) {
       /* 1. Clean Single-Line Top Navbar */
       .top-navbar {
         padding: 0 12px !important;
@@ -460,12 +460,88 @@
       }
     }
 
-    @media (max-width: 480px) {
+    @media screen and (max-width: 480px) {
       /* Floating Notification Dropdown on narrow phones */
       .notif-panel {
         right: -8px !important;
         width: calc(100vw - 20px) !important;
         max-width: 360px !important;
+      }
+    }
+
+    /* =========================================================================
+       PRINT SYSTEM-WIDE OVERRIDES & SAFEGUARDS
+       ========================================================================= */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 15mm;
+      }
+
+      html, body {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-family: 'Sarabun', 'Segoe UI', sans-serif !important;
+      }
+
+      /* Force collapse & hide all web UI elements completely so they cannot occupy page 1 */
+      #app-shell,
+      .main-wrapper,
+      .sidebar,
+      .sidebar-overlay,
+      .top-navbar,
+      .view-container,
+      .page-view,
+      #login-screen,
+      .toast-container,
+      .modal-overlay,
+      .modal,
+      #global-spinner-overlay,
+      .notif-panel {
+        display: none !important;
+        visibility: hidden !important;
+        min-height: 0 !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        top: -99999px !important;
+        left: -99999px !important;
+      }
+
+      /* Detail Print Mode (A4 Lab Certificate) */
+      body.print-mode-detail #a4-print-template {
+        display: block !important;
+        visibility: visible !important;
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+      }
+
+      /* Daily Report Print Mode */
+      body.print-mode-daily #daily-report-print-template {
+        display: block !important;
+        visibility: visible !important;
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+      }
+
+      /* Hide any elements explicitly tagged as no-print */
+      .no-print {
+        display: none !important;
       }
     }
   </style>
@@ -681,6 +757,7 @@
                   </table>
                 </div>
               </div>
+            </div>
           </div>
         </section>
 
@@ -1982,8 +2059,8 @@
     }
   </script>
 
-  <script src="config.js?v=129"></script>
-  <script src="dbService.js?v=129"></script>
-  <script src="app_v5.js?v=129"></script>
+  <script src="config.js?v=132"></script>
+  <script src="dbService.js?v=132"></script>
+  <script src="app_v5.js?v=132"></script>
 </body>
 </html>
