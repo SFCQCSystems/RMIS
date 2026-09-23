@@ -282,8 +282,24 @@
       const requester = users.find(u => u.id === req.requester_id);
       const approver = users.find(u => u.id === req.lab_approved_by);
 
+      // Auto-resolve signature snapshot if missing for Approved or Rejected documents
+      let approved_signature_snapshot = req.approved_signature_snapshot || null;
+      const statusLower = (req.status || '').toLowerCase();
+      const isApprovedOrRejected = req.approved || statusLower === 'approved' || statusLower === 'rejected';
+
+      if (!approved_signature_snapshot && isApprovedOrRejected) {
+        const sigs = JSON.parse(localStorage.getItem('lrms_local_signatures') || '{}');
+        const targetUserId = req.approved_by || req.lab_approved_by || (currentUser ? currentUser.id : null);
+        if (targetUserId && sigs[targetUserId]) {
+          approved_signature_snapshot = sigs[targetUserId];
+          req.approved_signature_snapshot = approved_signature_snapshot;
+          localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(requests));
+        }
+      }
+
       return {
         ...req,
+        approved_signature_snapshot: approved_signature_snapshot,
         requester_name: requester ? requester.display_name : 'ไม่ระบุ',
         lab_approved_name: approver ? approver.display_name : null,
         items: reqItems
@@ -382,6 +398,13 @@
       
       if (!['admin', 'lab'].includes(currentUser.role) && !(isRequester && isDraft)) {
         throw new Error('เฉพาะผู้ดูแลระบบ (Admin) หรือเจ้าหน้าที่ห้องปฏิบัติการ (Lab) เท่านั้นที่สามารถแก้ไขข้อมูลได้ ยกเว้นการแก้ไขแบบร่าง');
+      }
+
+      if (requestData.status === 'Complete') {
+        const hasInProcess = (itemsData || []).some(item => !item.test_result || item.test_result.trim() === 'In Process');
+        if (hasInProcess) {
+          throw new Error('ไม่สามารถเปลี่ยนสถานะเป็น Complete ได้ เนื่องจากยังมีรายการวัตถุดิบที่ผลการทดสอบยังเป็น In Process');
+        }
       }
 
       // Overwrite items for this request: delete old, insert new
@@ -922,14 +945,70 @@
       return this.getRequestDetail(id);
     },
 
-    async rejectRequest(id) {
+    async rejectRequest(id, reason = '') {
       const requests = JSON.parse(localStorage.getItem(LOCAL_REQUESTS_KEY) || '[]');
       const reqIndex = requests.findIndex(r => r.id === id);
       if (reqIndex !== -1) {
+        const currentUser = await this.getCurrentUser();
+        const sigs = JSON.parse(localStorage.getItem('lrms_local_signatures') || '{}');
+        const userSig = currentUser ? sigs[currentUser.id] : null;
+
         requests[reqIndex].status = 'Rejected';
+        requests[reqIndex].approved = false;
+        requests[reqIndex].approved_by = currentUser ? currentUser.id : null;
+        requests[reqIndex].approved_name = currentUser ? currentUser.display_name : 'Unknown';
+        requests[reqIndex].approved_role = currentUser ? currentUser.role : 'lab';
+        requests[reqIndex].approved_at = new Date().toISOString();
+        requests[reqIndex].approved_signature_snapshot = userSig || (currentUser ? currentUser.signature_url : null) || 'local-signature-dummy.png';
+
+        if (reason && reason.trim()) {
+          const existing = requests[reqIndex].lab_comments || '';
+          const rejectionNote = `[เหตุผลการ Reject โดย ${currentUser ? currentUser.display_name : 'Lab'}]: ${reason.trim()}`;
+          requests[reqIndex].lab_comments = existing ? `${existing}\n${rejectionNote}` : rejectionNote;
+        }
+
         localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(requests));
       }
       return this.getRequestDetail(id);
+    },
+
+    async signRequest(id) {
+      const requests = JSON.parse(localStorage.getItem(LOCAL_REQUESTS_KEY) || '[]');
+      const reqIndex = requests.findIndex(r => r.id === id);
+      if (reqIndex !== -1) {
+        const currentUser = await this.getCurrentUser();
+        const sigs = JSON.parse(localStorage.getItem('lrms_local_signatures') || '{}');
+        const userSig = currentUser ? (sigs[currentUser.id] || currentUser.signature_url || 'local-signature-dummy.png') : 'local-signature-dummy.png';
+
+        requests[reqIndex].approved_by = currentUser ? currentUser.id : null;
+        requests[reqIndex].approved_name = currentUser ? currentUser.display_name : 'Unknown';
+        requests[reqIndex].approved_role = currentUser ? currentUser.role : 'lab';
+        requests[reqIndex].approved_at = new Date().toISOString();
+        requests[reqIndex].approved_signature_snapshot = userSig;
+
+        localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(requests));
+      }
+      return this.getRequestDetail(id);
+    },
+
+    async getSystemSettings() {
+      try {
+        const stored = localStorage.getItem('lrms_system_settings');
+        return stored ? JSON.parse(stored) : {};
+      } catch (e) {
+        return {};
+      }
+    },
+
+    async saveSystemSettings(settings) {
+      try {
+        const current = await this.getSystemSettings();
+        const merged = { ...current, ...settings };
+        localStorage.setItem('lrms_system_settings', JSON.stringify(merged));
+        return merged;
+      } catch (e) {
+        return settings;
+      }
     },
 
     // --- REALTIME STUBS ---
@@ -1286,8 +1365,54 @@
         lab_approved_name = approver ? approver.display_name : null;
       }
 
+      // Auto-resolve signature snapshot if missing for Approved or Rejected documents
+      let approved_signature_snapshot = req.approved_signature_snapshot || null;
+      const statusLower = (req.status || '').toLowerCase();
+      const isApprovedOrRejected = req.approved || statusLower === 'approved' || statusLower === 'rejected';
+
+      if (!approved_signature_snapshot && isApprovedOrRejected) {
+        try {
+          let targetUserId = req.approved_by || req.lab_approved_by;
+          if (!targetUserId && req.approved_name) {
+            const { data: matchedProf } = await client
+              .from('profiles')
+              .select('id')
+              .eq('display_name', req.approved_name)
+              .maybeSingle();
+            if (matchedProf) targetUserId = matchedProf.id;
+          }
+          if (!targetUserId) {
+            const currentUser = await this.getCurrentUser();
+            if (currentUser && (currentUser.display_name === req.approved_name || currentUser.id === req.approved_by)) {
+              targetUserId = currentUser.id;
+            }
+          }
+          if (targetUserId) {
+            const { data: sigRow } = await client
+              .from('user_signatures')
+              .select('signature_url')
+              .eq('user_id', targetUserId)
+              .maybeSingle();
+            if (sigRow && sigRow.signature_url) {
+              approved_signature_snapshot = sigRow.signature_url;
+              // Persist back to database in background so next queries are instant
+              client.from('requests')
+                .update({ 
+                  approved_signature_snapshot: sigRow.signature_url,
+                  approved_by: targetUserId
+                })
+                .eq('id', id)
+                .then(() => {});
+            }
+          }
+        } catch (sigErr) {
+          console.warn('Auto signature recovery failed:', sigErr);
+        }
+      }
+
       return {
         ...req,
+        approved_signature_snapshot: approved_signature_snapshot,
         requester_name: req.profiles ? req.profiles.display_name : 'ไม่ระบุ',
         lab_approved_name: lab_approved_name,
         items: items
@@ -1354,6 +1479,13 @@
 
     async updateRequest(id, requestData, itemsData) {
       const client = getSupabaseClient();
+
+      if (requestData.status === 'Complete') {
+        const hasInProcess = (itemsData || []).some(item => !item.test_result || item.test_result.trim() === 'In Process');
+        if (hasInProcess) {
+          throw new Error('ไม่สามารถเปลี่ยนสถานะเป็น Complete ได้ เนื่องจากยังมีรายการวัตถุดิบที่ผลการทดสอบยังเป็น In Process');
+        }
+      }
 
       // Build update payload — only include defined fields
       const updatePayload = {
@@ -1974,6 +2106,18 @@
 
       if (error) throw new Error(error.message);
 
+      // If assigned role is privileged (admin/lab/base_oil), explicitly set via secure admin RPC
+      if (data && data.user && role && role !== 'requester') {
+        try {
+          await client.rpc('admin_set_user_role', {
+            p_user_id: data.user.id,
+            p_role: role
+          });
+        } catch (rpcErr) {
+          console.warn('RPC admin_set_user_role fallback:', rpcErr);
+        }
+      }
+
       return {
         id: data.user.id,
         username: username,
@@ -1997,8 +2141,15 @@
       const currentUser = await this.getCurrentUser();
       if (!currentUser || currentUser.role !== 'admin') throw new Error('Unauthorized');
       
-      const { error } = await client.from('profiles').update({ role: newRole }).eq('id', userId);
-      if (error) throw new Error(error.message);
+      // Attempt secure RPC first, fallback to direct update if RPC is not yet executed
+      const { error: rpcErr } = await client.rpc('admin_set_user_role', {
+        p_user_id: userId,
+        p_role: newRole
+      });
+      if (rpcErr) {
+        const { error } = await client.from('profiles').update({ role: newRole }).eq('id', userId);
+        if (error) throw new Error(error.message);
+      }
     },
 
     async changeOwnPassword(currentPassword, newPassword) {
@@ -2150,22 +2301,46 @@
       return this.getRequestDetail(id);
     },
 
-    async rejectRequest(id) {
+    async rejectRequest(id, reason = '') {
       const client = getSupabaseClient();
       const currentUser = await this.getCurrentUser();
       if (!currentUser) throw new Error('Unauthenticated');
 
+      // 1. Get current user's signature from user_signatures
+      const { data: sigRow, error: sigErr } = await client
+        .from('user_signatures')
+        .select('signature_url')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+      if (sigErr || !sigRow || !sigRow.signature_url) {
+        throw new Error('ไม่พบลายเซ็นของคุณในระบบ กรุณาให้ Admin อัปโหลดลายเซ็นในระบบก่อนทำการ Reject');
+      }
+
+      const updatePayload = {
+        status: 'Rejected',
+        approved: false,
+        approved_by: currentUser.id,
+        approved_name: currentUser.display_name,
+        approved_role: currentUser.role,
+        approved_at: new Date().toISOString(),
+        approved_signature_snapshot: sigRow.signature_url
+      };
+
+      if (reason && reason.trim()) {
+        try {
+          const { data: curReq } = await client.from('requests').select('lab_comments').eq('id', id).single();
+          const existingComments = curReq ? (curReq.lab_comments || '') : '';
+          const rejectionNote = `[เหตุผลการ Reject โดย ${currentUser.display_name}]: ${reason.trim()}`;
+          updatePayload.lab_comments = existingComments ? `${existingComments}\n${rejectionNote}` : rejectionNote;
+        } catch (commErr) {
+          console.warn('Could not append rejection reason to lab_comments:', commErr);
+        }
+      }
+
       const { error } = await client
         .from('requests')
-        .update({
-          status: 'Rejected',
-          approved: false,
-          approved_by: currentUser.id,
-          approved_name: currentUser.display_name,
-          approved_role: currentUser.role,
-          approved_at: new Date().toISOString(),
-          approved_signature_snapshot: null
-        })
+        .update(updatePayload)
         .eq('id', id);
 
       if (error) throw new Error(error.message);
@@ -2191,6 +2366,36 @@
           approved_role: null,
           approved_at: null,
           approved_signature_snapshot: null
+        })
+        .eq('id', id);
+
+      if (error) throw new Error(error.message);
+      return this.getRequestDetail(id);
+    },
+
+    async signRequest(id) {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+
+      const { data: sigRow, error: sigErr } = await client
+        .from('user_signatures')
+        .select('signature_url')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+      if (sigErr || !sigRow || !sigRow.signature_url) {
+        throw new Error('ไม่พบลายเซ็นของคุณในระบบ กรุณาให้ Admin อัปโหลดลายเซ็นของคุณที่เมนู Signatures ก่อน');
+      }
+
+      const { error } = await client
+        .from('requests')
+        .update({
+          approved_by: currentUser.id,
+          approved_name: currentUser.display_name,
+          approved_role: currentUser.role,
+          approved_at: new Date().toISOString(),
+          approved_signature_snapshot: sigRow.signature_url
         })
         .eq('id', id);
 
@@ -2301,11 +2506,17 @@
     },
 
     async updateRequestItemInspectionDate(itemId, testedDate) {
+      return this.updateRequestItemInspection(itemId, testedDate);
+    },
+
+    async updateRequestItemInspection(itemId, testedDate, itemComment = undefined) {
       const client = getSupabaseClient();
       if (!client) throw new Error('Database not connected');
-      const { data, error } = await client.from('request_items').update({
-        inspection_date: testedDate
-      }).eq('id', itemId).select();
+      const payload = { inspection_date: testedDate };
+      if (itemComment !== undefined) {
+        payload.item_comment = itemComment;
+      }
+      const { data, error } = await client.from('request_items').update(payload).eq('id', itemId).select();
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('ไม่พบข้อมูลรายการทดสอบที่ต้องการอัปเดต (ID: ' + itemId + ') - อาจติดปัญหา Permissions (RLS)');
       return data;
@@ -2350,6 +2561,52 @@
         .delete()
         .eq('endpoint', endpoint);
       if (error) console.warn('Error removing push subscription:', error);
+    },
+
+    async getSystemSettings() {
+      const client = getSupabaseClient();
+      if (!client) return null;
+      try {
+        const { data, error } = await client.from('system_settings').select('*');
+        if (!error && data && data.length > 0) {
+          const map = {};
+          data.forEach(row => map[row.key] = row.value);
+          localStorage.setItem('lrms_system_settings', JSON.stringify(map));
+          return map;
+        }
+      } catch (e) {
+        console.warn('getSystemSettings error:', e);
+      }
+      try {
+        const cached = localStorage.getItem('lrms_system_settings');
+        return cached ? JSON.parse(cached) : {};
+      } catch (e) {
+        return {};
+      }
+    },
+
+    async saveSystemSettings(settings) {
+      const client = getSupabaseClient();
+      const currentUser = await this.getCurrentUser();
+      try {
+        const cached = localStorage.getItem('lrms_system_settings');
+        const current = cached ? JSON.parse(cached) : {};
+        localStorage.setItem('lrms_system_settings', JSON.stringify({ ...current, ...settings }));
+      } catch (e) {}
+
+      if (!client) return;
+      try {
+        const upserts = Object.keys(settings).map(k => ({
+          key: k,
+          value: settings[k],
+          updated_at: new Date().toISOString(),
+          updated_by: currentUser ? currentUser.id : null
+        }));
+        const { error } = await client.from('system_settings').upsert(upserts, { onConflict: 'key' });
+        if (error) console.warn('Supabase saveSystemSettings error:', error);
+      } catch (e) {
+        console.warn('saveSystemSettings exception:', e);
+      }
     }
   };
 
@@ -2392,7 +2649,10 @@
     async deleteSignature(userId) { return this.getService().deleteSignature(userId); },
     async approveRequest(id) { return this.getService().approveRequest(id); },
     async reopenRequest(id) { return this.getService().reopenRequest(id); },
-    async rejectRequest(id) { return this.getService().rejectRequest(id); },
+    async rejectRequest(id, reason) { return this.getService().rejectRequest(id, reason); },
+    async signRequest(id) { return this.getService().signRequest(id); },
+    async getSystemSettings() { return this.getService().getSystemSettings(); },
+    async saveSystemSettings(settings) { return this.getService().saveSystemSettings(settings); },
     
     async setupRealtimeNotifications(onInsert, onUpdate) { return this.getService().setupRealtimeNotifications(onInsert, onUpdate); },
     async cleanupRealtimeNotifications() { return this.getService().cleanupRealtimeNotifications(); },
@@ -2430,6 +2690,7 @@
     async updateEditRequestStatus(id, status, actionedBy, oldData = null, newData = null) { return this.getService().updateEditRequestStatus(id, status, actionedBy, oldData, newData); },
     async deleteEditRequest(id) { return this.getService().deleteEditRequest(id); },
     async updateRequestItemInspectionDate(itemId, testedDate) { return this.getService().updateRequestItemInspectionDate(itemId, testedDate); },
+    async updateRequestItemInspection(itemId, testedDate, itemComment = undefined) { return this.getService().updateRequestItemInspection(itemId, testedDate, itemComment); },
     async savePushSubscription(subscription, role) { return this.getService().savePushSubscription(subscription, role); },
     async deletePushSubscription(endpoint) { return this.getService().deletePushSubscription(endpoint); },
     getSupabaseClient() { return getSupabaseClient(); }

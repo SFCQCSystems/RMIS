@@ -48,7 +48,8 @@ const App = (function () {
     'edit-requests': 'view-edit-requests',
     'daily-report': 'view-daily-report',
     signatures: 'view-signatures',
-    users: 'view-users'
+    users: 'view-users',
+    settings: 'view-settings'
   };
 
   // --- INITIALIZATION ---
@@ -208,6 +209,7 @@ const App = (function () {
         closeBatchTraceModal();
         closeCreateUserModal();
         closeChangePasswordModal();
+        closeNotesAlertModal();
       }
       // Prevent Enter key from submitting forms unintentionally (except in textarea & login form)
       if (e.key === 'Enter' && e.target && e.target.tagName !== 'TEXTAREA') {
@@ -328,7 +330,9 @@ const App = (function () {
       'edit-requests': 'nav-edit-requests',
       'daily-report': 'nav-daily-report',
       signatures: 'nav-settings',
-      users: 'nav-settings' // Keep active on settings tab when managing users/signatures
+      users: 'nav-settings', // Keep active on settings tab when managing users/signatures
+      settings: 'nav-settings',
+      'data-management': 'nav-settings'
     };
 
     document.querySelectorAll('.sidebar-menu .menu-item').forEach(el => el.classList.remove('active'));
@@ -401,6 +405,9 @@ const App = (function () {
         break;
       case 'users':
         loadUsersManager();
+        break;
+      case 'settings':
+        loadSettingsView();
         break;
     }
 
@@ -524,7 +531,6 @@ const App = (function () {
     const navHistory = document.getElementById('nav-history');
     const navEditRequests = document.getElementById('nav-edit-requests');
     const navDailyReport = document.getElementById('nav-daily-report');
-    const navDataManagement = document.getElementById('nav-data-management');
     const navSignatures = document.getElementById('setting-nav-signatures');
     const navUsers = document.getElementById('setting-nav-users');
     
@@ -538,7 +544,6 @@ const App = (function () {
     }
     if (navSignatures) navSignatures.style.display = isUserAdmin ? 'block' : 'none';
     if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
-    if (navDataManagement) navDataManagement.style.display = isUserAdmin ? 'block' : 'none';
 
     const navPush = document.getElementById('setting-nav-push');
     if (navPush) {
@@ -779,8 +784,11 @@ const App = (function () {
           }
         };
 
+        const hasRowNote = r.notes && r.notes.trim() && r.notes.trim() !== '-' && r.notes.trim() !== 'ไม่มีหมายเหตุ';
+        const noteBadge = hasRowNote ? ` <span title="หมายเหตุ: ${escapeHtml(r.notes)}" style="display:inline-flex; align-items:center; background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:11px; padding:1px 5px; border-radius:4px; margin-left:4px; font-weight:600; cursor:help;">📝</span>` : '';
+
         tr.innerHTML = `
-          <td style="white-space: nowrap;"><strong>${r.request_no}/${r.request_year}</strong></td>
+          <td style="white-space: nowrap;"><strong>${r.request_no}/${r.request_year}</strong>${noteBadge}</td>
           <td style="white-space: nowrap;">${formattedDate} ${formattedTime} น.</td>
           <td style="white-space: nowrap;">${escapeHtml(r.customer_name)}</td>
           <td title="${tooltip}" class="truncate-mobile" style="font-weight:500;">${productText}</td>
@@ -1021,7 +1029,23 @@ const App = (function () {
         if (poInput) poInput.value = details.po_number || '';
         const currentBaseOilCheck = document.getElementById('form-need-base-oil');
         if (currentBaseOilCheck) currentBaseOilCheck.checked = !!details.need_base_oil_view;
-        if (statusSelect) statusSelect.value = details.status || 'Pending';
+        if (statusSelect) {
+          statusSelect.value = details.status || 'Pending';
+          statusSelect.onchange = (e) => {
+            if (e.target.value === 'Complete') {
+              const itemRows = document.querySelectorAll('#form-items-tbody tr');
+              const hasInProcess = Array.from(itemRows).some(row => {
+                const resultSelect = row.querySelector('.item-form-result');
+                return !resultSelect || !resultSelect.value || resultSelect.value.trim() === 'In Process';
+              });
+              if (hasInProcess) {
+                showToast('ไม่สามารถเปลี่ยนสถานะเป็น Complete ได้ เนื่องจากยังมีรายการวัตถุดิบที่ผลการทดสอบยังเป็น In Process', 'warning');
+                const prevStatus = (state.editingRecord && state.editingRecord.status !== 'Complete') ? state.editingRecord.status : 'In Process';
+                e.target.value = prevStatus;
+              }
+            }
+          };
+        }
 
         // Re-apply base-oil-field visibility now that checkbox is populated from DB
         applyBaseOilFieldVisibility(!!details.need_base_oil_view);
@@ -1045,6 +1069,12 @@ const App = (function () {
 
         // Add item rows
         details.items.forEach(item => addFormItemRow(item));
+
+        // Show notes alert popup in edit mode if request has notes
+        const hasNote = details.notes && details.notes.trim() && details.notes.trim() !== '-' && details.notes.trim() !== 'ไม่มีหมายเหตุ';
+        if (hasNote) {
+          showNotesAlertModal(details);
+        }
 
       } catch (e) {
         console.error(e);
@@ -1151,6 +1181,34 @@ const App = (function () {
     }
   }
 
+  function updateItemResultStyle(el) {
+    if (!el) return;
+    const val = el.value || 'In Process';
+    el.setAttribute('data-result', val);
+    if (val === 'Pass') {
+      el.style.backgroundColor = '#dcfce7';
+      el.style.color = '#15803d';
+      el.style.borderColor = '#86efac';
+      el.style.fontWeight = '600';
+    } else if (val === 'Fail') {
+      el.style.backgroundColor = '#fee2e2';
+      el.style.color = '#b91c1c';
+      el.style.borderColor = '#fca5a5';
+      el.style.fontWeight = '600';
+    } else if (val === 'Hold') {
+      el.style.backgroundColor = '#fef3c7';
+      el.style.color = '#b45309';
+      el.style.borderColor = '#fde68a';
+      el.style.fontWeight = '600';
+    } else {
+      // In Process (default)
+      el.style.backgroundColor = '#ffffff';
+      el.style.color = '#334155';
+      el.style.borderColor = '#cbd5e1';
+      el.style.fontWeight = '500';
+    }
+  }
+
   function addFormItemRow(item = {}) {
     const tbody = document.getElementById('form-items-tbody');
     const rowId = 'item-row-' + Math.random().toString(36).slice(2, 9);
@@ -1197,11 +1255,11 @@ const App = (function () {
         <input type="text" class="item-form-rm" placeholder="เช่น RM-HYD-01" value="${escapeHtml(rm)}" ${isRequester ? 'disabled readonly' : ''}>
       </td>
       <td class="admin-lab-field" style="display:${isAdminOrLab ? 'table-cell' : 'none'};">
-        <select class="item-form-result" style="padding: 8px 10px;" ${isRequester ? 'disabled' : ''}>
-          <option value="In Process" ${result === 'In Process' ? 'selected' : ''}>In Process</option>
-          <option value="Pass" ${result === 'Pass' ? 'selected' : ''}>Pass</option>
-          <option value="Fail" ${result === 'Fail' ? 'selected' : ''}>Fail</option>
-          <option value="Hold" ${result === 'Hold' ? 'selected' : ''}>Hold</option>
+        <select class="item-form-result" data-result="${result}" style="padding: 8px 10px; cursor: pointer;" ${isRequester ? 'disabled' : ''}>
+          <option value="In Process" style="background-color: #ffffff; color: #334155; font-weight: 500;" ${result === 'In Process' ? 'selected' : ''}>In Process</option>
+          <option value="Pass" style="background-color: #dcfce7; color: #15803d; font-weight: 600;" ${result === 'Pass' ? 'selected' : ''}>Pass</option>
+          <option value="Fail" style="background-color: #fee2e2; color: #b91c1c; font-weight: 600;" ${result === 'Fail' ? 'selected' : ''}>Fail</option>
+          <option value="Hold" style="background-color: #fef3c7; color: #b45309; font-weight: 600;" ${result === 'Hold' ? 'selected' : ''}>Hold</option>
         </select>
       </td>
       <td class="admin-lab-field base-oil-field" style="display:${(isAdminOrLab && isBaseOilChecked) ? 'table-cell' : 'none'};">
@@ -1222,6 +1280,29 @@ const App = (function () {
       </td>
     `;
     tbody.appendChild(tr);
+
+    const resultSel = tr.querySelector('.item-form-result');
+    if (resultSel) {
+      updateItemResultStyle(resultSel);
+      resultSel.addEventListener('change', (e) => {
+        updateItemResultStyle(e.target);
+        if (e.target.value === 'In Process') {
+          const stSel = document.getElementById('form-status');
+          if (stSel && stSel.value === 'Complete') {
+            stSel.value = 'In Process';
+            showToast('มีรายการวัตถุดิบเป็น In Process ระบบปรับสถานะใบแจ้งเป็น In Process', 'info');
+          }
+        }
+      });
+    }
+
+    if (!item.id && !item.product_name) {
+      const stSel = document.getElementById('form-status');
+      if (stSel && stSel.value === 'Complete') {
+        stSel.value = 'In Process';
+        showToast('เพิ่มรายการใหม่ที่มีผลการทดสอบเป็น In Process ระบบปรับสถานะใบแจ้งเป็น In Process', 'info');
+      }
+    }
   }
 
   function removeFormItemRow(rowId) {
@@ -1335,6 +1416,21 @@ const App = (function () {
     if (requestData.status === 'Draft') {
       requestData.status = 'Pending';
       isSubmittingDraft = true;
+    }
+
+    if (requestData.status === 'Rejected' || requestData.status === 'Approved') {
+      showToast('สถานะ Approved และ Rejected ต้องดำเนินการผ่านระบบลงลายเซ็นในหน้ารายละเอียดใบแจ้งเท่านั้น', 'error');
+      isSaving = false;
+      return;
+    }
+
+    if (requestData.status === 'Complete') {
+      const hasInProcessItem = itemsData.some(item => !item.test_result || item.test_result.trim() === 'In Process');
+      if (hasInProcessItem) {
+        showToast('ไม่สามารถเปลี่ยนสถานะเป็น Complete ได้ เนื่องจากยังมีรายการวัตถุดิบที่ผลการทดสอบยังเป็น In Process', 'warning');
+        isSaving = false;
+        return;
+      }
     }
 
     // If Admin or Lab is editing, include the manual request numbers if provided
@@ -1477,6 +1573,7 @@ const App = (function () {
 
     try {
       const details = await window.DB.getRequestDetail(id);
+      state.currentRequestDetail = details;
       
       // Update details fields
       document.getElementById('detail-no').innerText = `${details.request_no}/${details.request_year}`;
@@ -1499,7 +1596,19 @@ const App = (function () {
       document.getElementById('detail-container-no').innerText = details.container_no || 'ไม่ระบุ';
 
       // Notes and comments
-      document.getElementById('detail-notes').innerText = details.notes || 'ไม่มีหมายเหตุ';
+      const notesEl = document.getElementById('detail-notes');
+      const hasNote = details.notes && details.notes.trim() && details.notes.trim() !== '-' && details.notes.trim() !== 'ไม่มีหมายเหตุ';
+      if (notesEl) {
+        notesEl.innerText = hasNote ? details.notes : 'ไม่มีหมายเหตุ';
+        notesEl.style.color = hasNote ? '#b45309' : '';
+        notesEl.style.fontWeight = hasNote ? '600' : 'normal';
+        const parentBlock = notesEl.closest('.print-block');
+        if (parentBlock) {
+          parentBlock.style.backgroundColor = hasNote ? '#fffdf5' : '';
+          parentBlock.style.borderColor = hasNote ? '#f59e0b' : '';
+          parentBlock.style.borderWidth = hasNote ? '1.5px' : '';
+        }
+      }
 
       // Lab comments — and append Density summary when need_base_oil_view is true
       const labCommentEl = document.getElementById('detail-lab-comments');
@@ -1580,7 +1689,7 @@ const App = (function () {
         if (item.inspection_date) {
             inspectionDateHtml = _formatRecDate(item.inspection_date);
         }
-        if (state.currentUser.role === 'admin') {
+        if (state.currentUser.role === 'admin' && !['approved', 'rejected'].includes((details.status || '').toLowerCase().trim())) {
             inspectionDateHtml += ` <button onclick="App.editInspectionDate('${item.id}', '${item.inspection_date || ''}')" style="background:none;border:none;cursor:pointer;color:var(--primary-color);" title="แก้ไขวันที่ตรวจสอบ">✏️</button>`;
         }
 
@@ -1612,19 +1721,22 @@ const App = (function () {
       const editBtn = document.getElementById('btn-detail-modify');
       const deleteBtn = document.getElementById('btn-detail-remove');
 
-      const isApproved = details.approved === true || (details.status && details.status.trim().toLowerCase() === 'approved');
+      const statusLower = (details.status || '').trim().toLowerCase();
+      const isApproved = details.approved === true || statusLower === 'approved';
+      const isRejected = statusLower === 'rejected';
+      const isLocked = isApproved || isRejected;
       
       if (printBtn) printBtn.style.setProperty('display', 'inline-flex', 'important');
       
-      if (isBaseOil || isApproved) {
+      // Hide Edit / Modify button and Delete button when locked (Approved OR Rejected) or for base_oil
+      if (isBaseOil || isLocked) {
         if (editBtn) editBtn.style.setProperty('display', 'none', 'important');
         if (deleteBtn) deleteBtn.style.setProperty('display', 'none', 'important');
       } else {
         if (editBtn) {
           editBtn.style.setProperty('display', (isAdmin || isLab) ? 'inline-flex' : 'none', 'important');
-          // Update button text for Lab based on edit request status
+          editBtn.innerHTML = '<i data-lucide="edit"></i> แก้ไขข้อมูลใบแจ้ง';
           if (isLab && !isAdmin) {
-            editBtn.innerHTML = '<i data-lucide="edit"></i> บันทึกผลทดสอบ / แก้ไข';
             window.DB.hasPendingEditRequest(details.id).then(hasActiveEdit => {
                if (hasActiveEdit) {
                  editBtn.innerHTML = '✏️ แก้ไขข้อมูลตามคำขอ';
@@ -1636,17 +1748,15 @@ const App = (function () {
                }
                if (window.lucide) window.lucide.createIcons();
             }).catch(e => console.error(e));
-          } else {
-            editBtn.innerHTML = '<i data-lucide="edit"></i> แก้ไขข้อมูลใบแจ้ง';
           }
         }
         if (deleteBtn) deleteBtn.style.setProperty('display', isAdmin ? 'inline-flex' : 'none', 'important');
       }
 
-      // Dynamically render Approve/Reject buttons ONLY when status is Complete
+      // Dynamically render Approve and Reject buttons together ONLY when status is Complete
       const approveRejectContainer = document.getElementById('approve-reject-btn-container');
       if (approveRejectContainer) {
-        if (details.status && details.status.trim().toLowerCase() === 'complete' && (isAdmin || isLab)) {
+        if (statusLower === 'complete' && (isAdmin || isLab)) {
           approveRejectContainer.innerHTML = `
             <button class="btn btn-sm" id="btn-detail-approve" style="background-color:#16a34a; color:white; border:none;" onclick="App.approveRequest()">
               <i data-lucide="check-circle"></i> Approve
@@ -1668,24 +1778,38 @@ const App = (function () {
         if (isAdmin || isLab) {
           approvalCard.style.display = 'block';
           const badge = document.getElementById('approval-status-badge');
-          
-          if (details.approved) {
-            badge.innerText = 'Approved';
-            badge.className = 'badge approved';
+          const reopenActionContainer = document.getElementById('reopen-action-container');
+
+          if (isApproved || isRejected) {
+            badge.innerText = isApproved ? 'Approved' : 'Rejected';
+            badge.className = isApproved ? 'badge approved' : 'badge rejected';
+            badge.style.backgroundColor = isApproved ? '' : '#dc2626';
+            badge.style.color = isApproved ? '' : 'white';
+
             document.getElementById('approval-pending-state').style.display = 'none';
             document.getElementById('approval-done-state').style.display = 'flex';
             
+            const actionLabel = document.getElementById('approval-action-label');
+            if (actionLabel) actionLabel.innerText = isApproved ? 'Approved By' : 'Rejected By';
+            const dateLabel = document.getElementById('approval-date-label');
+            if (dateLabel) dateLabel.innerText = isApproved ? 'Approved Date' : 'Rejected Date';
+
             document.getElementById('approval-name-display').innerText = details.approved_name || '-';
             document.getElementById('approval-role-display').innerText = details.approved_role || '-';
             
             const dt = details.approved_at ? new Date(details.approved_at) : null;
             document.getElementById('approval-date-display').innerText = dt ? `${formatThaiDate(dt.toISOString().split('T')[0])} ${dt.toTimeString().slice(0, 5)} น.` : '-';
 
-            document.getElementById('reopen-action-container').style.display = isAdmin ? 'block' : 'none';
+            if (reopenActionContainer) {
+              // Reopen is strictly restricted to Admin only (Lab users must never see or use Reopen)
+              reopenActionContainer.style.display = isAdmin ? 'flex' : 'none';
+            }
 
           } else {
             badge.innerText = 'Waiting for Approval';
             badge.className = 'badge pending';
+            badge.style.backgroundColor = '';
+            badge.style.color = '';
             document.getElementById('approval-pending-state').style.display = 'flex';
             document.getElementById('approval-done-state').style.display = 'none';
             
@@ -1718,24 +1842,41 @@ const App = (function () {
     const poPrintEl = document.getElementById('print-po-number');
     if (poPrintEl) poPrintEl.innerText = details.po_number || '-';
 
-    // Approved by info
+    // Approved / Rejected by info
     const approvedNameEl = document.getElementById('print-approved-name');
     const approvedDateEl = document.getElementById('print-approved-date');
     const waitingEl = document.getElementById('print-waiting-approval');
     const sigBox = document.getElementById('print-signature-img-box');
+    const approvedTitleEl = document.getElementById('print-approved-title');
+    const statusStampEl = document.getElementById('print-status-stamp');
     
-    // Clear old images
+    // Clear old images & stamps
     if (sigBox) {
-      const imgs = sigBox.querySelectorAll('img');
-      imgs.forEach(i => i.remove());
+      const oldNodes = sigBox.querySelectorAll('img, .reject-stamp-box');
+      oldNodes.forEach(i => i.remove());
+    }
+    if (statusStampEl) {
+      statusStampEl.style.display = 'none';
+      statusStampEl.innerHTML = '';
     }
 
-    if (details.approved) {
+    // Always restore title to "ผู้อนุมัติผลการตรวจสอบ (Approved By)"
+    if (approvedTitleEl) {
+      approvedTitleEl.innerText = 'ผู้อนุมัติผลการตรวจสอบ (Approved By)';
+      approvedTitleEl.style.color = '';
+    }
+
+    const statusLower = (details.status || '').trim().toLowerCase();
+    const isApproved = details.approved === true || statusLower === 'approved';
+    const isRejected = statusLower === 'rejected';
+
+    if (isApproved || isRejected) {
       if (waitingEl) waitingEl.style.display = 'none';
-      if (approvedNameEl) approvedNameEl.innerText = details.approved_name || '';
+      if (approvedNameEl) approvedNameEl.innerText = details.approved_name || '-';
       if (approvedDateEl && details.approved_at) {
         const dt = new Date(details.approved_at);
-        approvedDateEl.innerText = `อนุมัติเมื่อ: ${formatThaiDate(dt.toISOString().split('T')[0])} เวลา ${dt.toTimeString().slice(0, 5)} น.`;
+        const prefix = isApproved ? 'อนุมัติเมื่อ:' : 'วันที่:';
+        approvedDateEl.innerText = `${prefix} ${formatThaiDate(dt.toISOString().split('T')[0])} เวลา ${dt.toTimeString().slice(0, 5)} น.`;
       }
       
       // Signature image
@@ -1744,6 +1885,16 @@ const App = (function () {
         img.src = details.approved_signature_snapshot;
         img.style.cssText = 'max-height:60px; max-width:160px; object-fit:contain; position:relative; z-index:2;';
         sigBox.appendChild(img);
+      }
+
+      // If rejected, show clear header stamp on A4 report
+      if (isRejected && statusStampEl) {
+        statusStampEl.style.display = 'block';
+        statusStampEl.innerHTML = `
+          <div style="border:2px solid #dc2626; color:#dc2626; font-size:13px; font-weight:800; padding:4px 12px; border-radius:6px; letter-spacing:1px; background-color:#fef2f2; text-align:center;">
+            REJECTED / ปฏิเสธผล
+          </div>
+        `;
       }
     } else {
       if (waitingEl) waitingEl.style.display = 'block';
@@ -1807,6 +1958,17 @@ const App = (function () {
   async function deleteCurrentRequest() {
     if (!state.currentRequestId) return;
     
+    try {
+      const details = await window.DB.getRequestById(state.currentRequestId);
+      const statusLower = (details?.status || '').trim().toLowerCase();
+      if (details?.approved === true || statusLower === 'approved') {
+        showToast('ไม่สามารถลบใบแจ้งตรวจสอบที่ได้รับการอนุมัติ (Approved) แล้วได้', 'error');
+        return;
+      }
+    } catch (err) {
+      console.warn('Could not verify approval status before deletion:', err);
+    }
+
     if (confirm('คุณแน่ใจว่าต้องการลบใบแจ้งตรวจสอบห้องปฏิบัติการใบนี้ใช่หรือไม่? การลบจะไม่สามารถกู้ข้อมูลกลับมาได้')) {
       try {
         await window.DB.deleteRequest(state.currentRequestId);
@@ -2054,6 +2216,25 @@ const App = (function () {
     if (modal) modal.classList.remove('open');
   }
 
+  function showNotesAlertModal(details) {
+    const modal = document.getElementById('modal-notes-alert');
+    if (!modal) return;
+    const reqNoEl = document.getElementById('notes-alert-req-no');
+    const reqUserEl = document.getElementById('notes-alert-requester');
+    const contentEl = document.getElementById('notes-alert-content');
+
+    if (reqNoEl) reqNoEl.innerText = `${details.request_no || '-'}/${details.request_year || '-'}`;
+    if (reqUserEl) reqUserEl.innerText = details.requester_name || '-';
+    if (contentEl) contentEl.innerText = details.notes || '';
+
+    modal.classList.add('open');
+  }
+
+  function closeNotesAlertModal() {
+    const modal = document.getElementById('modal-notes-alert');
+    if (modal) modal.classList.remove('open');
+  }
+
   // --- 6. USER ACCOUNT MANAGER (ADMIN ONLY) ---
   async function loadUsersManager() {
     const listBody = document.getElementById('users-list-tbody');
@@ -2199,34 +2380,63 @@ const App = (function () {
     }
   }
 
-  function openSettingsModal() {
-    // เปิด modal ก่อนเสมอ
-    const modal = document.getElementById('modal-settings');
-    if (modal) modal.classList.add('open');
+  function loadSettingsView() {
+    if (!state.currentUser) return;
+    const role = (state.currentUser.role || '').toLowerCase();
+    const isUserAdmin = role === 'admin';
 
-    if (state.currentUser) {
-      const role = (state.currentUser.role || '').toLowerCase();
-      const isUserAdmin = role === 'admin';
+    // Populate user info card
+    const nameEl = document.getElementById('settings-user-name');
+    const usernameEl = document.getElementById('settings-user-username');
+    const avatarEl = document.getElementById('settings-user-avatar');
+    const roleBadgeEl = document.getElementById('settings-user-role-badge');
 
-      const navPush = document.getElementById('setting-nav-push');
-      if (navPush) {
-        navPush.style.display = 'block';
-        // เรียก async หลังจาก modal เปิดแล้ว ไม่บล็อค
-        setTimeout(() => checkPushSubscriptionStatus(), 50);
-      }
-
-      const navUsers = document.getElementById('setting-nav-users');
-      if (navUsers) navUsers.style.display = isUserAdmin ? 'block' : 'none';
-
-      const navSigs = document.getElementById('setting-nav-signatures');
-      if (navSigs) navSigs.style.display = isUserAdmin ? 'block' : 'none';
-
-      const btnSys = document.getElementById('setting-btn-system');
-      if (btnSys) btnSys.style.display = isUserAdmin ? 'block' : 'none';
-
-      const btnClearSample = document.getElementById('setting-btn-clear-sample');
-      if (btnClearSample) btnClearSample.style.display = isUserAdmin ? 'block' : 'none';
+    const displayName = state.currentUser.display_name || state.currentUser.username || 'User';
+    if (nameEl) nameEl.innerText = displayName;
+    if (usernameEl) usernameEl.innerText = state.currentUser.username || '-';
+    if (avatarEl) {
+      avatarEl.innerText = displayName.trim().charAt(0).toUpperCase() || 'U';
     }
+
+    if (roleBadgeEl) {
+      const roleNames = {
+        admin: 'ผู้ดูแลระบบ (Admin)',
+        lab: 'เจ้าหน้าที่แล็บ (Lab)',
+        requester: 'ผู้ขอตรวจ (Requester)',
+        base_oil: 'Base Oil'
+      };
+      roleBadgeEl.innerText = roleNames[role] || role.toUpperCase();
+      roleBadgeEl.className = 'badge';
+      if (isUserAdmin) {
+        roleBadgeEl.classList.add('badge-admin');
+        roleBadgeEl.style.backgroundColor = '#dbeafe';
+        roleBadgeEl.style.color = '#1d4ed8';
+      } else if (role === 'lab') {
+        roleBadgeEl.classList.add('badge-lab');
+        roleBadgeEl.style.backgroundColor = '#e0e7ff';
+        roleBadgeEl.style.color = '#4338ca';
+      } else if (role === 'base_oil') {
+        roleBadgeEl.style.backgroundColor = '#fef3c7';
+        roleBadgeEl.style.color = '#b45309';
+      } else {
+        roleBadgeEl.classList.add('badge-requester');
+        roleBadgeEl.style.backgroundColor = '#f1f5f9';
+        roleBadgeEl.style.color = '#475569';
+      }
+    }
+
+    // Admin Section Visibility
+    const adminSec = document.getElementById('setting-admin-section');
+    if (adminSec) {
+      adminSec.style.display = isUserAdmin ? 'block' : 'none';
+    }
+
+    // Check Push Notification Status
+    checkPushSubscriptionStatus();
+  }
+
+  function openSettingsModal() {
+    navigate('settings');
   }
 
   function closeSettingsModal() {
@@ -2366,7 +2576,7 @@ const App = (function () {
     }
   }
 
-  // --- DATABASE CONNECTION CONFIG ---
+  // --- DATABASE & SYSTEM SETTINGS CONFIG ---
   function openConfigModal() {
     const modal = document.getElementById('modal-config');
     if (!modal) return;
@@ -2379,7 +2589,7 @@ const App = (function () {
     
     const soundToggle = document.getElementById('config-sound-enabled');
     if (soundToggle) soundToggle.checked = config.soundEnabled !== false;
-    
+
     // Show/hide fields
     handleConfigModeChange();
     modal.classList.add('open');
@@ -2398,7 +2608,7 @@ const App = (function () {
     }
   }
 
-  function saveDatabaseConfig() {
+  async function saveDatabaseConfig() {
     const mode = document.getElementById('config-db-mode').value;
     const url = document.getElementById('config-sb-url').value.trim();
     const key = document.getElementById('config-sb-key').value.trim();
@@ -2408,21 +2618,40 @@ const App = (function () {
       return;
     }
 
-    const config = {
+    const soundEnabled = document.getElementById('config-sound-enabled') ? document.getElementById('config-sound-enabled').checked : true;
+
+    const currentConfig = window.AppConfig.load();
+    const isDbChanged = currentConfig.supabaseUrl !== url || currentConfig.supabaseAnonKey !== key;
+
+    const newConfig = {
+      ...currentConfig,
       dbMode: mode,
       supabaseUrl: url,
-      supabaseAnonKey: key
+      supabaseAnonKey: key,
+      soundEnabled: soundEnabled
     };
 
-    if (window.AppConfig.save(config)) {
-      showToast('บันทึกการตั้งค่าการเชื่อมต่อสำเร็จแล้ว ระบบกำลังรีเฟรชฐานข้อมูล...', 'success');
+    if (window.AppConfig.save(newConfig)) {
+
+      showToast('บันทึกการตั้งค่าระบบเรียบร้อยแล้ว', 'success');
       closeConfigModal();
       
-      // Update badge status and logout active user sessions because DB provider has changed
-      updateConnectionBadge();
-      logout();
+      // Only logout and reload if database credentials were changed
+      if (isDbChanged) {
+        updateConnectionBadge();
+        logout();
+      }
     } else {
       showToast('ไม่สามารถบันทึกการตั้งค่าลงเครื่องได้', 'error');
+    }
+  }
+
+  // --- LINE MESSAGING API FUNCTIONS ---
+  function toggleLineConfigFields() {
+    const isEnabled = document.getElementById('config-line-enabled')?.checked;
+    const container = document.getElementById('line-config-fields');
+    if (container) {
+      container.style.display = isEnabled ? 'block' : 'none';
     }
   }
 
@@ -2959,6 +3188,7 @@ const App = (function () {
     if (!details) return;
     
     if (details.status !== 'Complete') {
+      showToast('ไม่สามารถอนุมัติได้ เนื่องจากข้อมูลการตรวจสอบยังไม่สมบูรณ์ (Status ต้องเป็น Complete)', 'warning');
       const msgEl = document.getElementById('approval-validation-msg');
       if (msgEl) {
         msgEl.innerText = 'ไม่สามารถอนุมัติได้ เนื่องจากข้อมูลการตรวจสอบยังไม่สมบูรณ์ (Status ต้องเป็น Complete)';
@@ -2974,6 +3204,7 @@ const App = (function () {
       }
     }
     if (!allComplete) {
+      showToast('ไม่สามารถอนุมัติได้ เนื่องจากยังมีรายการที่ตรวจสอบไม่เสร็จสิ้น', 'warning');
       const msgEl = document.getElementById('approval-validation-msg');
       if (msgEl) {
         msgEl.innerText = 'ไม่สามารถอนุมัติได้ เนื่องจากยังมีรายการที่ตรวจสอบไม่เสร็จสิ้น';
@@ -2987,6 +3218,8 @@ const App = (function () {
     isApproving = true;
     const btn = document.getElementById('btn-approve-doc');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอนุมัติ...'; }
+    const btnTop = document.getElementById('btn-detail-approve');
+    if (btnTop) { btnTop.disabled = true; btnTop.innerText = 'กำลังอนุมัติ...'; }
     
     try {
       const updated = await window.DB.approveRequest(state.currentRequestId);
@@ -2999,6 +3232,7 @@ const App = (function () {
     } finally {
       isApproving = false;
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Approve Document'; }
+      if (btnTop) { btnTop.disabled = false; btnTop.innerHTML = '<i data-lucide="check-circle"></i> Approve'; if (window.lucide) window.lucide.createIcons(); }
     }
   }
 
@@ -3028,15 +3262,21 @@ const App = (function () {
       return;
     }
     if (isApproving) return;
-    if (!confirm('คุณต้องการ Reject ใบแจ้งนี้ใช่หรือไม่?\nสถานะจะเปลี่ยนเป็น Rejected')) return;
+
+    const reason = prompt('กรุณาระบุเหตุผลในการ Reject (หรือกดตกลงหากไม่ต้องการระบุ):', '');
+    if (reason === null) return; // User cancelled
+    
+    if (!confirm('คุณต้องการ Reject ใบแจ้งนี้ใช่หรือไม่?\nระบบจะประทับลายเซ็นดิจิทัลของคุณเป็นผู้ปฏิเสธผลลงในเอกสาร')) return;
     
     isApproving = true;
     const btn = document.getElementById('btn-detail-reject');
     if (btn) { btn.disabled = true; btn.innerText = 'กำลังปฏิเสธ...'; }
+    const btnDoc = document.getElementById('btn-reject-doc');
+    if (btnDoc) { btnDoc.disabled = true; btnDoc.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังปฏิเสธ...'; }
     
     try {
-      const updated = await window.DB.rejectRequest(state.currentRequestId);
-      showToast('Reject ใบแจ้งเรียบร้อยแล้ว สถานะเปลี่ยนเป็น Rejected', 'success');
+      const updated = await window.DB.rejectRequest(state.currentRequestId, reason);
+      showToast('Reject ใบแจ้งเรียบร้อยแล้ว (บันทึกลายเซ็นผู้ปฏิเสธผลแล้ว)', 'success');
       await loadRequestDetail(state.currentRequestId);
       loadRequestsList();
     } catch (e) {
@@ -3045,6 +3285,21 @@ const App = (function () {
     } finally {
       isApproving = false;
       if (btn) { btn.disabled = false; btn.innerText = 'Reject'; }
+      if (btnDoc) { btnDoc.disabled = false; btnDoc.innerHTML = '<i class="fas fa-times-circle"></i> Reject Document'; }
+    }
+  }
+
+  async function signCurrentRequest() {
+    if (!state.currentRequestId) return;
+    if (!confirm('คุณต้องการประทับลายเซ็นดิจิทัลของคุณลงในเอกสารนี้ใช่หรือไม่?')) return;
+    
+    try {
+      await window.DB.signRequest(state.currentRequestId);
+      showToast('ลงลายเซ็นดิจิทัลกำกับเอกสารเรียบร้อยแล้ว', 'success');
+      await loadRequestDetail(state.currentRequestId);
+    } catch (e) {
+      console.error('signCurrentRequest error:', e);
+      showToast('ไม่สามารถลงลายเซ็นได้: ' + e.message, 'error');
     }
   }
 
@@ -4277,17 +4532,89 @@ const App = (function () {
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
   }
 
-  function _buildStickerPreviewHtml(testResult, productName, batchNumber, requestDate) {
-    const resText = (testResult || 'PENDING').toUpperCase();
-    const recDate = _formatRecDate(requestDate);
+  function _buildStickerPreviewHtml(arg1, arg2, arg3, arg4) {
+    let data;
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      data = arg1;
+    } else {
+      data = {
+        test_result: arg1,
+        product_name: arg2,
+        batch_number: arg3,
+        inspection_date: arg4,
+        supplier_name: '-',
+        quantity: '-',
+        item_comment: ''
+      };
+    }
+
+    const resText = (data.test_result || 'PENDING').toUpperCase();
+    const recDate = _formatRecDate(data.inspection_date || data.request_date);
+    const isHold = (resText === 'HOLD');
+
+    if (isHold) {
+      return `
+        <div style="border: 3px solid #000; width: 100%; max-width: 800px; min-height: 520px; box-sizing: border-box; background: white; color: black; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
+          <!-- Top Header: HOLD with yellow background (~1/4 height) -->
+          <div style="background-color: #ffff99; border-bottom: 3px solid #000; height: 110px; display: flex; align-items: center; justify-content: center; text-align: center;">
+            <div style="font-size: 75px; font-weight: bold; letter-spacing: 8px; line-height: 1; color: #000; font-family: monospace;">HOLD</div>
+          </div>
+
+          <!-- Body Content: Table layout for precise colon alignment -->
+          <div style="padding: 20px 30px 14px 30px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 19px; line-height: 1.85; color: #000; font-family: monospace;">
+              <tr>
+                <td style="width: 260px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
+                <td style="width: 25px; font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.product_name || '-')}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">ลูกค้า</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.supplier_name || '-')}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">Lot no.</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.batch_number || '-')}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">จำนวน</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.quantity || '-')}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">สาเหตุ</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 4px 0; word-break: break-word;">${escapeHtml(data.item_comment || '-')}</td>
+              </tr>
+            </table>
+
+            <!-- Bottom Right Signature Block (with generous clearance above the line) -->
+            <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 55px; margin-bottom: 8px;">
+              <div style="width: 280px; text-align: center; color: #000; font-family: monospace;">
+                <div style="border-top: 2.5px solid #000; margin-bottom: 6px;"></div>
+                <div style="font-size: 19px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
+                <div style="font-size: 19px; font-weight: bold; margin-top: 4px;">วันที่ &nbsp;&nbsp;${recDate}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: right; font-size: 11px; color: #64748b; padding: 4px 16px 8px 16px;">
+            * ตัวอย่างสติกเกอร์ขนาด A4 แนวนอน (Landscape)
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div style="border:2px solid black; padding:12px 14px; width:300px; font-family:monospace; background:white; color:black; box-sizing:border-box;">
         <div style="text-align:center; border-bottom:2px solid black; padding-bottom:8px; margin-bottom:10px;">
           <div style="font-size:36px; font-weight:bold; letter-spacing:4px;">${resText}</div>
         </div>
         <div style="font-size:13px; line-height:1.8; color:black;">
-          <div><strong>Product :</strong> ${escapeHtml(productName)}</div>
-          <div><strong>Batch &nbsp;&nbsp;:</strong> ${escapeHtml(batchNumber)}</div>
+          <div><strong>Product :</strong> ${escapeHtml(data.product_name || '-')}</div>
+          <div><strong>Batch &nbsp;&nbsp;:</strong> ${escapeHtml(data.batch_number || '-')}</div>
           <div><strong>Pass Date:</strong> ${recDate}</div>
         </div>
       </div>
@@ -4313,29 +4640,45 @@ const App = (function () {
       stickerData.inspection_date = defaultDate;
     }
     // Rebuild preview HTML with the default date
-    previewHtml = _buildStickerPreviewHtml(stickerData.test_result, stickerData.product_name, stickerData.batch_number, stickerData.inspection_date);
+    previewHtml = _buildStickerPreviewHtml(stickerData);
 
-    // Determine if date should be editable
+    const isHold = (stickerData.test_result || '').toUpperCase() === 'HOLD';
     const isRequester = state.currentUser && state.currentUser.role === 'requester';
     const dateDisabled = isRequester ? 'disabled' : '';
 
     modal.style.cssText = [
       'display:flex', 'position:fixed', 'top:0', 'left:0',
       'width:100vw', 'height:100vh', 'background:rgba(0,0,0,0.6)',
-      'z-index:99999', 'align-items:center', 'justify-content:center'
+      'z-index:99999', 'align-items:center', 'justify-content:center',
+      'padding:16px', 'box-sizing:border-box', 'backdrop-filter:blur(2px)'
     ].join(';');
+
+    const modalWidth = isHold ? '860px' : '440px';
+    const modalTitle = isHold ? '🏷️ Preview สติกเกอร์ HOLD (A4 แนวนอน)' : '🏷️ Preview สติกเกอร์วัตถุดิบ';
+    const dateLabel = isHold ? 'วันที่ตรวจสอบ (Inspection Date):' : 'วันที่ผ่าน (Passed Date):';
+
     modal.innerHTML = `
-      <div style="background:white;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.4);width:440px;max-width:95vw;overflow:hidden;font-family:'Sarabun',sans-serif;">
+      <div style="background:white;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.4);width:${modalWidth};max-width:96vw;max-height:92vh;overflow-y:auto;font-family:'Sarabun',sans-serif;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e0e0e0;">
-          <h2 style="margin:0;font-size:18px;color:#1a1a2e;">🏷️ Preview สติกเกอร์วัตถุดิบ</h2>
+          <h2 style="margin:0;font-size:18px;color:#1a1a2e;">${modalTitle}</h2>
           <button onclick="App.closeStickerModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#666;line-height:1;">&times;</button>
         </div>
         <div style="padding:20px;">
           <div id="sticker-preview-container" style="display:flex;justify-content:center;margin-bottom:20px;">${previewHtml}</div>
-          <div style="margin-bottom:12px;">
-            <label style="display:block;margin-bottom:6px;font-weight:600;color:#333;">วันที่ผ่าน (Passed Date):</label>
-            <input type="date" id="sticker-passed-date" value="${stickerData.inspection_date}" onchange="App.updateStickerPreviewDate(this.value)"
-              style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box;" ${dateDisabled}>
+          
+          <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:200px;margin-bottom:8px;">
+              <label style="display:block;margin-bottom:6px;font-weight:600;color:#333;">${dateLabel}</label>
+              <input type="date" id="sticker-passed-date" value="${stickerData.inspection_date}" onchange="App.updateStickerPreviewDate(this.value)"
+                style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box;" ${dateDisabled}>
+            </div>
+            ${isHold && !isRequester ? `
+            <div style="flex:2;min-width:280px;margin-bottom:8px;">
+              <label style="display:block;margin-bottom:6px;font-weight:600;color:#333;">สาเหตุ (Hold Reason):</label>
+              <input type="text" id="sticker-hold-reason" value="${escapeHtml(stickerData.item_comment || '')}" oninput="App.updateStickerPreviewReason(this.value)" placeholder="ระบุสาเหตุการ Hold..."
+                style="width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box;">
+            </div>
+            ` : ''}
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 20px;border-top:1px solid #e0e0e0;">
@@ -4352,12 +4695,15 @@ const App = (function () {
   function updateStickerPreviewDate(dateStr) {
     if (!state.currentStickerItem) return;
     state.currentStickerItem.inspection_date = dateStr;
-    const previewHtml = _buildStickerPreviewHtml(
-      state.currentStickerItem.test_result, 
-      state.currentStickerItem.product_name, 
-      state.currentStickerItem.batch_number, 
-      dateStr
-    );
+    const previewHtml = _buildStickerPreviewHtml(state.currentStickerItem);
+    const container = document.getElementById('sticker-preview-container');
+    if (container) container.innerHTML = previewHtml;
+  }
+
+  function updateStickerPreviewReason(val) {
+    if (!state.currentStickerItem) return;
+    state.currentStickerItem.item_comment = val;
+    const previewHtml = _buildStickerPreviewHtml(state.currentStickerItem);
     const container = document.getElementById('sticker-preview-container');
     if (container) container.innerHTML = previewHtml;
   }
@@ -4365,23 +4711,57 @@ const App = (function () {
   // Used by Material History page (looks up item from state.historyList by id)
   function openStickerPreview(itemId) {
     if (!state.historyList) return;
-    const item = state.historyList.find(i => i.id === itemId || i.id === Number(itemId));
+    const item = state.historyList.find(i => String(i.id) === String(itemId) || Number(i.id) === Number(itemId));
     if (!item) return;
-    const previewHtml = _buildStickerPreviewHtml(item.test_result, item.product_name, item.batch_number, item.inspection_date || item.request_date);
-    _showStickerModal(previewHtml, item);
+    const stickerData = {
+      id: item.id,
+      test_result: item.test_result,
+      product_name: item.product_name,
+      batch_number: item.batch_number,
+      supplier_name: item.customer_name || '-',
+      quantity: item.quantity || '-',
+      item_comment: item.item_comment || '',
+      request_date: item.request_date,
+      inspection_date: item.inspection_date || item.request_date
+    };
+    const previewHtml = _buildStickerPreviewHtml(stickerData);
+    _showStickerModal(previewHtml, stickerData);
   }
 
-  // Used by Request Detail page (data passed directly from row)
-  function openStickerPreviewDirect(testResult, productName, batchNumber, requestDate, testedDate, itemId) {
-    const stickerData = { 
-      id: itemId,
-      test_result: testResult, 
-      product_name: productName, 
-      batch_number: batchNumber, 
-      request_date: requestDate,
-      inspection_date: testedDate 
-    };
-    const previewHtml = _buildStickerPreviewHtml(testResult, productName, batchNumber, testedDate || requestDate);
+  // Used by Request Detail page (data passed directly or looked up from currentRequestDetail)
+  function openStickerPreviewDirect(testResultOrId, productName, batchNumber, requestDate, testedDate, itemId) {
+    let stickerData = null;
+    const targetId = itemId || testResultOrId;
+    if (state.currentRequestDetail && state.currentRequestDetail.items) {
+      const found = state.currentRequestDetail.items.find(i => String(i.id) === String(targetId));
+      if (found) {
+        stickerData = { 
+          id: found.id,
+          test_result: found.test_result, 
+          product_name: found.product_name, 
+          batch_number: found.batch_number, 
+          supplier_name: state.currentRequestDetail.customer_name || '-',
+          quantity: found.quantity || '-',
+          item_comment: found.item_comment || '',
+          request_date: state.currentRequestDetail.request_date || requestDate,
+          inspection_date: found.inspection_date || testedDate || state.currentRequestDetail.request_date
+        };
+      }
+    }
+    if (!stickerData) {
+      stickerData = { 
+        id: targetId,
+        test_result: productName ? testResultOrId : 'Hold', 
+        product_name: productName || '-', 
+        batch_number: batchNumber || '-', 
+        supplier_name: (state.currentRequestDetail && state.currentRequestDetail.customer_name) || '-',
+        quantity: '-',
+        item_comment: '',
+        request_date: requestDate || '',
+        inspection_date: testedDate || requestDate || ''
+      };
+    }
+    const previewHtml = _buildStickerPreviewHtml(stickerData);
     _showStickerModal(previewHtml, stickerData);
   }
 
@@ -4399,16 +4779,23 @@ const App = (function () {
     }
     const dateInput = document.getElementById('sticker-passed-date');
     if (!dateInput || !dateInput.value) return;
+    const reasonInput = document.getElementById('sticker-hold-reason');
+    const reasonVal = reasonInput ? reasonInput.value.trim() : undefined;
     
     try {
       const btn = document.querySelector('#modal-sticker-preview button[onclick="App.saveStickerDate()"]');
       if (btn) { btn.disabled = true; btn.innerText = 'กำลังบันทึก...'; }
       
-      await window.DB.updateRequestItemInspectionDate(item.id, dateInput.value);
+      if (reasonVal !== undefined && window.DB.updateRequestItemInspection) {
+        await window.DB.updateRequestItemInspection(item.id, dateInput.value, reasonVal);
+        item.item_comment = reasonVal;
+      } else {
+        await window.DB.updateRequestItemInspectionDate(item.id, dateInput.value);
+      }
       
       item.inspection_date = dateInput.value;
       
-      showToast('บันทึกวันที่สำเร็จ', 'success');
+      showToast('บันทึกข้อมูลสติกเกอร์สำเร็จ', 'success');
       
       if (btn) { btn.disabled = false; btn.innerText = '💾 บันทึก'; }
       
@@ -4417,7 +4804,7 @@ const App = (function () {
         await loadRequestDetail(state.currentRequestId);
       }
     } catch (err) {
-      console.error('Error saving tested date:', err);
+      console.error('Error saving sticker info:', err);
       showToast('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, 'error');
       const btn = document.querySelector('#modal-sticker-preview button[onclick="App.saveStickerDate()"]');
       if (btn) { btn.disabled = false; btn.innerText = '💾 บันทึก'; }
@@ -4432,21 +4819,94 @@ const App = (function () {
 
     let resText = item.test_result ? item.test_result.toUpperCase() : 'PENDING';
     let recDate = _formatRecDate(dateStr);
+    const isHold = (resText === 'HOLD');
 
-    const singleSticker = `
-      <div class="sticker-page" style="page-break-after: always; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
-        <div style="border: 2px solid black; padding: 10px; width: 300px; font-family: monospace; background: white; color: black; box-sizing: border-box;">
-          <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 10px;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: bold; color: black;">${resText}</h1>
-          </div>
-          <div style="font-size: 14px; line-height: 1.5; color: black;">
-            <div>Product : ${escapeHtml(item.product_name)}</div>
-            <div>Batch &nbsp;&nbsp;: ${escapeHtml(item.batch_number)}</div>
-            <div>Pass Date: ${recDate}</div>
+    let pageCss = '';
+    let singleSticker = '';
+
+    if (isHold) {
+      pageCss = `
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background-color: white !important; margin: 0 !important; padding: 0 !important; }
+        }
+        body { margin: 0; padding: 0; background: white; font-family: monospace; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      `;
+      singleSticker = `
+        <div class="sticker-page" style="page-break-after: always; box-sizing: border-box; width: 100%; height: 100vh; display: flex; align-items: stretch; justify-content: center; padding: 0;">
+          <div style="border: 4px solid #000; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; background: white; color: black; font-family: monospace; overflow: hidden;">
+            
+            <!-- HEADER: HOLD with Yellow Background (approx. 1/4 of paper height) -->
+            <div style="background-color: #ffff99; border-bottom: 4px solid #000; height: 24vh; min-height: 46mm; display: flex; align-items: center; justify-content: center; text-align: center; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box;">
+              <h1 style="margin: 0; font-size: 140px; font-weight: bold; letter-spacing: 12px; line-height: 1; color: black; font-family: monospace;">HOLD</h1>
+            </div>
+
+            <!-- BODY CONTENT: Table for exact colon alignment -->
+            <div style="padding: 26px 45px 20px 45px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 34px; line-height: 2.1; color: black; font-family: monospace;">
+                <tr>
+                  <td style="width: 440px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
+                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.product_name || '-')}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">ลูกค้า</td>
+                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.supplier_name || '-')}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">Lot no.</td>
+                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.batch_number || '-')}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">จำนวน</td>
+                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.quantity || '-')}</td>
+                </tr>
+                <tr>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">สาเหตุ</td>
+                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0; word-break: break-word;">${escapeHtml(item.item_comment || '-')}</td>
+                </tr>
+              </table>
+
+              <!-- RIGHT SIGNATURE BLOCK (with generous clearance above the line for hand-signing) -->
+              <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 85px; margin-right: 20px; margin-bottom: 20px;">
+                <div style="width: 380px; text-align: center; color: black; font-family: monospace;">
+                  <div style="border-top: 3px solid #000; margin-bottom: 10px;"></div>
+                  <div style="font-size: 30px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
+                  <div style="font-size: 30px; font-weight: bold; margin-top: 8px;">วันที่ &nbsp;&nbsp;${recDate}</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      pageCss = `
+        @media print {
+          @page { size: auto; margin: 0; }
+          body { background-color: white !important; margin: 0 !important; padding: 0 !important; }
+        }
+        body { margin: 0; padding: 0; background: white; font-family: monospace; }
+      `;
+      singleSticker = `
+        <div class="sticker-page" style="page-break-after: always; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+          <div style="border: 2px solid black; padding: 10px; width: 300px; font-family: monospace; background: white; color: black; box-sizing: border-box;">
+            <div style="text-align: center; border-bottom: 2px solid black; padding-bottom: 5px; margin-bottom: 10px;">
+              <h1 style="margin: 0; font-size: 32px; font-weight: bold; color: black;">${resText}</h1>
+            </div>
+            <div style="font-size: 14px; line-height: 1.5; color: black;">
+              <div>Product : ${escapeHtml(item.product_name || '-')}</div>
+              <div>Batch &nbsp;&nbsp;: ${escapeHtml(item.batch_number || '-')}</div>
+              <div>Pass Date: ${recDate}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     let allStickers = '';
     for (let i = 0; i < copies; i++) {
@@ -4468,11 +4928,7 @@ const App = (function () {
     doc.write('<html><head><title>Print Label</title>');
     doc.write(`
       <style>
-        @media print {
-          @page { size: auto; margin: 0; }
-          body { background-color: white !important; margin: 0 !important; padding: 0 !important; }
-        }
-        body { margin: 0; padding: 0; background: white; }
+        ${pageCss}
       </style>
     `);
     doc.write('</head><body>');
@@ -4907,6 +5363,7 @@ const App = (function () {
     openStickerPreviewDirect,
     closeStickerModal,
     updateStickerPreviewDate,
+    updateStickerPreviewReason,
     saveStickerDate,
     confirmPrintSticker,
     clearDraftFilters: () => {
@@ -4988,6 +5445,7 @@ const App = (function () {
     approveRequest,
     reopenRequest,
     rejectRequest,
+    signCurrentRequest,
     clearAndReimportHistoricalData,
     exportPDF,
     generateDailyReportPDF,
@@ -5041,6 +5499,9 @@ const App = (function () {
     fulfillEditRequest,
     deleteEditRequest,
     togglePushNotification,
-    checkPushSubscriptionStatus
+    checkPushSubscriptionStatus,
+    showNotesAlertModal,
+    closeNotesAlertModal,
+    loadSettingsView
   };
 })();

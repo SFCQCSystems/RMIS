@@ -50,6 +50,45 @@
       justify-content: center;
       box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
+    /* iOS Style Toggle Switch */
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .switch-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #cbd5e1;
+      transition: .25s ease;
+      border-radius: 24px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .25s ease;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .switch-toggle input:checked + .switch-slider {
+      background-color: #10b981;
+    }
+    .switch-toggle input:checked + .switch-slider:before {
+      transform: translateX(20px);
+    }
     .notif-panel {
       display: none;
       position: absolute;
@@ -544,6 +583,78 @@
         display: none !important;
       }
     }
+
+    /* Item Form Result Dropdown Color Styling */
+    .item-form-result {
+      border-radius: 6px;
+      font-weight: 500;
+      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .item-form-result[data-result="In Process"] {
+      background-color: #ffffff;
+      color: #334155;
+      border-color: #cbd5e1;
+      font-weight: 500;
+    }
+    .item-form-result[data-result="Pass"] {
+      background-color: #dcfce7 !important;
+      color: #15803d !important;
+      border-color: #86efac !important;
+      font-weight: 600 !important;
+    }
+    .item-form-result[data-result="Hold"] {
+      background-color: #fef3c7 !important;
+      color: #b45309 !important;
+      border-color: #fde68a !important;
+      font-weight: 600 !important;
+    }
+    .item-form-result[data-result="Fail"] {
+      background-color: #fee2e2 !important;
+      color: #b91c1c !important;
+      border-color: #fca5a5 !important;
+      font-weight: 600 !important;
+    }
+
+    .item-form-result option[value="In Process"],
+    #hist-result option[value="In Process"] {
+      background-color: #ffffff;
+      color: #334155;
+      font-weight: 500;
+    }
+    .item-form-result option[value="Pass"],
+    #hist-result option[value="Pass"] {
+      background-color: #dcfce7;
+      color: #15803d;
+      font-weight: 600;
+    }
+    .item-form-result option[value="Hold"],
+    #hist-result option[value="Hold"] {
+      background-color: #fef3c7;
+      color: #b45309;
+      font-weight: 600;
+    }
+    .item-form-result option[value="Fail"],
+    #hist-result option[value="Fail"] {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    /* Admin Request No Edit Bar - 1 Row Layout */
+    #form-admin-no-edit {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 15px;
+    }
+    @media (max-width: 992px) {
+      #form-admin-no-edit {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+    }
+    @media (max-width: 576px) {
+      #form-admin-no-edit {
+        grid-template-columns: 1fr !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -609,15 +720,9 @@
           </a>
         </li>
 
-        <li class="menu-item" id="nav-data-management" style="display:none;">
-          <a href="#data-management" onclick="App.navigate('data-management'); return false;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
-            จัดการข้อมูล
-          </a>
-        </li>
 
         <li class="menu-item" id="nav-settings">
-          <a href="#settings" onclick="App.openSettingsModal(); return false;">
+          <a href="#settings" onclick="App.navigate('settings'); return false;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             การตั้งค่า
           </a>
@@ -913,22 +1018,21 @@
                   </div>
                   <div class="card-body">
                     <!-- Not Approved State -->
-                    <div id="approval-pending-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px 0;">
-                      <p style="color:var(--text-muted); margin-bottom:15px;">เอกสารนี้ยังไม่ได้รับการอนุมัติ</p>
-                      <button id="btn-approve-doc" class="btn btn-primary" onclick="App.approveRequest()" style="padding:10px 24px; font-weight:600;"><i class="fas fa-check-circle"></i> Approve Document</button>
+                    <div id="approval-pending-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px 0;">
+                      <p style="color:var(--text-muted); margin:0; font-size:13px;">เอกสารนี้ยังไม่ได้รับการอนุมัติ / ตรวจรับรอง (สามารถกดปุ่ม Approve หรือ Reject ได้ที่แถบเมนูด้านบน)</p>
                       <div id="approval-validation-msg" style="color:#ef4444; font-size:13px; margin-top:10px; display:none;">
                         ไม่สามารถอนุมัติได้ เนื่องจากข้อมูลการตรวจสอบยังไม่สมบูรณ์
                       </div>
                     </div>
 
-                    <!-- Approved State -->
-                    <div id="approval-done-state" style="display:none; align-items:center; justify-content:space-between; gap:20px;">
+                    <!-- Approved / Rejected State -->
+                    <div id="approval-done-state" style="display:none; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
                       <div>
-                        <div class="meta-item mb-10"><label>Approved By</label><span id="approval-name-display" style="font-weight:600; font-size:15px;">-</span></div>
+                        <div class="meta-item mb-10"><label id="approval-action-label">Approved By</label><span id="approval-name-display" style="font-weight:600; font-size:15px;">-</span></div>
                         <div class="meta-item mb-10"><label>Role</label><span id="approval-role-display">-</span></div>
-                        <div class="meta-item"><label>Approved Date</label><span id="approval-date-display">-</span></div>
+                        <div class="meta-item"><label id="approval-date-label">Approved Date</label><span id="approval-date-display">-</span></div>
                       </div>
-                      <div id="reopen-action-container" style="display:none;">
+                      <div id="reopen-action-container" style="display:none; align-items:center;">
                         <button class="btn btn-danger btn-sm" onclick="App.reopenRequest()"><i class="fas fa-undo"></i> Reopen Document</button>
                       </div>
                     </div>
@@ -999,7 +1103,7 @@
                 <div class="section-title" style="margin-top:0;">ข้อมูลทั่วไป</div>
                 
                 <!-- Admin specific block for request number editing -->
-                <div class="grid-3 mb-20" id="form-admin-no-edit" style="display:none; background: #e0f2fe; padding: 15px; border-radius: var(--radius-sm); border: 1px dashed var(--primary-color);">
+                <div class="mb-20" id="form-admin-no-edit" style="display:none; background: #e0f2fe; padding: 15px; border-radius: var(--radius-sm); border: 1px dashed var(--primary-color); grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px;">
                   <div class="form-group" style="margin-bottom:0;">
                     <label for="form-request-no">เลขที่ใบแจ้ง (Request No) <span style="color:red;">*</span></label>
                     <input type="number" id="form-request-no" min="1">
@@ -1016,7 +1120,7 @@
                     <label for="form-request-time">เวลาที่แจ้ง</label>
                     <input type="time" id="form-request-time">
                   </div>
-                  <div class="form-group" style="margin-bottom:0; display:flex; align-items:flex-end;">
+                  <div style="grid-column: 1 / -1; margin-top: 4px;">
                     <span style="font-size:11px; color:var(--text-muted); line-height:1.4;">* เฉพาะผู้ดูแลระบบที่แก้ไขเลขที่ใบแจ้งได้ โดยระบบจะตรวจสอบไม่ให้ซ้ำปีเดียวกัน</span>
                   </div>
                 </div>
@@ -1111,8 +1215,8 @@
                         <option value="Pending">Pending – รอดำเนินการ</option>
                         <option value="In Process">In Process – กำลังตรวจสอบ</option>
                         <option value="Complete">Complete – ตรวจสอบแล้ว</option>
-                        <option value="Approved" hidden style="display:none;">Approved – อนุมัติเอกสารแล้ว</option>
-                        <option value="Rejected">Rejected – ยกเลิก</option>
+                        <option value="Approved" hidden style="display:none;">Approved – อนุมัติเอกสารแล้ว (ต้องมีลายเซ็นที่หน้ารายละเอียด)</option>
+                        <option value="Rejected" hidden style="display:none;">Rejected – ยกเลิก/ปฏิเสธ (ต้องมีลายเซ็นที่หน้ารายละเอียด)</option>
                       </select>
                     </div>
                   </div>
@@ -1336,7 +1440,135 @@
           </div>
         </section>
 
-        <!-- PRINT TEMPLATE FOR DAILY REPORT REMOVED FROM HERE -->
+        <!-- 9. SETTINGS VIEW (FULL-PAGE) -->
+        <section id="view-settings" class="page-view" style="display: none; padding: 20px;">
+          <div class="flex justify-between align-center mb-20">
+            <div>
+              <h1 style="font-size: 24px; font-weight: 700;">⚙️ การตั้งค่า (Settings)</h1>
+              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">จัดการบัญชีผู้ใช้งาน ความปลอดภัย และการตั้งค่าระบบ</p>
+            </div>
+          </div>
+
+          <!-- User Profile Summary Card -->
+          <div class="card mb-20" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid var(--border-color);">
+            <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; padding: 20px;">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="width: 52px; height: 52px; border-radius: 50%; background: #0284c7; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; box-shadow: 0 2px 8px rgba(2,132,199,0.3);" id="settings-user-avatar">
+                  U
+                </div>
+                <div>
+                  <div style="font-size: 17px; font-weight: 700; color: var(--text-color);" id="settings-user-name">-</div>
+                  <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+                    ชื่อผู้ใช้: <span id="settings-user-username" style="font-weight: 500; color: var(--text-color);">-</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <span class="badge" id="settings-user-role-badge" style="font-size: 13px; padding: 6px 14px; border-radius: 20px;">-</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+            <!-- Section 1: Account & Security -->
+            <div class="card">
+              <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px;">
+                <h3 class="card-title" style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                  <span>🔒</span> บัญชีและความปลอดภัย
+                </h3>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <!-- Change Password Row -->
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px;">เปลี่ยนรหัสผ่าน</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">อัปเดตรหัสผ่านสำหรับเข้าสู่ระบบของบัญชีคุณ</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="App.openChangeOwnPasswordModal()" style="white-space: nowrap;">
+                    เปลี่ยนรหัสผ่าน
+                  </button>
+                </div>
+
+                <!-- Push Notifications Row -->
+                <div id="setting-nav-push" class="setting-push-row" style="padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                      <span>🔔</span> แจ้งเตือนบนอุปกรณ์ (Push Notification)
+                    </div>
+                    <div id="push-status-text" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      รับแจ้งเตือนเมื่อมีใบงานใหม่หรือการอนุมัติ แม้ปิดหน้าจอ
+                    </div>
+                  </div>
+                  <button id="btn-toggle-push" class="btn btn-sm btn-primary" onclick="App.togglePushNotification()" style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+                    เปิดใช้งาน
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Section 2: Administration (Admin Only) -->
+            <div class="card" id="setting-admin-section" style="display: none;">
+              <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px;">
+                <h3 class="card-title" style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                  <span>🛠️</span> การจัดการระบบ (สำหรับผู้ดูแลระบบ)
+                </h3>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <!-- User Management -->
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                      <span>👥</span> จัดการผู้ใช้งาน
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">เพิ่ม ลบ แก้ไข บัญชีและกำหนดสิทธิ์ผู้ใช้งาน</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="App.navigate('users')" style="white-space: nowrap;">
+                    จัดการ &rarr;
+                  </button>
+                </div>
+
+                <!-- Lab Signatures -->
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                      <span>✍️</span> จัดการลายเซ็น Lab
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">อัปโหลดและจัดการลายเซ็นอิเล็กทรอนิกส์ของเจ้าหน้าที่ Lab</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="App.navigate('signatures')" style="white-space: nowrap;">
+                    จัดการ &rarr;
+                  </button>
+                </div>
+
+                <!-- Database & System Settings -->
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                      <span>⚙️</span> การเชื่อมต่อฐานข้อมูล
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">ตั้งค่า Supabase URL, Anon Key และโหมดฐานข้อมูล</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="App.openConfigModal()" style="white-space: nowrap;">
+                    ตั้งค่า &rarr;
+                  </button>
+                </div>
+
+                <!-- Data Management / Import -->
+                <div style="padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                      <span>📂</span> จัดการข้อมูลย้อนหลัง
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">นำเข้าและตรวจสอบประวัติข้อมูลการตรวจสอบย้อนหลัง</div>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="App.navigate('data-management')" style="white-space: nowrap;">
+                    เปิดเมนู &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
       </main>
     </div>
@@ -1377,40 +1609,90 @@
        MODAL: DATABASE SETTINGS CONFIG
        ========================================================================= -->
   <div class="modal-overlay" id="modal-config">
-    <div class="modal-container">
+    <div class="modal-container" style="max-width: 580px;">
       <div class="modal-header">
-        <h3 class="modal-title">ตั้งค่าการเชื่อมต่อ Supabase Cloud</h3>
+        <h3 class="modal-title">⚙️ การตั้งค่าระบบ (System Settings)</h3>
         <button class="btn-close" onclick="App.closeConfigModal()">&times;</button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body" style="max-height: calc(85vh - 120px); overflow-y: auto; padding-right: 6px;">
         <input type="hidden" id="config-db-mode" value="supabase">
-        <div id="supabase-config-fields">
-          <div class="form-group">
-            <label for="config-sb-url">Supabase Project URL <span style="color:red;">*</span></label>
-            <input type="text" id="config-sb-url" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co" required>
-          </div>
-          <div class="form-group">
-            <label for="config-sb-key">Supabase Anon Key <span style="color:red;">*</span></label>
-            <input type="password" id="config-sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
-          </div>
-          <div style="background-color: #fffbeb; border:1px solid #fef3c7; color:#b45309; padding:12px; border-radius:var(--radius-sm); font-size:12px; line-height:1.4;">
-            <strong>ข้อแนะนำ:</strong> ระบบนี้ทำงานบนฐานข้อมูล Supabase Cloud เท่านั้น กรุณากรอก URL และ Anon Key เพื่อเข้าใช้งาน
-          </div>
-          
-          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;" />
-          <h4 style="margin-bottom: 12px; font-weight: 600; color: var(--text-color);">การตั้งค่าระบบ (System Settings)</h4>
-          <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between;">
-            <label for="config-sound-enabled" style="margin-bottom: 0;">เปิดเสียงแจ้งเตือนระบบ</label>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <input type="checkbox" id="config-sound-enabled" checked style="width: auto; transform: scale(1.2);">
-              <button type="button" class="btn btn-secondary" onclick="App.testNotificationSound()" style="padding: 6px 12px; font-size: 12px;">🔊 ทดสอบเสียง</button>
+        
+        <!-- SECTION 1: SYSTEM AUDIO NOTIFICATION -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin-bottom: 12px; font-weight: 700; color: #1e293b; font-size: 15px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">🔊</span> เสียงแจ้งเตือนระบบ
+          </h4>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <label for="config-sound-enabled" style="font-weight: 600; font-size: 14px; color: #0f172a; margin: 0; cursor: pointer;">
+                เปิดเสียงกระดิ่งแจ้งเตือนเมื่อมีรายการใหม่
+              </label>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                เสียงเตือน Chime ภายในเบราว์เซอร์เมื่อมีใบแจ้งเข้ามาใหม่หรือเปลี่ยนสถานะ
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="App.testNotificationSound()" style="padding: 5px 12px; font-size: 12px;">ทดสอบเสียง</button>
+              <label class="switch-toggle">
+                <input type="checkbox" id="config-sound-enabled" checked>
+                <span class="switch-slider"></span>
+              </label>
             </div>
           </div>
         </div>
+
+        <!-- SECTION 3: SUPABASE CLOUD DATABASE CONFIG -->
+        <div>
+          <h4 style="margin-bottom: 12px; font-weight: 700; color: #1e293b; font-size: 15px; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">☁️</span> ฐานข้อมูล Supabase Cloud
+          </h4>
+          <div id="supabase-config-fields">
+            <div class="form-group">
+              <label for="config-sb-url">Supabase Project URL <span style="color:red;">*</span></label>
+              <input type="text" id="config-sb-url" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co" required>
+            </div>
+            <div class="form-group">
+              <label for="config-sb-key">Supabase Anon Key <span style="color:red;">*</span></label>
+              <input type="password" id="config-sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required>
+            </div>
+            <div style="background-color: #fffbeb; border:1px solid #fef3c7; color:#b45309; padding:10px 12px; border-radius:var(--radius-sm); font-size:12px; line-height:1.4;">
+              <strong>ข้อแนะนำ:</strong> ข้อมูลนี้ใช้สำหรับการเชื่อมต่อระบบกับ Supabase Cloud
+            </div>
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="App.closeConfigModal()">ยกเลิก</button>
         <button class="btn btn-primary" onclick="App.saveDatabaseConfig()" style="width:auto; padding:10px 24px;">บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: REQUESTER NOTES ALERT POPUP
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-notes-alert">
+    <div class="modal-container" style="max-width: 480px; border-top: 4px solid #f59e0b; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.25);">
+      <div class="modal-header" style="background-color: #fffbeb; border-bottom: 1px solid #fef3c7; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;">
+        <h3 class="modal-title" style="color: #b45309; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">
+          <span style="font-size: 20px;">📌</span> หมายเหตุสำคัญจากผู้แจ้ง
+        </h3>
+        <button class="btn-close" onclick="App.closeNotesAlertModal()" style="font-size: 24px; color: #92400e; cursor: pointer; background: none; border: none; line-height: 1;" title="ปิด">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+          <span>เลขที่ใบแจ้ง: <strong id="notes-alert-req-no" style="color: #1e293b;">-</strong></span>
+          <span>ผู้แจ้ง: <strong id="notes-alert-requester" style="color: #1e293b;">-</strong></span>
+        </div>
+        <div style="background-color: #fffdf5; border: 1.5px dashed #f59e0b; border-radius: 8px; padding: 14px 16px; font-size: 15px; line-height: 1.6; color: #1e293b; font-weight: 500; white-space: pre-wrap; word-break: break-word; max-height: 250px; overflow-y: auto;" id="notes-alert-content">
+          <!-- Note content injected here -->
+        </div>
+      </div>
+      <div class="modal-footer" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px 20px; display: flex; justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="App.closeNotesAlertModal()" style="background-color: #f59e0b; border-color: #d97706; color: white; padding: 8px 22px; font-weight: 600; border-radius: 6px;">
+          ✓ รับทราบแล้ว (ปิดหน้าต่าง)
+        </button>
       </div>
     </div>
   </div>
@@ -1749,11 +2031,12 @@
        A4 PRINT LAYOUT TEMPLATE (Used by html2pdf.js for PDF export)
        ========================================================================= -->
   <div id="a4-print-template" class="a4-print-layout">
-    <div class="print-header">
+    <div class="print-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
       <div class="print-title" style="text-align:left;">
         <h2 style="margin:0; font-size:18px; font-weight:700;">ใบรายงานผลการตรวจสอบห้องปฏิบัติการ</h2>
         <p style="margin:0; font-size:14px; font-weight:500; color:#555;">บริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด</p>
       </div>
+      <div id="print-status-stamp" style="display:none;"></div>
     </div>
 
     <div class="print-meta-grid">
@@ -1816,7 +2099,7 @@
         <p id="print-requester" style="margin-top:5px; font-size:11px; font-weight:600;"></p>
       </div>
       <div>
-        <p style="margin-bottom:10px;"><strong>ผู้อนุมัติผลการตรวจสอบ (Approved By)</strong></p>
+        <p style="margin-bottom:10px;"><strong id="print-approved-title">ผู้อนุมัติผลการตรวจสอบ (Approved By)</strong></p>
         <div class="signature-box" id="print-signature-img-box" style="display:flex; align-items:center; justify-content:center; position:relative;">
           <span id="print-waiting-approval" style="color:#ef4444; font-weight:600; font-size:14px; opacity:0.6;">Waiting for Approval</span>
           <!-- Signature image inserted here dynamically -->
@@ -1850,75 +2133,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="modal-settings" class="modal-overlay">
-    <div class="modal-container" style="max-width:520px;">
-      <div class="modal-header">
-        <h2>⚙️ การตั้งค่า (Settings)</h2>
-        <button class="btn-close" onclick="App.closeSettingsModal()">&times;</button>
-      </div>
-      <div class="modal-body" style="padding:8px 0;">
-        <ul style="list-style:none;margin:0;padding:0;">
-          <li>
-            <button onclick="App.openChangeOwnPasswordModal()" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
-              <span style="font-size:22px;width:32px;text-align:center;">&#128274;</span>
-              <div>
-                <div style="font-weight:600;">เปลี่ยนรหัสผ่าน</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">อัปเดตรหัสผ่านสำหรับบัญชีของคุณ</div>
-              </div>
-              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-          </li>
-          <li id="setting-nav-users" style="display:none;">
-            <button onclick="App.navigate('users'); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
-              <span style="font-size:22px;width:32px;text-align:center;">👥</span>
-              <div>
-                <div style="font-weight:600;">จัดการผู้ใช้งาน</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">เพิ่ม ลบ แก้ไข บัญชีผู้ใช้งานระบบ</div>
-              </div>
-              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-          </li>
-          <li id="setting-nav-signatures" style="display:none;">
-            <button onclick="App.navigate('signatures'); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
-              <span style="font-size:22px;width:32px;text-align:center;">✍️</span>
-              <div>
-                <div style="font-weight:600;">จัดการลายเซ็น Lab</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">อัปโหลดและจัดการลายเซ็นอิเล็กทรอนิกส์</div>
-              </div>
-              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-          </li>
-          <li id="setting-nav-push">
-            <div class="setting-push-row" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:16px 20px;border-bottom:1px solid var(--border-color);">
-              <div style="display:flex;align-items:center;gap:14px;">
-                <span style="font-size:22px;width:32px;text-align:center;">🔔</span>
-                <div>
-                  <div style="font-weight:600;">แจ้งเตือนบนอุปกรณ์ (Push Notification)</div>
-                  <div id="push-status-text" style="font-size:12px;color:var(--text-muted);margin-top:2px;">รับแจ้งเตือนบนหน้าจอมือถือ/คอมพิวเตอร์</div>
-                </div>
-              </div>
-              <button id="btn-toggle-push" class="btn btn-sm btn-primary" onclick="App.togglePushNotification()" style="padding:6px 14px;font-size:13px;border-radius:20px;white-space:nowrap;">
-                เปิดใช้งาน
-              </button>
-            </div>
-          </li>
-          <li id="setting-btn-system" style="display:none;">
-            <button onclick="App.openConfigModal(); App.closeSettingsModal();" style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 20px;background:transparent;border:none;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:15px;color:var(--text-color);text-align:left;transition:background 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
-              <span style="font-size:22px;width:32px;text-align:center;">⚙️</span>
-              <div>
-                <div style="font-weight:600;">ตั้งค่าระบบ</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">การเชื่อมต่อฐานข้อมูลและตั้งค่าขั้นสูง</div>
-              </div>
-              <svg style="margin-left:auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-          </li>
 
-          <!-- Future settings items can be added here -->
-        </ul>
-      </div>
-    </div>
-  </div>
 
   <!-- Search Filter Modal -->
   <div id="modal-search-filters" class="modal-overlay">
@@ -2060,7 +2275,7 @@
   </script>
 
   <script src="config.js?v=132"></script>
-  <script src="dbService.js?v=132"></script>
-  <script src="app_v5.js?v=132"></script>
+  <script src="dbService.js?v=139"></script>
+  <script src="app_v5.js?v=149"></script>
 </body>
 </html>
