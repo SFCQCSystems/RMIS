@@ -886,13 +886,17 @@
         padding: 12px !important;
       }
 
-      /* Requests Split Layout on Mobile: Fluid Vertical Flow */
-      #view-requests {
-        height: auto !important;
-        min-height: calc(100vh - 60px) !important;
-        display: block !important;
-        overflow-y: auto !important;
-      }
+    /* Strict view visibility: hidden page-views MUST always remain hidden */
+    .page-view[style*="display: none"] {
+      display: none !important;
+    }
+
+    /* Requests Split Layout on Mobile: Fluid Vertical Flow when active */
+    #view-requests:not([style*="display: none"]) {
+      height: auto !important;
+      min-height: calc(100vh - 60px);
+      overflow-y: auto;
+    }
       #requests-split-layout {
         height: auto !important;
         overflow: visible !important;
@@ -2639,6 +2643,6 @@
 
   <script src="config.js?v=132"></script>
   <script src="dbService.js?v=139"></script>
-  <script src="app_v5.js?v=153"></script>
+  <script src="app_v5.js?v=154"></script>
 </body>
 </html>

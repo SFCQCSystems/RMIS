@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rmis-cache-v38';
+const CACHE_NAME = 'rmis-cache-v39';
 const STATIC_ASSETS = [
   './',
   './index.html',
