@@ -4553,49 +4553,59 @@ const App = (function () {
     const isHold = (resText === 'HOLD');
 
     if (isHold) {
+      const hasSig = !!data.signature_url;
+      const sigImgHtml = hasSig
+        ? `<div style="height: 65px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 4px;">
+             <img src="${data.signature_url}" style="max-height: 65px; max-width: 220px; object-fit: contain;" alt="Signature">
+           </div>`
+        : `<div style="height: 65px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 4px;">
+             <!-- พื้นที่ว่างสำหรับเซ็นสดด้วยปากกา -->
+           </div>`;
+
       return `
-        <div style="border: 3px solid #000; width: 100%; max-width: 800px; min-height: 520px; box-sizing: border-box; background: white; color: black; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
+        <div style="border: 3px solid #000; width: 100%; max-width: 780px; height: 490px; box-sizing: border-box; background: white; color: black; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden;">
           <!-- Top Header: HOLD with yellow background (~1/4 height) -->
-          <div style="background-color: #ffff99; border-bottom: 3px solid #000; height: 110px; display: flex; align-items: center; justify-content: center; text-align: center;">
-            <div style="font-size: 75px; font-weight: bold; letter-spacing: 8px; line-height: 1; color: #000; font-family: monospace;">HOLD</div>
+          <div style="background-color: #ffff99; border-bottom: 3px solid #000; height: 105px; min-height: 105px; display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box;">
+            <div style="font-size: 68px; font-weight: bold; letter-spacing: 8px; line-height: 1; color: #000; font-family: monospace;">HOLD</div>
           </div>
 
           <!-- Body Content: Table layout for precise colon alignment -->
-          <div style="padding: 20px 30px 14px 30px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 19px; line-height: 1.85; color: #000; font-family: monospace;">
+          <div style="padding: 14px 28px 12px 28px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace; box-sizing: border-box;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 16px; line-height: 1.65; color: #000; font-family: monospace;">
               <tr>
-                <td style="width: 260px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
-                <td style="width: 25px; font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
-                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.product_name || '-')}</td>
+                <td style="width: 250px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
+                <td style="width: 25px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(data.product_name || '-')}</td>
               </tr>
               <tr>
                 <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">ลูกค้า</td>
-                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
-                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.supplier_name || '-')}</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(data.supplier_name || '-')}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">Lot no.</td>
-                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
-                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.batch_number || '-')}</td>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">Lot no.</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(data.batch_number || '-')}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">จำนวน</td>
-                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
-                <td style="font-weight: bold; vertical-align: top; padding: 4px 0;">${escapeHtml(data.quantity || '-')}</td>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">จำนวน</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(data.quantity || '-')}</td>
               </tr>
               <tr>
-                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 4px 0;">สาเหตุ</td>
-                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 4px 0;">:</td>
-                <td style="font-weight: bold; vertical-align: top; padding: 4px 0; word-break: break-word;">${escapeHtml(data.item_comment || '-')}</td>
+                <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">สาเหตุ</td>
+                <td style="font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                <td style="font-weight: bold; vertical-align: top; padding: 3px 0; word-break: break-word;">${escapeHtml(data.item_comment || '-')}</td>
               </tr>
             </table>
 
-            <!-- Bottom Right Signature Block (with generous clearance above the line) -->
-            <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 55px; margin-bottom: 8px;">
-              <div style="width: 280px; text-align: center; color: #000; font-family: monospace;">
-                <div style="border-top: 2.5px solid #000; margin-bottom: 6px;"></div>
-                <div style="font-size: 19px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
-                <div style="font-size: 19px; font-weight: bold; margin-top: 4px;">วันที่ &nbsp;&nbsp;${recDate}</div>
+            <!-- Bottom Right Signature Block -->
+            <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 10px; margin-bottom: 6px;">
+              <div style="width: 250px; text-align: center; color: #000; font-family: monospace;">
+                ${sigImgHtml}
+                <div style="border-top: 2px solid #000; margin-bottom: 4px;"></div>
+                <div style="font-size: 16px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
+                <div style="font-size: 16px; font-weight: bold; margin-top: 3px;">วันที่ &nbsp;&nbsp;${recDate}</div>
               </div>
             </div>
           </div>
@@ -4657,6 +4667,13 @@ const App = (function () {
     const modalTitle = isHold ? '🏷️ Preview สติกเกอร์ HOLD (A4 แนวนอน)' : '🏷️ Preview สติกเกอร์วัตถุดิบ';
     const dateLabel = isHold ? 'วันที่ตรวจสอบ (Inspection Date):' : 'วันที่ผ่าน (Passed Date):';
 
+    const hasSig = !!stickerData.signature_url;
+    const sigStatusNotice = isHold
+      ? (hasSig 
+          ? `<div style="margin-bottom:14px; font-size:13px; color:#15803d; background:#dcfce7; border:1px solid #86efac; border-radius:6px; padding:8px 14px; display:flex; align-items:center; gap:8px;"><span>✍️</span><span>แนบลายเซ็นเจ้าหน้าที่ Lab ผู้ตรวจ/อนุมัติ: <strong>${escapeHtml(stickerData.approver_name || '-')}</strong> เรียบร้อยแล้ว</span></div>`
+          : `<div style="margin-bottom:14px; font-size:13px; color:#64748b; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:8px 14px; display:flex; align-items:center; gap:8px;"><span>ℹ️</span><span>ใบแจ้งยังไม่ได้รับการอนุมัติ (Approve) จาก Lab &mdash; เว้นว่างช่องเซ็นชื่อไว้สำหรับเซ็นสดด้วยปากกา</span></div>`)
+      : '';
+
     modal.innerHTML = `
       <div style="background:white;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.4);width:${modalWidth};max-width:96vw;max-height:92vh;overflow-y:auto;font-family:'Sarabun',sans-serif;">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e0e0e0;">
@@ -4666,6 +4683,8 @@ const App = (function () {
         <div style="padding:20px;">
           <div id="sticker-preview-container" style="display:flex;justify-content:center;margin-bottom:20px;">${previewHtml}</div>
           
+          ${sigStatusNotice}
+
           <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:1;min-width:200px;margin-bottom:8px;">
               <label style="display:block;margin-bottom:6px;font-weight:600;color:#333;">${dateLabel}</label>
@@ -4709,10 +4728,26 @@ const App = (function () {
   }
 
   // Used by Material History page (looks up item from state.historyList by id)
-  function openStickerPreview(itemId) {
+  async function openStickerPreview(itemId) {
     if (!state.historyList) return;
     const item = state.historyList.find(i => String(i.id) === String(itemId) || Number(i.id) === Number(itemId));
     if (!item) return;
+
+    let signatureUrl = null;
+    let approverName = null;
+
+    if (item.request_id) {
+      try {
+        const req = await window.DB.getRequestDetail(item.request_id);
+        if (req && (req.approved === true || (req.status || '').toLowerCase() === 'approved')) {
+          signatureUrl = req.approved_signature_snapshot || null;
+          approverName = req.approved_name || null;
+        }
+      } catch (err) {
+        console.warn('Could not fetch request detail for sticker signature:', err);
+      }
+    }
+
     const stickerData = {
       id: item.id,
       test_result: item.test_result,
@@ -4722,7 +4757,9 @@ const App = (function () {
       quantity: item.quantity || '-',
       item_comment: item.item_comment || '',
       request_date: item.request_date,
-      inspection_date: item.inspection_date || item.request_date
+      inspection_date: item.inspection_date || item.request_date,
+      signature_url: signatureUrl,
+      approver_name: approverName
     };
     const previewHtml = _buildStickerPreviewHtml(stickerData);
     _showStickerModal(previewHtml, stickerData);
@@ -4732,19 +4769,26 @@ const App = (function () {
   function openStickerPreviewDirect(testResultOrId, productName, batchNumber, requestDate, testedDate, itemId) {
     let stickerData = null;
     const targetId = itemId || testResultOrId;
-    if (state.currentRequestDetail && state.currentRequestDetail.items) {
-      const found = state.currentRequestDetail.items.find(i => String(i.id) === String(targetId));
+    const curReq = state.currentRequestDetail;
+    const isApproved = curReq && (curReq.approved === true || (curReq.status || '').toLowerCase() === 'approved');
+    const signatureUrl = (isApproved && curReq.approved_signature_snapshot) ? curReq.approved_signature_snapshot : null;
+    const approverName = (isApproved && curReq.approved_name) ? curReq.approved_name : null;
+
+    if (curReq && curReq.items) {
+      const found = curReq.items.find(i => String(i.id) === String(targetId));
       if (found) {
         stickerData = { 
           id: found.id,
           test_result: found.test_result, 
           product_name: found.product_name, 
           batch_number: found.batch_number, 
-          supplier_name: state.currentRequestDetail.customer_name || '-',
+          supplier_name: curReq.customer_name || '-',
           quantity: found.quantity || '-',
           item_comment: found.item_comment || '',
-          request_date: state.currentRequestDetail.request_date || requestDate,
-          inspection_date: found.inspection_date || testedDate || state.currentRequestDetail.request_date
+          request_date: curReq.request_date || requestDate,
+          inspection_date: found.inspection_date || testedDate || curReq.request_date,
+          signature_url: signatureUrl,
+          approver_name: approverName
         };
       }
     }
@@ -4754,11 +4798,13 @@ const App = (function () {
         test_result: productName ? testResultOrId : 'Hold', 
         product_name: productName || '-', 
         batch_number: batchNumber || '-', 
-        supplier_name: (state.currentRequestDetail && state.currentRequestDetail.customer_name) || '-',
+        supplier_name: (curReq && curReq.customer_name) || '-',
         quantity: '-',
         item_comment: '',
         request_date: requestDate || '',
-        inspection_date: testedDate || requestDate || ''
+        inspection_date: testedDate || requestDate || '',
+        signature_url: signatureUrl,
+        approver_name: approverName
       };
     }
     const previewHtml = _buildStickerPreviewHtml(stickerData);
@@ -4825,58 +4871,87 @@ const App = (function () {
     let singleSticker = '';
 
     if (isHold) {
+      const hasSig = !!item.signature_url;
+      const printSigImgHtml = hasSig
+        ? `<div style="height: 80px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 4px;">
+             <img src="${item.signature_url}" style="max-height: 78px; max-width: 280px; object-fit: contain;" alt="Signature">
+           </div>`
+        : `<div style="height: 80px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 4px;">
+             <!-- พื้นที่ว่างสำหรับเซ็นสดด้วยปากกา -->
+           </div>`;
+
       pageCss = `
         @media print {
-          @page { size: A4 landscape; margin: 10mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background-color: white !important; margin: 0 !important; padding: 0 !important; }
+          @page { size: A4 landscape; margin: 6mm; }
+          html, body {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            overflow: hidden !important;
+          }
+          .sticker-page {
+            width: 100% !important;
+            height: 192mm !important;
+            max-height: 192mm !important;
+            box-sizing: border-box !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
         }
         body { margin: 0; padding: 0; background: white; font-family: monospace; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       `;
       singleSticker = `
-        <div class="sticker-page" style="page-break-after: always; box-sizing: border-box; width: 100%; height: 100vh; display: flex; align-items: stretch; justify-content: center; padding: 0;">
-          <div style="border: 4px solid #000; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; background: white; color: black; font-family: monospace; overflow: hidden;">
+        <div class="sticker-page" style="page-break-after: avoid; page-break-inside: avoid; box-sizing: border-box; width: 100%; height: 192mm; max-height: 192mm; display: flex; align-items: stretch; justify-content: center; padding: 0; margin: 0;">
+          <div style="border: 3.5px solid #000; width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; background: white; color: black; font-family: monospace; overflow: hidden;">
             
-            <!-- HEADER: HOLD with Yellow Background (approx. 1/4 of paper height) -->
-            <div style="background-color: #ffff99; border-bottom: 4px solid #000; height: 24vh; min-height: 46mm; display: flex; align-items: center; justify-content: center; text-align: center; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box;">
-              <h1 style="margin: 0; font-size: 140px; font-weight: bold; letter-spacing: 12px; line-height: 1; color: black; font-family: monospace;">HOLD</h1>
+            <!-- HEADER: HOLD with Yellow Background (approx. 1/4 of paper height = 45mm) -->
+            <div style="background-color: #ffff99; border-bottom: 3.5px solid #000; height: 45mm; min-height: 45mm; max-height: 45mm; display: flex; align-items: center; justify-content: center; text-align: center; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box;">
+              <h1 style="margin: 0; font-size: 80pt; font-weight: bold; letter-spacing: 12px; line-height: 1; color: black; font-family: monospace;">HOLD</h1>
             </div>
 
             <!-- BODY CONTENT: Table for exact colon alignment -->
-            <div style="padding: 26px 45px 20px 45px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 34px; line-height: 2.1; color: black; font-family: monospace;">
+            <div style="padding: 10px 35px 12px 35px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; font-family: monospace; box-sizing: border-box;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 22px; line-height: 1.6; color: black; font-family: monospace;">
                 <tr>
-                  <td style="width: 440px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
-                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
-                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.product_name || '-')}</td>
+                  <td style="width: 380px; font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">ชื่อวัตถุดิบ / ชื่อผลิตภัณฑ์</td>
+                  <td style="width: 35px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(item.product_name || '-')}</td>
                 </tr>
                 <tr>
-                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">ลูกค้า</td>
-                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
-                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.supplier_name || '-')}</td>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">ลูกค้า</td>
+                  <td style="width: 35px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(item.supplier_name || '-')}</td>
                 </tr>
                 <tr>
-                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">Lot no.</td>
-                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
-                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.batch_number || '-')}</td>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">Lot no.</td>
+                  <td style="width: 35px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(item.batch_number || '-')}</td>
                 </tr>
                 <tr>
-                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">จำนวน</td>
-                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
-                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0;">${escapeHtml(item.quantity || '-')}</td>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">จำนวน</td>
+                  <td style="width: 35px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 3px 0;">${escapeHtml(item.quantity || '-')}</td>
                 </tr>
                 <tr>
-                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 6px 0;">สาเหตุ</td>
-                  <td style="width: 40px; font-weight: bold; vertical-align: top; text-align: center; padding: 6px 0;">:</td>
-                  <td style="font-weight: bold; vertical-align: top; padding: 6px 0; word-break: break-word;">${escapeHtml(item.item_comment || '-')}</td>
+                  <td style="font-weight: bold; white-space: nowrap; vertical-align: top; padding: 3px 0;">สาเหตุ</td>
+                  <td style="width: 35px; font-weight: bold; vertical-align: top; text-align: center; padding: 3px 0;">:</td>
+                  <td style="font-weight: bold; vertical-align: top; padding: 3px 0; word-break: break-word;">${escapeHtml(item.item_comment || '-')}</td>
                 </tr>
               </table>
 
-              <!-- RIGHT SIGNATURE BLOCK (with generous clearance above the line for hand-signing) -->
-              <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 85px; margin-right: 20px; margin-bottom: 20px;">
-                <div style="width: 380px; text-align: center; color: black; font-family: monospace;">
-                  <div style="border-top: 3px solid #000; margin-bottom: 10px;"></div>
-                  <div style="font-size: 30px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
-                  <div style="font-size: 30px; font-weight: bold; margin-top: 8px;">วันที่ &nbsp;&nbsp;${recDate}</div>
+              <!-- RIGHT SIGNATURE BLOCK (anchored to bottom right with generous clearance) -->
+              <div style="display: flex; justify-content: flex-end; margin-top: auto; padding-top: 10px; margin-right: 15px; margin-bottom: 5px;">
+                <div style="width: 350px; text-align: center; color: black; font-family: monospace;">
+                  ${printSigImgHtml}
+                  <div style="border-top: 2.5px solid #000; margin-bottom: 6px;"></div>
+                  <div style="font-size: 20px; font-weight: bold;">ผู้ตรวจ/ผู้อนุมัติ</div>
+                  <div style="font-size: 20px; font-weight: bold; margin-top: 6px;">วันที่ &nbsp;&nbsp;${recDate}</div>
                 </div>
               </div>
             </div>
