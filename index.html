@@ -686,23 +686,43 @@
       min-width: 0;
     }
 
-    /* Mobile Sidebar Backdrop Overlay */
-    .sidebar-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.55);
-      backdrop-filter: blur(2px);
-      z-index: 995;
-      transition: opacity 0.2s ease;
+    /* Desktop Collapsed Sidebar: Expand main wrapper to full width & hide any overlays */
+    @media (min-width: 769px) {
+      body.sidebar-collapsed .sidebar {
+        transform: translateX(-100%) !important;
+      }
+      body.sidebar-collapsed .main-wrapper {
+        margin-left: 0 !important;
+        width: 100% !important;
+      }
+      .sidebar-overlay {
+        display: none !important;
+        pointer-events: none !important;
+      }
     }
 
-    #sidebar.open + .sidebar-overlay,
-    .sidebar.open + #sidebar-overlay {
-      display: block !important;
+    /* Mobile Sidebar Backdrop Overlay: Only active on mobile screens (<= 768px) */
+    .sidebar-overlay {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(2px);
+        z-index: 995;
+        transition: opacity 0.2s ease;
+      }
+
+      #sidebar.open + .sidebar-overlay,
+      .sidebar.open + #sidebar-overlay {
+        display: block !important;
+      }
     }
 
     /* Responsive Table Wrapper */
@@ -2643,6 +2663,6 @@
 
   <script src="config.js?v=132"></script>
   <script src="dbService.js?v=139"></script>
-  <script src="app_v5.js?v=154"></script>
+  <script src="app_v5.js?v=155"></script>
 </body>
 </html>

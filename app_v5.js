@@ -434,9 +434,14 @@ const App = (function () {
   }
 
   function toggleSidebar() {
-    document.body.classList.toggle('sidebar-collapsed');
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.classList.toggle('open');
+    if (window.innerWidth <= 768) {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.toggle('open');
+    } else {
+      document.body.classList.toggle('sidebar-collapsed');
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) sidebar.classList.remove('open');
+    }
   }
 
   // --- LOGIN & LOGOUT CONTROL ---
