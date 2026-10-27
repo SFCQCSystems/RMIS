@@ -131,6 +131,54 @@
     if (!localStorage.getItem(LOCAL_REQUESTS_KEY)) {
       localStorage.setItem(LOCAL_REQUESTS_KEY, JSON.stringify(defaultRequests));
     }
+    
+    if (!localStorage.getItem('rmis_mix_tank_requests')) {
+      const sampleMix = [{
+        id: 'sample-mt-001',
+        doc_no: 'MT-2610-001',
+        to_dept: 'QC',
+        tank_name: 'T-505',
+        request_date: new Date().toISOString().slice(0, 10),
+        product_name: 'EHC 110',
+        status: 'Approved',
+        top_up_items: [
+          { item: 'EHC 110', lot_no: '261001', quantity: 249.00, unit: 'MT', supplier: 'ESSO', vehicle: '70-1234' }
+        ],
+        before_item: {
+          item: 'EHC 110', lot_no: '260905', quantity: 1531.00, unit: 'MT', supplier: 'ESSO'
+        },
+        after_item: {
+          item: 'EHC 110', lot_no: '261001/505', quantity: 1780.00, unit: 'MT', supplier: 'MIXED'
+        },
+        density_15: '0.8741',
+        density_30: '0.8646',
+        visc_40_time: "6'54'48",
+        visc_40_const: 0.22602,
+        visc_40_result: 93.68,
+        visc_100_time: "5'14'99",
+        visc_100_const: 0.03397,
+        visc_100_result: 10.70,
+        viscosity_index: 97,
+        water_content: 'NIL',
+        remark: 'MIXED STORAGE TANK T-505 เรียบร้อยตามเกณฑ์มาตรฐาน',
+        prepared_by_name: 'เจ้าหน้าที่คลังน้ำมัน',
+        prepared_by_id: 'sample-prep',
+        prepared_signature_url: '',
+        prepared_at: new Date(Date.now() - 86400000).toISOString(),
+        tested_by_name: 'QC Analyst',
+        tested_by_id: 'sample-test',
+        tested_signature_url: '',
+        tested_at: new Date(Date.now() - 43200000).toISOString(),
+        approved_by_name: 'QC Supervisor',
+        approved_by_id: 'sample-appr',
+        approved_signature_url: '',
+        approved_at: new Date().toISOString(),
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        updated_at: new Date().toISOString()
+      }];
+      localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(sampleMix));
+    }
+
     if (!localStorage.getItem(LOCAL_ITEMS_KEY)) {
       localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(defaultItems));
     }
@@ -633,6 +681,50 @@
       localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(items));
     },
 
+    async saveHistoricalRecord(record) {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+      const role = (currentUser.role || '').toLowerCase();
+      if (!['admin', 'lab'].includes(role)) throw new Error('เฉพาะผู้ดูแลระบบ (Admin) หรือเจ้าหน้าที่แลป (Lab) เท่านั้นที่มีสิทธิ์เพิ่มข้อมูลย้อนหลัง');
+
+      const payload = {
+        id: record.id || (crypto.randomUUID ? crypto.randomUUID() : 'hist-' + Math.random().toString(36).slice(2, 9)),
+        receive_date: record.receive_date || new Date().toISOString().slice(0, 10),
+        product_name: (record.product_name || '').trim(),
+        batch_number: (record.batch_number || '').trim(),
+        quantity: (record.quantity || '').toString().trim() || null,
+        rm_no: (record.rm_no || '').trim() || null,
+        density_15c: (record.density_15c || '').toString().trim() || null,
+        density_30c: (record.density_30c || '').toString().trim() || null,
+        test_result: record.test_result || 'Pass',
+        item_comment: (record.item_comment || '').trim() || null,
+        created_at: new Date().toISOString()
+      };
+
+      if (!payload.product_name) throw new Error('กรุณากรอกชื่อสินค้า/วัตถุดิบ');
+      if (!payload.batch_number) throw new Error('กรุณากรอก Batch Number');
+
+      let client = null;
+      try {
+        client = getSupabaseClient();
+      } catch (e) {}
+
+      if (client) {
+        const { data, error } = await client
+          .from('historical_material_records')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) {
+          console.warn('Fallback to LocalStorage for saveHistoricalRecord:', error.message);
+          return LocalDBService.saveHistoricalRecord(payload);
+        }
+        return data;
+      }
+      return LocalDBService.saveHistoricalRecord(payload);
+    },
+
     async bulkImportHistoricalRecords(newRecords) {
       const currentUser = await this.getCurrentUser();
       if (!currentUser) throw new Error('Unauthenticated');
@@ -655,6 +747,35 @@
       historical.push(...prepared);
       localStorage.setItem('rmis_historical_records', JSON.stringify(historical));
       return prepared.length;
+    },
+
+    async saveHistoricalRecord(record) {
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser) throw new Error('Unauthenticated');
+      const role = (currentUser.role || '').toLowerCase();
+      if (!['admin', 'lab'].includes(role)) throw new Error('เฉพาะผู้ดูแลระบบ (Admin) หรือเจ้าหน้าที่แลป (Lab) เท่านั้นที่มีสิทธิ์เพิ่มข้อมูลย้อนหลัง');
+
+      const payload = {
+        id: record.id || generateUUID(),
+        receive_date: record.receive_date || new Date().toISOString().slice(0, 10),
+        product_name: (record.product_name || '').trim(),
+        batch_number: (record.batch_number || '').trim(),
+        quantity: (record.quantity || '').toString().trim() || '',
+        rm_no: (record.rm_no || '').trim() || '',
+        density_15c: (record.density_15c || '').toString().trim() || '',
+        density_30c: (record.density_30c || '').toString().trim() || '',
+        test_result: record.test_result || 'Pass',
+        item_comment: (record.item_comment || '').trim() || '',
+        created_at: new Date().toISOString()
+      };
+
+      if (!payload.product_name) throw new Error('กรุณากรอกชื่อสินค้า/วัตถุดิบ');
+      if (!payload.batch_number) throw new Error('กรุณากรอก Batch Number');
+
+      let historical = JSON.parse(localStorage.getItem('rmis_historical_records') || '[]');
+      historical.unshift(payload);
+      localStorage.setItem('rmis_historical_records', JSON.stringify(historical));
+      return payload;
     },
 
     async clearHistoricalRecords() {
@@ -880,7 +1001,18 @@
     },
 
     async getSignatures() {
-      return [];
+      const sigs = JSON.parse(localStorage.getItem('rmis_signatures') || '{}');
+      const users = JSON.parse(localStorage.getItem(LOCAL_USERS_KEY) || '[]');
+      return users.map(u => ({
+        ...u,
+        signature_url: sigs[u.id]?.signature_url || null
+      }));
+    },
+
+    async getUserSignature(userId) {
+      if (!userId) return null;
+      const sigs = JSON.parse(localStorage.getItem('rmis_signatures') || '{}');
+      return sigs[userId]?.signature_url || null;
     },
 
     async saveSignature(userId, fileOrDataUrl) {
@@ -1044,7 +1176,144 @@
     async fetchEditRequests() { return []; },
     async createEditRequest(data) { return null; },
     async updateEditRequestStatus(id, status, actionedBy) { return false; },
-    async deleteEditRequest(id) { return false; }
+    async deleteEditRequest(id) { return false; },
+
+    // --- MIX TANK (FM-QC003) ---
+    async getMixTankRequests(filters = {}) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      if (filters.tankName) {
+        list = list.filter(r => (r.tank_name || '').toLowerCase().includes(filters.tankName.toLowerCase()));
+      }
+      if (filters.productName) {
+        list = list.filter(r => (r.product_name || '').toLowerCase().includes(filters.productName.toLowerCase()));
+      }
+      if (filters.docNo) {
+        list = list.filter(r => (r.doc_no || '').toLowerCase().includes(filters.docNo.toLowerCase()));
+      }
+      if (filters.status && filters.status !== 'All') {
+        list = list.filter(r => r.status === filters.status);
+      }
+      return list.sort((a, b) => new Date(b.created_at || b.request_date || 0) - new Date(a.created_at || a.request_date || 0));
+    },
+
+    async getMixTankDetail(id) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      const item = list.find(r => r.id === id);
+      if (!item) throw new Error('ไม่พบข้อมูลใบตรวจ Mix Tank');
+      return item;
+    },
+
+    async saveMixTankRequest(data) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      const now = new Date();
+      let recordId = data.id || generateUUID();
+      let docNo = data.doc_no;
+      
+      if (!docNo) {
+        const d = data.request_date ? new Date(data.request_date) : now;
+        const yy = String(d.getFullYear()).slice(-2);
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const prefix = 'MT-' + yy + mm + '-';
+        let maxSeq = 0;
+        list.forEach(r => {
+          if (r.doc_no && r.doc_no.startsWith(prefix)) {
+            const seq = parseInt(r.doc_no.replace(prefix, ''), 10);
+            if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+          }
+        });
+        docNo = prefix + String(maxSeq + 1).padStart(3, '0');
+      }
+
+      const existingIndex = list.findIndex(r => r.id === recordId);
+      const newRecord = {
+        ...(existingIndex >= 0 ? list[existingIndex] : {}),
+        ...data,
+        id: recordId,
+        doc_no: docNo,
+        updated_at: now.toISOString(),
+        created_at: (existingIndex >= 0 && list[existingIndex].created_at) ? list[existingIndex].created_at : now.toISOString()
+      };
+
+      if (existingIndex >= 0) {
+        list[existingIndex] = newRecord;
+      } else {
+        list.unshift(newRecord);
+      }
+      localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(list));
+      return newRecord;
+    },
+
+    async updateMixTankQC(id, qcData) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      const idx = list.findIndex(r => r.id === id);
+      if (idx === -1) throw new Error('ไม่พบข้อมูลใบตรวจ Mix Tank');
+      list[idx] = {
+        ...list[idx],
+        ...qcData,
+        status: (list[idx].status === 'Pending' || list[idx].status === 'Pending QC') ? 'In Process' : list[idx].status,
+        updated_at: new Date().toISOString()
+      };
+      localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(list));
+      return list[idx];
+    },
+
+    async signMixTank(id, role, sigData = {}) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      const idx = list.findIndex(r => r.id === id);
+      if (idx === -1) throw new Error('ไม่พบข้อมูลใบตรวจ Mix Tank');
+      const now = new Date().toISOString();
+      const rec = list[idx];
+
+      if (role === 'prepared') {
+        rec.prepared_by_name = sigData.name || rec.prepared_by_name;
+        rec.prepared_by_id = sigData.userId || rec.prepared_by_id;
+        rec.prepared_signature_url = sigData.signatureUrl || rec.prepared_signature_url;
+        rec.prepared_at = now;
+        rec.status = 'Pending';
+      } else if (role === 'tested') {
+        rec.tested_by_name = sigData.name || rec.tested_by_name;
+        rec.tested_by_id = sigData.userId || rec.tested_by_id;
+        rec.tested_signature_url = sigData.signatureUrl || rec.tested_signature_url;
+        rec.tested_at = now;
+        rec.status = 'Complete';
+      } else if (role === 'approved') {
+        rec.approved_by_name = sigData.name || rec.approved_by_name;
+        rec.approved_by_id = sigData.userId || rec.approved_by_id;
+        rec.approved_signature_url = sigData.signatureUrl || rec.approved_signature_url;
+        rec.approved_at = now;
+        rec.status = 'Approved';
+      } else if (role === 'rejected') {
+        rec.status = 'Rejected';
+        rec.remark = (rec.remark ? rec.remark + '\n' : '') + '[ปฏิเสธเมื่อ ' + new Date().toLocaleString('th-TH') + ']: ' + (sigData.reason || '');
+      }
+
+      rec.updated_at = now;
+      list[idx] = rec;
+      localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(list));
+      return rec;
+    },
+
+    async reopenMixTank(id) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      const idx = list.findIndex(r => r.id === id);
+      if (idx !== -1) {
+        list[idx].status = 'Complete';
+        list[idx].approved_by_name = null;
+        list[idx].approved_by_id = null;
+        list[idx].approved_at = null;
+        list[idx].approved_signature_url = null;
+        localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(list));
+      }
+      return list[idx] || null;
+    },
+
+    async deleteMixTank(id) {
+      let list = JSON.parse(localStorage.getItem('rmis_mix_tank_requests') || '[]');
+      list = list.filter(r => r.id !== id);
+      localStorage.setItem('rmis_mix_tank_requests', JSON.stringify(list));
+      return true;
+    }
+
   };
 
   // Expose LocalDBService globally for Supabase fallback references
@@ -1395,12 +1664,13 @@
               .maybeSingle();
             if (sigRow && sigRow.signature_url) {
               approved_signature_snapshot = sigRow.signature_url;
-              // Persist back to database in background so next queries are instant
+              // Persist approved_by if missing, but NEVER persist heavy Base64 image into requests table
+              const updatePayload = { approved_by: targetUserId };
+              if (sigRow.signature_url && sigRow.signature_url.startsWith('http')) {
+                updatePayload.approved_signature_snapshot = sigRow.signature_url;
+              }
               client.from('requests')
-                .update({ 
-                  approved_signature_snapshot: sigRow.signature_url,
-                  approved_by: targetUserId
-                })
+                .update(updatePayload)
                 .eq('id', id)
                 .then(() => {});
             }
@@ -2200,6 +2470,23 @@
       }));
     },
 
+    async getUserSignature(userId) {
+      if (!userId) return null;
+      const client = getSupabaseClient();
+      if (!client) return LocalDBService.getUserSignature(userId);
+      try {
+        const { data, error } = await client
+          .from('user_signatures')
+          .select('signature_url')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (error || !data) return null;
+        return data.signature_url;
+      } catch (e) {
+        return null;
+      }
+    },
+
     async saveSignature(userId, fileOrDataUrl) {
       const client = getSupabaseClient();
       const currentUser = await this.getCurrentUser();
@@ -2293,7 +2580,7 @@
           approved_name: currentUser.display_name,
           approved_role: currentUser.role,
           approved_at: new Date().toISOString(),
-          approved_signature_snapshot: sigRow.signature_url
+          approved_signature_snapshot: (sigRow.signature_url && sigRow.signature_url.startsWith('http')) ? sigRow.signature_url : null
         })
         .eq('id', id);
 
@@ -2324,7 +2611,7 @@
         approved_name: currentUser.display_name,
         approved_role: currentUser.role,
         approved_at: new Date().toISOString(),
-        approved_signature_snapshot: sigRow.signature_url
+        approved_signature_snapshot: (sigRow.signature_url && sigRow.signature_url.startsWith('http')) ? sigRow.signature_url : null
       };
 
       if (reason && reason.trim()) {
@@ -2395,7 +2682,7 @@
           approved_name: currentUser.display_name,
           approved_role: currentUser.role,
           approved_at: new Date().toISOString(),
-          approved_signature_snapshot: sigRow.signature_url
+          approved_signature_snapshot: (sigRow.signature_url && sigRow.signature_url.startsWith('http')) ? sigRow.signature_url : null
         })
         .eq('id', id);
 
@@ -2607,6 +2894,196 @@
       } catch (e) {
         console.warn('saveSystemSettings exception:', e);
       }
+    },
+
+    // --- MIX TANK (FM-QC003) ---
+    async getMixTankRequests(filters = {}) {
+      const client = getSupabaseClient();
+      if (!client) return LocalDBService.getMixTankRequests(filters);
+      try {
+        let query = client.from('mix_tank_requests').select('*');
+        if (filters.tankName) query = query.ilike('tank_name', '%' + filters.tankName + '%');
+        if (filters.productName) query = query.ilike('product_name', '%' + filters.productName + '%');
+        if (filters.docNo) query = query.ilike('doc_no', '%' + filters.docNo + '%');
+        if (filters.status && filters.status !== 'All') query = query.eq('status', filters.status);
+        query = query.order('created_at', { ascending: false });
+        const { data, error } = await query;
+        if (error) {
+          console.warn('Supabase getMixTankRequests fallback to local:', error.message);
+          return LocalDBService.getMixTankRequests(filters);
+        }
+        return data || [];
+      } catch (e) {
+        console.warn('Supabase getMixTankRequests exception fallback to local:', e);
+        return LocalDBService.getMixTankRequests(filters);
+      }
+    },
+
+    async getMixTankDetail(id) {
+      const client = getSupabaseClient();
+      if (!client) return LocalDBService.getMixTankDetail(id);
+      try {
+        const { data, error } = await client.from('mix_tank_requests').select('*').eq('id', id).single();
+        if (error || !data) {
+          return LocalDBService.getMixTankDetail(id);
+        }
+        return data;
+      } catch (e) {
+        return LocalDBService.getMixTankDetail(id);
+      }
+    },
+
+    async saveMixTankRequest(data) {
+      const client = getSupabaseClient();
+      await LocalDBService.saveMixTankRequest(data);
+      if (!client) return data;
+      try {
+        let docNo = data.doc_no;
+        if (!docNo) {
+          const now = new Date();
+          const d = data.request_date ? new Date(data.request_date) : now;
+          const yy = String(d.getFullYear()).slice(-2);
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const prefix = 'MT-' + yy + mm + '-';
+          const { data: existing } = await client.from('mix_tank_requests').select('doc_no').ilike('doc_no', prefix + '%');
+          let maxSeq = 0;
+          (existing || []).forEach(r => {
+            if (r.doc_no) {
+              const seq = parseInt(r.doc_no.replace(prefix, ''), 10);
+              if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+            }
+          });
+          docNo = prefix + String(maxSeq + 1).padStart(3, '0');
+        }
+
+        const payload = {
+          ...data,
+          id: data.id || generateUUID(),
+          doc_no: docNo,
+          updated_at: new Date().toISOString()
+        };
+
+        const allowedColumns = [
+          'id', 'doc_no', 'request_date', 'to_dept', 'tank_name', 'product_name', 'status',
+          'top_up_items', 'before_item', 'after_item', 'density_15', 'density_30', 'remark',
+          'prepared_by_name', 'prepared_by_id', 'prepared_signature_url', 'prepared_at',
+          'tested_by_name', 'tested_by_id', 'tested_signature_url', 'tested_at',
+          'approved_by_name', 'approved_by_id', 'approved_signature_url', 'approved_at',
+          'created_at', 'updated_at'
+        ];
+
+        const sanitized = {};
+        for (const col of allowedColumns) {
+          if (payload[col] !== undefined) {
+            sanitized[col] = payload[col];
+          }
+        }
+        if (payload.customer && sanitized.after_item) {
+          sanitized.after_item.supplier = payload.customer;
+        }
+        if (payload.created_by && !sanitized.prepared_by_name) {
+          sanitized.prepared_by_name = payload.created_by;
+        }
+        if (payload.created_by_id && !sanitized.prepared_by_id) {
+          sanitized.prepared_by_id = payload.created_by_id;
+        }
+
+        const { data: res, error } = await client.from('mix_tank_requests').upsert([sanitized]).select();
+        if (error) {
+          console.error('Supabase saveMixTankRequest error:', error.message);
+          throw new Error('Supabase save error: ' + error.message);
+        }
+        return res[0];
+      } catch (e) {
+        console.warn('Supabase saveMixTankRequest exception fallback:', e);
+        return data;
+      }
+    },
+
+    async updateMixTankQC(id, qcData) {
+      const client = getSupabaseClient();
+      await LocalDBService.updateMixTankQC(id, qcData);
+      if (!client) return;
+      try {
+        const payload = {
+          ...qcData,
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await client.from('mix_tank_requests').update(payload).eq('id', id);
+        if (error) console.warn('Supabase updateMixTankQC error:', error.message);
+      } catch (e) {
+        console.warn('Supabase updateMixTankQC exception:', e);
+      }
+    },
+
+    async signMixTank(id, role, sigData = {}) {
+      const client = getSupabaseClient();
+      const localResult = await LocalDBService.signMixTank(id, role, sigData);
+      if (!client) return localResult;
+      try {
+        const now = new Date().toISOString();
+        const updatePayload = { updated_at: now };
+        if (role === 'prepared') {
+          updatePayload.prepared_by_name = sigData.name;
+          updatePayload.prepared_by_id = sigData.userId;
+          updatePayload.prepared_signature_url = sigData.signatureUrl;
+          updatePayload.prepared_at = now;
+          updatePayload.status = 'Pending';
+        } else if (role === 'tested') {
+          updatePayload.tested_by_name = sigData.name;
+          updatePayload.tested_by_id = sigData.userId;
+          updatePayload.tested_signature_url = sigData.signatureUrl;
+          updatePayload.tested_at = now;
+          updatePayload.status = 'Complete';
+        } else if (role === 'approved') {
+          updatePayload.approved_by_name = sigData.name;
+          updatePayload.approved_by_id = sigData.userId;
+          updatePayload.approved_signature_url = sigData.signatureUrl;
+          updatePayload.approved_at = now;
+          updatePayload.status = 'Approved';
+        } else if (role === 'rejected') {
+          updatePayload.status = 'Rejected';
+          updatePayload.remark = localResult.remark;
+        }
+        const { error } = await client.from('mix_tank_requests').update(updatePayload).eq('id', id);
+        if (error) console.warn('Supabase signMixTank error:', error.message);
+      } catch (e) {
+        console.warn('Supabase signMixTank exception:', e);
+      }
+      return localResult;
+    },
+
+    async reopenMixTank(id) {
+      const client = getSupabaseClient();
+      await LocalDBService.reopenMixTank(id);
+      if (!client) return true;
+      try {
+        const { error } = await client.from('mix_tank_requests').update({
+          status: 'Complete',
+          approved_by_name: null,
+          approved_by_id: null,
+          approved_at: null,
+          approved_signature_url: null,
+          updated_at: new Date().toISOString()
+        }).eq('id', id);
+        if (error) console.warn('Supabase reopenMixTank error:', error.message);
+      } catch (e) {
+        console.warn('Supabase reopenMixTank exception:', e);
+      }
+      return true;
+    },
+
+    async deleteMixTank(id) {
+      const client = getSupabaseClient();
+      await LocalDBService.deleteMixTank(id);
+      if (!client) return true;
+      try {
+        const { error } = await client.from('mix_tank_requests').delete().eq('id', id);
+        if (error) console.warn('Supabase deleteMixTank error:', error.message);
+      } catch (e) {
+        console.warn('Supabase deleteMixTank exception:', e);
+      }
+      return true;
     }
   };
 
@@ -2634,6 +3111,7 @@
     async updateRequest(id, requestData, itemsData) { return this.getService().updateRequest(id, requestData, itemsData); },
     async updateDraft(id, requestData, itemsData) { return this.getService().updateDraft(id, requestData, itemsData); },
     async submitDraft(id, requestData, itemsData) { return this.getService().submitDraft(id, requestData, itemsData); },
+    async saveHistoricalRecord(record) { return this.getService().saveHistoricalRecord(record); },
     async bulkImportRequests(requests, items) { return this.getService().bulkImportRequests(requests, items); },
     async deleteRequest(id) { return this.getService().deleteRequest(id); },
     async getMaterialHistory(filters) { return this.getService().getMaterialHistory(filters); },
@@ -2645,6 +3123,7 @@
     async changeOwnPassword(currentPassword, newPassword) { return this.getService().changeOwnPassword(currentPassword, newPassword); },
     async deleteUser(userId) { return this.getService().deleteUser(userId); },
     async getSignatures() { return this.getService().getSignatures(); },
+    async getUserSignature(userId) { return this.getService().getUserSignature(userId); },
     async saveSignature(userId, signatureUrl) { return this.getService().saveSignature(userId, signatureUrl); },
     async deleteSignature(userId) { return this.getService().deleteSignature(userId); },
     async approveRequest(id) { return this.getService().approveRequest(id); },
@@ -2693,6 +3172,14 @@
     async updateRequestItemInspection(itemId, testedDate, itemComment = undefined) { return this.getService().updateRequestItemInspection(itemId, testedDate, itemComment); },
     async savePushSubscription(subscription, role) { return this.getService().savePushSubscription(subscription, role); },
     async deletePushSubscription(endpoint) { return this.getService().deletePushSubscription(endpoint); },
-    getSupabaseClient() { return getSupabaseClient(); }
+    getSupabaseClient() { return getSupabaseClient(); },
+    async getMixTankRequests(filters) { return this.getService().getMixTankRequests(filters); },
+    async getMixTankDetail(id) { return this.getService().getMixTankDetail(id); },
+    async saveMixTankRequest(data) { return this.getService().saveMixTankRequest(data); },
+    async updateMixTankQC(id, qcData) { return this.getService().updateMixTankQC(id, qcData); },
+    async signMixTank(id, role, sigData) { return this.getService().signMixTank(id, role, sigData); },
+    async reopenMixTank(id) { return this.getService().reopenMixTank(id); },
+    async deleteMixTank(id) { return this.getService().deleteMixTank(id); },
+
   };
 })();

@@ -302,19 +302,23 @@
       }
 
       /* 7. Requests View & Split Layout Responsiveness */
-      #view-requests {
+      #view-requests,
+      #view-mix-tank {
         height: auto !important;
         min-height: calc(100vh - 70px) !important;
       }
-      #view-requests .flex.justify-between.align-center {
+      #view-requests .flex.justify-between.align-center,
+      #view-mix-tank .flex.justify-between.align-center {
         flex-wrap: wrap !important;
         gap: 10px !important;
       }
-      #view-requests .flex.justify-between.align-center .flex.gap-10 {
+      #view-requests .flex.justify-between.align-center .flex.gap-10,
+      #view-mix-tank .flex.justify-between.align-center .flex.gap-10 {
         width: 100% !important;
         gap: 8px !important;
       }
-      #view-requests .flex.justify-between.align-center .flex.gap-10 .btn {
+      #view-requests .flex.justify-between.align-center .flex.gap-10 .btn,
+      #view-mix-tank .flex.justify-between.align-center .flex.gap-10 .btn {
         flex: 1 1 calc(50% - 4px) !important;
         justify-content: center !important;
         padding: 0 8px !important;
@@ -348,11 +352,13 @@
         padding: 0 8px !important;
         justify-content: center !important;
       }
-      #requests-detail-pane > div:first-child #approve-reject-btn-container {
+      #requests-detail-pane > div:first-child #approve-reject-btn-container,
+      #mix-tank-detail-pane > div:first-child #mt-approve-reject-btn-container {
         width: 100% !important;
         gap: 6px !important;
       }
-      #requests-detail-pane > div:first-child #approve-reject-btn-container .btn {
+      #requests-detail-pane > div:first-child #approve-reject-btn-container .btn,
+      #mix-tank-detail-pane > div:first-child #mt-approve-reject-btn-container .btn {
         flex: 1 !important;
         justify-content: center !important;
       }
@@ -930,13 +936,23 @@
         max-height: 440px !important;
         border-radius: 8px !important;
       }
-      #requests-detail-pane {
+      /* Role-based hiding for requester and base_oil */
+      body.role-requester #btn-mt-detail-edit,
+      body.role-requester #btn-mt-detail-delete,
+      body.role-base_oil #btn-mt-detail-edit,
+      body.role-base_oil #btn-mt-detail-delete {
+        display: none !important;
+      }
+
+      #requests-detail-pane,
+      #mix-tank-detail-pane {
         flex: none !important;
         border-radius: 8px !important;
         border-top: 1px solid var(--border-color) !important;
         margin-top: 0 !important;
       }
-      #pane-resizer {
+      #pane-resizer,
+      #mix-tank-pane-resizer {
         display: none !important;
       }
 
@@ -1042,6 +1058,78 @@
         font-size: 12px !important;
       }
     }
+  
+    /* --- MIX TANK (FM-QC003) SPECIFIC STYLES --- */
+    .mix-tank-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .mix-tank-table th, .mix-tank-table td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .mix-tank-table th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      color: #334155;
+    }
+    .mix-tank-calc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 600;
+    }
+    .sig-card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .sig-card-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 220px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .sig-card-box.signed {
+      border-color: #86efac;
+      background: #f0fdf4;
+    }
+    .sig-card-box .sig-img-container {
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px dashed #cbd5e1;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+    }
+    .sig-card-box .sig-img-container img {
+      max-height: 60px;
+      max-width: 100%;
+      object-fit: contain;
+    }
+    @media (max-width: 768px) {
+      .sig-card-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .visc-calc-row {
+        grid-template-columns: 1fr !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1080,6 +1168,13 @@
             รายการใบแจ้งตรวจสอบ
           </a>
         </li>
+          <li class="menu-item" id="nav-mix-tank">
+            <a href="#mix-tank" onclick="App.navigate('mix-tank'); return false;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+              ใบตรวจ Mix Tank
+              <span class="badge pending" id="sidebar-mix-tank-count" style="display:none; margin-left: 8px;">0</span>
+            </a>
+          </li>
         <li class="menu-item" id="nav-drafts" style="display:none;">
           <a href="#drafts" onclick="App.navigate('drafts'); return false;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -1261,9 +1356,14 @@
               เครื่องมือสำหรับผู้ดูแลระบบ เพื่อนำเข้าหรือส่งออกข้อมูลต่างๆ ในระบบ
             </p>
             <div class="data-mgmt-btn-group" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+              <button class="btn btn-primary" id="btn-manual-add-hist" onclick="App.openManualHistoricalModal()" style="display: inline-flex; align-items: center;">
+                <i data-lucide="plus-circle" style="margin-right:8px; width: 18px; height: 18px;"></i>
+                เพิ่มข้อมูลย้อนหลัง (กรอกเอง)
+              </button>
+
               <button class="btn btn-secondary" id="btn-admin-import" style="border-color:#10b981; color:#10b981;" onclick="App.handleImportClick(event)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                นำเข้าข้อมูลย้อนหลัง
+                นำเข้าข้อมูลย้อนหลัง (Excel)
               </button>
               <input type="file" id="file-import-excel" accept=".xlsx, .xls" style="display: none;" onchange="App.handleImportExcel(event)">
               
@@ -1623,6 +1723,10 @@
         <section id="view-history" class="page-view" style="display: none;">
           <div class="flex justify-between align-center mb-20">
             <h1>ระบบค้นหาประวัติวัตถุดิบย้อนหลัง (Material Audit)</h1>
+            <button class="btn btn-primary btn-sm" onclick="App.openManualHistoricalModal()" style="display: inline-flex; align-items: center;">
+              <i data-lucide="plus-circle" style="margin-right:6px; width:16px; height:16px;"></i>
+              + เพิ่มข้อมูลย้อนหลัง
+            </button>
           </div>
 
           <!-- History filters -->
@@ -1957,6 +2061,325 @@
           </div>
         </section>
 
+      
+        <!-- MIX TANK LIST VIEW (FM-QC003) -->
+        <section id="view-mix-tank" class="page-view" style="display: none; height: calc(100vh - 80px); flex-direction: column;">
+          <div class="flex justify-between align-center mb-10" style="flex-shrink: 0; margin-top: -10px;">
+            <h1 style="font-size: 20px; font-weight: 700;">รายการใบตรวจ Mix Tank</h1>
+            <div class="flex gap-10">
+              <button class="btn btn-secondary btn-sm" onclick="App.openMixTankFilterModal()" style="border-color:var(--primary-color); color:var(--primary-color);">
+                <i data-lucide="filter"></i>
+                ค้นหา / กรองข้อมูล
+              </button>
+
+              <button class="btn btn-primary btn-sm" id="btn-create-mix-tank" onclick="App.navigate('mix-tank-form', { mode: 'create' })">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                สร้างใบตรวจ Mix Tank
+              </button>
+            </div>
+          </div>
+
+          <div id="mix-tank-split-layout" style="display: flex; flex-direction: column; gap: 0; flex: 1; overflow: hidden;">
+            <!-- Top Pane (Master Table) -->
+            <div id="mix-tank-master-pane" class="card" style="margin-bottom: 0 !important; border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 !important;">
+              <div class="table-responsive" style="flex: 1; overflow-y: auto;">
+                <table class="table">
+                  <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                    <tr>
+                      <th>เลขที่เอกสาร</th>
+                      <th>วันที่ตรวจ</th>
+                      <th>Tank</th>
+                      <th>ลูกค้า</th>
+                      <th>วัตถุดิบ</th>
+                      <th>Batch Number</th>
+                      <th>ผู้แจ้ง</th>
+                      <th style="text-align: center;">สถานะ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mix-tank-list-tbody">
+                    <tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:30px;">กำลังโหลดข้อมูล...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="mix-tank-pagination"></div>
+            </div>
+
+            <!-- Resizer Handle -->
+            <div id="mix-tank-pane-resizer" style="height: 6px; cursor: ns-resize; display: flex; justify-content: center; align-items: center; background-color: var(--border-color); flex-shrink: 0;">
+              <div style="width: 40px; height: 2px; background-color: #94a3b8; border-radius: 1px;"></div>
+            </div>
+
+            <!-- Bottom Pane (Detail View) -->
+            <div id="mix-tank-detail-pane" class="card" style="margin-bottom: 0 !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 10px 0 0 0 !important; border-top: none !important;">
+              <!-- Detail Header -->
+              <div style="padding: 0 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <h2 style="font-size: 14px; font-weight: 600; color: var(--text-muted); margin: 0; text-transform: uppercase;">รายละเอียดใบตรวจ Mix Tank</h2>
+                  <span id="mt-detail-doc-badge" style="display: none;"></span>
+                  <span id="mt-detail-status-badge" style="display: none;"></span>
+                </div>
+                <div class="flex gap-10">
+                  <button id="btn-mt-detail-print" class="btn btn-secondary btn-sm" style="display: none; border-color: var(--primary-color); color: var(--primary-color);" onclick="App.printMixTankCurrentFromDetail()">
+                    <i data-lucide="printer"></i>
+                    พิมพ์รายงาน
+                  </button>
+                  <button id="btn-mt-detail-edit" class="btn btn-primary btn-sm" style="display: none !important;" onclick="App.editCurrentMixTankFromDetail()">
+                    <i data-lucide="edit"></i>
+                    แก้ไขข้อมูลใบตรวจ
+                  </button>
+                  <button id="btn-mt-detail-delete" class="btn btn-danger btn-sm" style="display: none !important; width: auto; border-radius: var(--radius-sm);" onclick="App.deleteCurrentMixTankFromDetail()">
+                    <i data-lucide="trash-2"></i>
+                    ลบ
+                  </button>
+                  <div id="mt-approve-reject-btn-container" class="flex gap-10"></div>
+                </div>
+              </div>
+
+              <!-- Detail Scrollable Content Area -->
+              <div style="flex: 1; overflow-y: auto; padding: 0 24px 24px 24px;">
+                <div id="mt-detail-empty" style="text-align: center; color: var(--text-muted); padding: 50px 20px;">
+                  <div style="margin-bottom: 12px;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--text-muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
+                  กรุณาคลิกเลือกใบตรวจ Mix Tank จากตารางด้านบนเพื่อแสดงรายละเอียด
+                </div>
+
+                <div id="mt-detail-body" style="display: none;">
+<!-- Section 2: Volume Tracking Table -->
+                  <div class="section-title" style="margin-top: 0;">ตารางบันทึกปริมาณเนื้อน้ำมัน (Tank Volume Tracking)</div>
+                  <div class="table-responsive mb-20">
+                    <table class="table">
+                      <thead style="position: sticky; top: 0; background: white; z-index: 1;">
+                        <tr>
+                          <th style="width: 100px;">ประเภท</th>
+                          <th>วัตถุดิบ</th>
+                          <th>Lot No.</th>
+                          <th style="text-align: right;">ปริมาณ (MT)</th>
+                          <th>ลูกค้า</th>
+                          <th>ทะเบียนรถ/เรือ</th>
+                        </tr>
+                      </thead>
+                      <tbody id="mt-det-volumes-tbody">
+                        <!-- Loaded dynamically -->
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <!-- Section 3: QC Results (Read-only view) -->
+                  <div class="section-title">ผลการทดสอบทางห้องปฏิบัติการ (QC Results)</div>
+                  <div class="card mb-20" style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; align-items: start;">
+                      <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Density 15°C</div>
+                        <div id="mt-det-density-15" style="font-size: 15px; font-weight: 700; color: #1e293b;">-</div>
+                      </div>
+                      <div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Density 30°C</div>
+                        <div id="mt-det-density-30" style="font-size: 15px; font-weight: 700; color: #1e293b;">-</div>
+                      </div>
+                      <div style="grid-column: 1 / -1;">
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">หมายเหตุเพิ่มเติม (Remark / Note)</div>
+                        <div id="mt-det-remark" style="font-size: 14px; color: #334155; font-weight: 500;">-</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Section 4: Document Approval Card (Matched to requests-detail-pane) -->
+                  <div id="mt-detail-approval-card" class="card mt-20" style="display:none; border:2px solid var(--border-color);">
+                    <div class="card-header" style="background-color:#f8fafc; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                      <h3 style="margin:0; font-size:16px; color:#1e293b;"><i class="fas fa-file-signature"></i> Document Approval</h3>
+                      <div id="mt-approval-status-badge" class="badge pending">Waiting for Approval</div>
+                    </div>
+                    <div class="card-body">
+                      <!-- Not Approved State -->
+                      <div id="mt-approval-pending-state" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px 0;">
+                        <p style="color:var(--text-muted); margin:0; font-size:13px;">เอกสารนี้ยังไม่ได้รับการอนุมัติ / ตรวจรับรอง (สามารถกดปุ่ม Approve หรือ Reject ได้ที่แถบเมนูด้านบน)</p>
+                        <div id="mt-approval-validation-msg" style="color:#ef4444; font-size:13px; margin-top:10px; display:none;">
+                          ไม่สามารถอนุมัติได้ เนื่องจากยังไม่ได้บันทึกผลการทดสอบ QC
+                        </div>
+                      </div>
+
+                      <!-- Approved / Rejected State -->
+                      <div id="mt-approval-done-state" style="display:none; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;">
+                        <div>
+                          <div class="meta-item mb-10"><label id="mt-approval-action-label">Approved By</label><span id="mt-approval-name-display" style="font-weight:600; font-size:15px;">-</span></div>
+                          <div class="meta-item mb-10"><label>Role</label><span id="mt-approval-role-display">-</span></div>
+                          <div class="meta-item"><label id="mt-approval-date-label">Approved Date</label><span id="mt-approval-date-display">-</span></div>
+                        </div>
+                        <div id="mt-reopen-action-container" style="display:none; align-items:center;">
+                          <button class="btn btn-danger btn-sm" onclick="App.reopenMixTank()"><i class="fas fa-undo"></i> Reopen Document</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- MIX TANK FORM / DETAIL VIEW (FM-QC003) -->
+        <section id="view-mix-tank-form" class="page-view" style="display: none;">
+          <div class="flex justify-between align-center mb-20">
+            <h1 id="mix-tank-form-heading" style="font-size: 24px; font-weight: 700; margin: 0;">สร้างใบแจ้งตรวจ Mix Tank</h1>
+            <div class="flex align-center gap-10">
+              <button class="btn btn-secondary" onclick="App.navigate('mix-tank')">ย้อนกลับ</button>
+              <span id="mix-tank-form-subheading" style="display: none;"></span>
+              <span id="mix-form-status-badge" style="display: none;"></span>
+              <button id="btn-mix-form-print" style="display: none;"></button>
+            </div>
+          </div>
+
+          <!-- Card 1: Header / Tank Information -->
+          <div class="card mb-20" style="padding: 20px;">
+            <div style="font-weight: 600; font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>ข้อมูลเอกสารและถังจัดเก็บ (Document & Tank Header)</span>
+            </div>
+            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+              <input type="hidden" id="mt-doc-no">
+              <div class="form-group">
+                <label class="form-label">วันที่ส่งตรวจ (Date) <span style="color:red">*</span></label>
+                <input type="date" id="mt-request-date" class="form-control" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">ผู้แจ้ง (Requester)</label>
+                <input type="text" id="mt-requester-name" class="form-control" readonly style="background: #f8fafc; font-weight: 600;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">ชื่อถังจัดเก็บ (TANK) <span style="color:red">*</span></label>
+                <input type="text" id="mt-tank-name" class="form-control" placeholder="เช่น T-505" required style="font-weight: 600;">
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Mixing & Volume Tracking Table -->
+          <div class="card mb-20" style="padding: 20px;">
+            <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              ตารางบันทึกปริมาณเนื้อน้ำมัน (Tank Volume Tracking)
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+              บันทึกปริมาณน้ำมันเดิมในถัง (BEFORE), น้ำมันที่นำมาเติมเพิ่ม (TOP UP) หรือจ่ายออก (DISCHARGE) เพื่อคำนวณยอดคงเหลือใหม่ (AFTER) ให้อัตโนมัติ
+            </p>
+
+            <!-- Table Volume -->
+            <div style="overflow-x: auto; margin-bottom: 16px;">
+              <table class="mix-tank-table">
+                <thead>
+                  <tr>
+                    <th style="width: 110px;">ประเภท</th>
+                    <th>วัตถุดิบ <span style="color:red">*</span></th>
+                    <th style="width: 140px;">LOT NO. <span style="color:red">*</span></th>
+                    <th style="width: 130px;">QUANTITY (MT) <span style="color:red">*</span></th>
+                    <th>ลูกค้า <span style="color:red">*</span></th>
+                    <th>ทะเบียนรถ/เรือ <span style="color:red">*</span></th>
+                    <th style="width: 50px; text-align: center;">ลบ</th>
+                  </tr>
+                </thead>
+                <!-- TOP UP & DISCHARGE Rows -->
+                <tbody id="mt-topup-tbody">
+                  <!-- Dynamically injected rows -->
+                </tbody>
+                <!-- Add TOP UP / DISCHARGE Buttons row -->
+                <tbody>
+                  <tr>
+                    <td colspan="7" style="background: #f8fafc; padding: 10px 12px;">
+                      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="App.addMixTankTopUpRow()" id="btn-add-topup">
+                          + เพิ่มรายการเติมเพิ่ม (TOP UP)
+                        </button>
+                        <button type="button" class="btn btn-sm" onclick="App.addMixTankDischargeRow()" id="btn-add-discharge" style="border: 1px solid #ea580c; color: #ea580c; background: #fff7ed; font-weight: 600;">
+                          - เพิ่มรายการจ่ายออก (DISCHARGE)
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <!-- BEFORE Row -->
+                <tbody>
+                  <tr style="background: #fefce8;">
+                    <td style="font-weight: 700; color: #854d0e;">BEFORE</td>
+                    <td><input type="text" id="mt-before-item" class="form-control form-control-sm" placeholder="เช่น EHC 110" required></td>
+                    <td><input type="text" id="mt-before-lot" class="form-control form-control-sm" placeholder="เช่น 260905" required></td>
+                    <td><input type="number" step="0.01" id="mt-before-qty" class="form-control form-control-sm" placeholder="เช่น 1531.00" oninput="App.recalculateMixTankTotals()" style="font-weight: 600;" required></td>
+                    <td><input type="text" id="mt-before-supplier" class="form-control form-control-sm" placeholder="เช่น ESSO" required></td>
+                    <td colspan="2"><span style="font-size: 11px; color: #854d0e;">(ยอดคงเหลือในถังเดิม)</span></td>
+                  </tr>
+                </tbody>
+                <!-- AFTER Row (Auto Sum) -->
+                <tbody>
+                  <tr style="background: #f0fdf4; border-top: 2px solid #86efac;">
+                    <td style="font-weight: 700; color: #166534;">AFTER</td>
+                    <td><input type="text" id="mt-after-item" class="form-control form-control-sm" placeholder="เช่น EHC 110" required></td>
+                    <td><input type="text" id="mt-after-lot" class="form-control form-control-sm" placeholder="เช่น 261001/505" style="font-weight: 700; border-color: #22c55e;" required></td>
+                    <td>
+                      <input type="number" step="0.01" id="mt-after-qty" class="form-control form-control-sm" readonly style="font-weight: 800; background: #dcfce7; color: #166534;">
+                    </td>
+                    <td><input type="text" id="mt-after-supplier" class="form-control form-control-sm" placeholder="เช่น ชื่อลูกค้า" style="font-weight: 600;" required></td>
+                    <td colspan="2">
+                      <span class="mix-tank-calc-badge">
+                        คำนวณอัตโนมัติ (BEFORE + SUM TOP UP - SUM DISCHARGE)
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 3: QC Results & Status (QC / Lab Section) -->
+          <div class="card mb-20" id="mt-form-qc-card" style="padding: 20px;">
+            <div style="font-weight: 600; font-size: 15px; margin-bottom: 14px;">
+              ผลการทดสอบทางห้องปฏิบัติการ (QC Results)
+            </div>
+            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+              <div class="form-group">
+                <label class="form-label">Density 15°C</label>
+                <input type="text" id="mt-density-15" class="form-control" placeholder="เช่น 0.8520" style="font-weight: 600;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Density 30°C</label>
+                <input type="text" id="mt-density-30" class="form-control" placeholder="เช่น 0.8420" style="font-weight: 600;">
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label">หมายเหตุเพิ่มเติม (Remark / Note)</label>
+                <input type="text" id="mt-remark" class="form-control" placeholder="ระบุข้อความหรือหมายเหตุ (ถ้ามี)">
+              </div>
+            </div>
+
+            <!-- Lab/Admin: Status Selection -->
+            <div class="admin-lab-field" id="mt-form-status-section" style="margin-top: 16px;">
+              <div style="background: #e0f2fe; border: 1px solid #bae6fd; padding: 12px 16px; border-radius: var(--radius-sm);">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="mt-form-status" style="color: #0369a1; font-weight: 600;">สถานะใบแจ้งตรวจ (Status)</label>
+                  <select id="mt-form-status" class="form-control" style="font-weight: 600;">
+                    <option value="Draft">Draft – แบบร่าง</option>
+                    <option value="Pending">Pending – รอดำเนินการ</option>
+                    <option value="In Process">In Process – กำลังตรวจสอบ</option>
+                    <option value="Complete">Complete – ตรวจสอบแล้ว</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Actions Bar -->
+          <div style="padding: 20px 0; display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="App.navigate('mix-tank')">ยกเลิก</button>
+            <div id="mt-form-actions-create" style="display: flex; gap: 12px;">
+              <button type="button" class="btn btn-secondary" id="btn-mix-save-draft" onclick="App.saveMixTankForm('Draft')">
+                ร่าง
+              </button>
+              <button type="button" class="btn btn-primary" id="btn-mix-submit" onclick="App.saveMixTankForm('Pending QC')">
+                ส่ง
+              </button>
+            </div>
+            <div id="mt-form-actions-edit" style="display: none; gap: 12px;">
+              <button type="button" class="btn btn-primary" id="btn-mix-save-edit" onclick="App.saveMixTankEdit()">
+                บันทึก
+              </button>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -2126,6 +2549,79 @@
   <!-- =========================================================================
        MODAL: CREATE USER ACCOUNT (ADMIN ONLY)
        ========================================================================= -->
+  <!-- =========================================================================
+       MODAL: ADD HISTORICAL RECORD MANUALLY (ADMIN / LAB)
+       ========================================================================= -->
+  <div class="modal-overlay" id="modal-manual-historical">
+    <div class="modal-container" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">เพิ่มข้อมูลประวัติวัตถุดิบย้อนหลัง (Manual Entry)</h3>
+        <button class="btn-close" onclick="App.closeManualHistoricalModal()">&times;</button>
+      </div>
+      <form id="form-manual-historical" onsubmit="App.handleManualHistoricalSubmit(event)">
+        <div class="modal-body" style="padding: 20px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-date" class="form-label">วันที่รับเข้า / วันที่ตรวจ <span style="color:red;">*</span></label>
+              <input type="date" id="mhist-date" class="form-control" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-product" class="form-label">ชื่อสินค้า / วัตถุดิบ <span style="color:red;">*</span></label>
+              <input type="text" id="mhist-product" class="form-control" required placeholder="เช่น SN 150, T-505...">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-batch" class="form-label">Batch Number <span style="color:red;">*</span></label>
+              <input type="text" id="mhist-batch" class="form-control" required placeholder="เช่น 261001...">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-quantity" class="form-label">ปริมาณ (Quantity)</label>
+              <input type="text" id="mhist-quantity" class="form-control" placeholder="เช่น 25 MT, 1,000 L...">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-rm" class="form-label">RM No.</label>
+              <input type="text" id="mhist-rm" class="form-control" placeholder="เช่น RM-001...">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-result" class="form-label">ผลการทดสอบ</label>
+              <select id="mhist-result" class="form-control">
+                <option value="Pass">Pass – ผ่าน</option>
+                <option value="In Process">In Process – กำลังตรวจสอบ</option>
+                <option value="Fail">Fail – ไม่ผ่าน</option>
+                <option value="Hold">Hold – ชะลอผล</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-den15" class="form-label">Density 15°C</label>
+              <input type="text" id="mhist-den15" class="form-control" placeholder="เช่น 0.8520">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="mhist-den30" class="form-label">Density 30°C</label>
+              <input type="text" id="mhist-den30" class="form-control" placeholder="เช่น 0.8420">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="mhist-comment" class="form-label">หมายเหตุ / คอมเมนต์</label>
+            <input type="text" id="mhist-comment" class="form-control" placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)">
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="App.closeManualHistoricalModal()">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-manual-hist" style="width: auto; padding: 8px 24px;">บันทึกข้อมูล</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-create-user">
     <div class="modal-container">
       <div class="modal-header">
@@ -2585,6 +3081,58 @@
     </div>
   </div>
 
+  <!-- Mix Tank Search Filter Modal -->
+  <div id="modal-mix-tank-filters" class="modal-overlay">
+    <div class="modal-container" style="max-width:800px;">
+      <div class="modal-header">
+        <h2>ค้นหา / กรองข้อมูลใบตรวจ Mix Tank</h2>
+        <button class="btn-close" onclick="App.closeMixTankFilterModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="mix-tank-filter-form" onsubmit="App.handleMixTankFilterSubmit(event)">
+          <div class="filter-grid">
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-doc-no">เลขที่เอกสาร</label>
+              <input type="text" id="filter-mt-doc-no" placeholder="เช่น MT-2610-001">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-tank">ชื่อถังจัดเก็บ (TANK)</label>
+              <input type="text" id="filter-mt-tank" placeholder="เช่น T-505">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-product">ชื่อสินค้า (PRODUCT)</label>
+              <input type="text" id="filter-mt-product" placeholder="เช่น EHC 110">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-status">สถานะ</label>
+              <select id="filter-mt-status">
+                <option value="">ทั้งหมด</option>
+                <option value="Pending">Pending</option>
+                <option value="In Process">In Process</option>
+                <option value="Complete">Complete</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Draft">Draft</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-start-date">ตั้งแต่วันที่</label>
+              <input type="date" id="filter-mt-start-date">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="filter-mt-end-date">ถึงวันที่</label>
+              <input type="date" id="filter-mt-end-date">
+            </div>
+          </div>
+          <div class="filter-actions mt-20" style="display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="App.resetMixTankFilters()">ล้างตัวกรอง</button>
+            <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 24px;">ค้นหา</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Change Own Password Modal -->
   <div id="modal-change-own-password" class="modal-overlay">
     <div class="modal-container" style="max-width:440px;">
@@ -2645,7 +3193,7 @@
   </template>
 
   <!-- JavaScript Modules -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.363.0/dist/umd/lucide.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
@@ -2662,7 +3210,7 @@
   </script>
 
   <script src="config.js?v=132"></script>
-  <script src="dbService.js?v=139"></script>
-  <script src="app_v5.js?v=155"></script>
+  <script src="dbService.js?v=149"></script>
+  <script src="app_v5.js?v=192"></script>
 </body>
 </html>

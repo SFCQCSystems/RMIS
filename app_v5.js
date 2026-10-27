@@ -31,6 +31,16 @@ const App = (function () {
       page: 1,
       pageSize: 20,
       _hasSearched: false
+    },
+    mixTankFilters: {
+      docNo: '',
+      tank: '',
+      product: '',
+      status: '',
+      startDate: '',
+      endDate: '',
+      page: 1,
+      pageSize: 20
     }
   };
 
@@ -49,7 +59,9 @@ const App = (function () {
     'daily-report': 'view-daily-report',
     signatures: 'view-signatures',
     users: 'view-users',
-    settings: 'view-settings'
+    settings: 'view-settings',
+    'mix-tank': 'view-mix-tank',
+    'mix-tank-form': 'view-mix-tank-form'
   };
 
   // --- INITIALIZATION ---
@@ -163,42 +175,46 @@ const App = (function () {
   }
 
   function setupSplitResizer() {
-    const resizer = document.getElementById('pane-resizer');
-    const topPane = document.getElementById('requests-master-pane');
-    const bottomPane = document.getElementById('requests-detail-pane');
-    const container = document.getElementById('requests-split-layout');
-    
-    if (!resizer || !topPane || !bottomPane || !container) return;
-
-    let isResizing = false;
-
-    resizer.addEventListener('mousedown', function(e) {
-      isResizing = true;
-      document.body.style.cursor = 'ns-resize';
-      document.body.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', function(e) {
-      if (!isResizing) return;
+    function bindResizer(resizerId, topPaneId, bottomPaneId, containerId) {
+      const resizer = document.getElementById(resizerId);
+      const topPane = document.getElementById(topPaneId);
+      const bottomPane = document.getElementById(bottomPaneId);
+      const container = document.getElementById(containerId);
       
-      const containerRect = container.getBoundingClientRect();
-      let newHeight = e.clientY - containerRect.top;
-      
-      // Add minimum height constraints for both panes
-      if (newHeight < 150) newHeight = 150;
-      if (newHeight > containerRect.height - 150) newHeight = containerRect.height - 150;
-      
-      topPane.style.flex = 'none';
-      topPane.style.height = newHeight + 'px';
-    });
+      if (!resizer || !topPane || !bottomPane || !container) return;
 
-    document.addEventListener('mouseup', function(e) {
-      if (isResizing) {
-        isResizing = false;
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      }
-    });
+      let isResizing = false;
+
+      resizer.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        let newHeight = e.clientY - containerRect.top;
+        
+        if (newHeight < 150) newHeight = 150;
+        if (newHeight > containerRect.height - 150) newHeight = containerRect.height - 150;
+        
+        topPane.style.flex = 'none';
+        topPane.style.height = newHeight + 'px';
+      });
+
+      document.addEventListener('mouseup', function(e) {
+        if (isResizing) {
+          isResizing = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
+      });
+    }
+
+    bindResizer('pane-resizer', 'requests-master-pane', 'requests-detail-pane', 'requests-split-layout');
+    bindResizer('mix-tank-pane-resizer', 'mix-tank-master-pane', 'mix-tank-detail-pane', 'mix-tank-split-layout');
   }
 
   function setupGlobalListeners() {
@@ -325,6 +341,8 @@ const App = (function () {
       'request-create': 'nav-requests',
       'request-edit': 'nav-requests',
       'request-detail': 'nav-requests',
+      'mix-tank': 'nav-mix-tank',
+      'mix-tank-form': 'nav-mix-tank',
       drafts: 'nav-drafts',
       history: 'nav-history',
       'edit-requests': 'nav-edit-requests',
@@ -359,7 +377,7 @@ const App = (function () {
     state.currentView = viewName;
     const viewEl = document.getElementById(VIEWS[actualViewName]);
     if (viewEl) {
-      if (VIEWS[actualViewName] === 'view-requests') {
+      if (VIEWS[actualViewName] === 'view-requests' || VIEWS[actualViewName] === 'view-mix-tank') {
         viewEl.style.display = 'flex';
       } else {
         viewEl.style.display = 'block';
@@ -408,6 +426,13 @@ const App = (function () {
         break;
       case 'settings':
         loadSettingsView();
+        break;
+      case 'mix-tank':
+        clearMixTankDetailPane();
+        loadMixTankList();
+        break;
+      case 'mix-tank-form':
+        prepareMixTankForm(params.id, params.mode);
         break;
     }
 
@@ -495,6 +520,18 @@ const App = (function () {
 
   function updateUIForUser() {
     if (!state.currentUser) return;
+
+    // Set body role class for bulletproof CSS hiding
+    document.body.classList.remove('role-admin', 'role-lab', 'role-requester', 'role-base_oil');
+    const currentRole = (state.currentUser.role || 'requester').toLowerCase();
+    document.body.classList.add('role-' + currentRole);
+
+    const mtEditBtn = document.getElementById('btn-mt-detail-edit');
+    const mtDelBtn = document.getElementById('btn-mt-detail-delete');
+    if (currentRole === 'requester' || currentRole === 'base_oil') {
+      if (mtEditBtn) mtEditBtn.style.setProperty('display', 'none', 'important');
+      if (mtDelBtn) mtDelBtn.style.setProperty('display', 'none', 'important');
+    }
     
     const nameEl = document.getElementById('sidebar-user-name');
     const roleEl = document.getElementById('sidebar-user-role');
@@ -583,10 +620,21 @@ const App = (function () {
   }
 
   // --- BACKGROUND DATA LOADERS ---
+  let isUpdatingDraftCounts = false;
   async function updateDraftCountsInBackground() {
+    if (isUpdatingDraftCounts) return;
+    isUpdatingDraftCounts = true;
+    try {
+      const mtRecords = await window.DB.getMixTankRequests();
+      updateMixTankBadge(mtRecords);
+    } catch (e) {}
+
     const isRequester = state.currentUser?.role === 'requester';
     const isAdmin = state.currentUser?.role === 'admin';
-    if (!isRequester && !isAdmin) return;
+    if (!isRequester && !isAdmin) {
+      isUpdatingDraftCounts = false;
+      return;
+    }
 
     try {
       const draftCount = await window.DB.getDraftCount();
@@ -605,7 +653,8 @@ const App = (function () {
       }
     } catch (err) {
       console.error('Failed to load background drafts:', err);
-      // Optional: Update UI to show error state, but menu remains visible
+    } finally {
+      isUpdatingDraftCounts = false;
     }
   }
 
@@ -2704,6 +2753,80 @@ const App = (function () {
     } catch (e) {
       console.warn('html2pdf script load failed:', e);
       return false;
+    }
+  }
+
+  // --- MANUAL HISTORICAL RECORD ENTRY ---
+  function openManualHistoricalModal() {
+    const role = (state.currentUser?.role || '').toLowerCase();
+    if (!['admin', 'lab'].includes(role)) {
+      showToast('เฉพาะผู้ดูแลระบบ (Admin) หรือเจ้าหน้าที่แลป (Lab) เท่านั้นที่มีสิทธิ์เพิ่มข้อมูลย้อนหลัง', 'error');
+      return;
+    }
+    const modal = document.getElementById('modal-manual-historical');
+    if (modal) {
+      const today = new Date().toISOString().slice(0, 10);
+      const dateInput = document.getElementById('mhist-date');
+      if (dateInput) dateInput.value = today;
+      modal.classList.add('open');
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
+
+  function closeManualHistoricalModal() {
+    const modal = document.getElementById('modal-manual-historical');
+    if (modal) {
+      modal.classList.remove('open');
+      const form = document.getElementById('form-manual-historical');
+      if (form) form.reset();
+    }
+  }
+
+  async function handleManualHistoricalSubmit(e) {
+    if (e) e.preventDefault();
+    const date = document.getElementById('mhist-date')?.value;
+    const product = document.getElementById('mhist-product')?.value.trim();
+    const batch = document.getElementById('mhist-batch')?.value.trim();
+    const qty = document.getElementById('mhist-quantity')?.value.trim();
+    const rmNo = document.getElementById('mhist-rm')?.value.trim();
+    const result = document.getElementById('mhist-result')?.value;
+    const den15 = document.getElementById('mhist-den15')?.value.trim();
+    const den30 = document.getElementById('mhist-den30')?.value.trim();
+    const comment = document.getElementById('mhist-comment')?.value.trim();
+
+    if (!product || !batch) {
+      showToast('กรุณากรอกชื่อสินค้าและ Batch Number', 'warning');
+      return;
+    }
+
+    showLoading();
+    const btn = document.getElementById('btn-submit-manual-hist');
+    if (btn) btn.disabled = true;
+
+    try {
+      await window.DB.saveHistoricalRecord({
+        receive_date: date,
+        product_name: product,
+        batch_number: batch,
+        quantity: qty,
+        rm_no: rmNo,
+        test_result: result,
+        density_15c: den15,
+        density_30c: den30,
+        item_comment: comment
+      });
+
+      showToast('บันทึกข้อมูลประวัติย้อนหลังเรียบร้อยแล้ว', 'success');
+      closeManualHistoricalModal();
+      if (state.currentView === 'history') {
+        loadMaterialHistory();
+      }
+    } catch (err) {
+      console.error('saveHistoricalRecord error:', err);
+      showToast('ไม่สามารถบันทึกข้อมูลได้: ' + err.message, 'error');
+    } finally {
+      hideLoading();
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -5416,6 +5539,1898 @@ const App = (function () {
     }
   }
 
+
+  /* =========================================================================
+     MIX TANK INSPECTION (FM-QC003) CONTROLLER
+     ========================================================================= */
+
+  let currentMixTankRecord = null;
+
+  function openMixTankFilterModal() {
+    const modal = document.getElementById('modal-mix-tank-filters');
+    if (modal) modal.classList.add('open');
+  }
+
+  function closeMixTankFilterModal() {
+    const modal = document.getElementById('modal-mix-tank-filters');
+    if (modal) modal.classList.remove('open');
+  }
+
+  function handleMixTankFilterSubmit(e) {
+    if (e) e.preventDefault();
+    state.mixTankFilters.docNo = (document.getElementById('filter-mt-doc-no')?.value || '').trim();
+    state.mixTankFilters.tank = (document.getElementById('filter-mt-tank')?.value || '').trim();
+    state.mixTankFilters.product = (document.getElementById('filter-mt-product')?.value || '').trim();
+    state.mixTankFilters.status = document.getElementById('filter-mt-status')?.value || '';
+    state.mixTankFilters.startDate = document.getElementById('filter-mt-start-date')?.value || '';
+    state.mixTankFilters.endDate = document.getElementById('filter-mt-end-date')?.value || '';
+    state.mixTankFilters.page = 1;
+    closeMixTankFilterModal();
+    loadMixTankList();
+  }
+
+  function resetMixTankFilters() {
+    const form = document.getElementById('mix-tank-filter-form');
+    if (form) form.reset();
+    state.mixTankFilters.docNo = '';
+    state.mixTankFilters.tank = '';
+    state.mixTankFilters.product = '';
+    state.mixTankFilters.status = '';
+    state.mixTankFilters.startDate = '';
+    state.mixTankFilters.endDate = '';
+    state.mixTankFilters.page = 1;
+    closeMixTankFilterModal();
+    loadMixTankList();
+  }
+
+  function setMixTankPage(p) {
+    state.mixTankFilters.page = Math.max(1, p);
+    loadMixTankList();
+  }
+
+  function setMixTankPageSize(ps) {
+    state.mixTankFilters.pageSize = ps;
+    state.mixTankFilters.page = 1;
+    loadMixTankList();
+  }
+
+  async function loadMixTankList() {
+    showLoading();
+    try {
+      const records = await window.DB.getMixTankRequests();
+      updateMixTankBadge(records);
+
+      const f = state.mixTankFilters;
+      const filtered = (records || []).filter(r => {
+        if (f.docNo && !(r.doc_no || '').toLowerCase().includes(f.docNo.toLowerCase())) return false;
+        if (f.tank && !(r.tank_name || '').toLowerCase().includes(f.tank.toLowerCase())) return false;
+        if (f.product && !(r.product_name || '').toLowerCase().includes(f.product.toLowerCase())) return false;
+        if (f.status && r.status !== f.status) return false;
+        if (f.startDate && r.request_date && r.request_date < f.startDate) return false;
+        if (f.endDate && r.request_date && r.request_date > f.endDate) return false;
+        return true;
+      });
+
+      const totalCount = filtered.length;
+      const page = f.page || 1;
+      const pageSize = f.pageSize || 20;
+      const startIndex = (page - 1) * pageSize;
+      const paginated = filtered.slice(startIndex, startIndex + pageSize);
+
+      renderMixTankTable(paginated, totalCount, page, pageSize);
+
+      // Auto-select record in bottom pane if available
+      if (paginated.length > 0) {
+        const targetId = (currentMixTankRecord && paginated.some(r => r.id === currentMixTankRecord.id))
+          ? currentMixTankRecord.id
+          : paginated[0].id;
+        
+        setTimeout(() => {
+          const tbody = document.getElementById('mix-tank-list-tbody');
+          if (tbody) {
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+              if (row.innerHTML.includes(targetId) || (targetId === paginated[0].id && row === rows[0])) {
+                row.classList.add('selected-row');
+              }
+            });
+          }
+          loadMixTankDetailInPane(targetId);
+        }, 50);
+      } else {
+        clearMixTankDetailPane();
+      }
+    } catch (e) {
+      console.error('loadMixTankList error:', e);
+      showToast('ไม่สามารถโหลดรายการใบตรวจ Mix Tank ได้: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function updateMixTankBadge(records) {
+    const badge = document.getElementById('sidebar-mix-tank-count');
+    if (!badge) return;
+    const pendingCount = (records || []).filter(r => r.status === 'Pending QC' || r.status === 'Pending Approval').length;
+    if (pendingCount > 0) {
+      badge.innerText = pendingCount;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function renderMixTankTable(records, totalCount, page, pageSize) {
+    const tbody = document.getElementById('mix-tank-list-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    if (!records || records.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่พบรายการใบตรวจ Mix Tank ที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
+      renderPaginationControls({
+        containerId: 'mix-tank-pagination',
+        page: 1,
+        pageSize: pageSize || 20,
+        totalCount: 0,
+        onPageChange: 'App.setMixTankPage',
+        onPageSizeChange: 'App.setMixTankPageSize'
+      });
+      return;
+    }
+
+    records.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.style.transition = 'background 0.15s';
+      tr.onclick = (e) => {
+        if (!e.target.closest('button')) {
+          Array.from(tr.parentNode.children).forEach(child => child.classList.remove('selected-row'));
+          tr.classList.add('selected-row');
+          loadMixTankDetailInPane(r.id);
+        }
+      };
+
+      const rawMaterial = (r.after_item && r.after_item.item && r.after_item.item.trim()) || r.product_name || '-';
+      const batchNo = (r.after_item && r.after_item.lot_no && r.after_item.lot_no.trim()) || r.batch_number || '-';
+      const customer = (r.after_item && r.after_item.supplier && r.after_item.supplier.trim()) || r.customer || r.customer_name || '-';
+      const requester = r.created_by || r.prepared_by_name || '-';
+
+      // Status mapping to: Pending, In Process, Complete, Approved, Rejected
+      let displayStatus = r.status || 'Pending';
+      if (displayStatus === 'Pending QC') displayStatus = 'Pending';
+      else if (displayStatus === 'Pending Approval') displayStatus = 'Complete';
+      else if (displayStatus === 'Draft') displayStatus = 'Pending';
+
+      let statusBadgeClass = 'pending';
+      if (displayStatus === 'Pending') statusBadgeClass = 'pending';
+      else if (displayStatus === 'In Process') statusBadgeClass = 'in-process';
+      else if (displayStatus === 'Complete') statusBadgeClass = 'complete';
+      else if (displayStatus === 'Approved') statusBadgeClass = 'approved';
+      else if (displayStatus === 'Rejected') statusBadgeClass = 'rejected';
+
+      tr.innerHTML = `
+        <td style="white-space: nowrap;"><strong>${escapeHtml(r.doc_no || '-')}</strong></td>
+        <td style="white-space: nowrap;">${escapeHtml(r.request_date || '-')}</td>
+        <td style="white-space: nowrap;"><strong>${escapeHtml(r.tank_name || '-')}</strong></td>
+        <td style="white-space: nowrap;">${escapeHtml(customer)}</td>
+        <td style="white-space: nowrap;">${escapeHtml(rawMaterial)}</td>
+        <td style="white-space: nowrap; font-weight: 600; color: #166534;">${escapeHtml(batchNo)}</td>
+        <td style="white-space: nowrap;">${escapeHtml(requester)}</td>
+        <td style="white-space: nowrap; text-align: center;"><span class="badge ${statusBadgeClass}">${displayStatus}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    renderPaginationControls({
+      containerId: 'mix-tank-pagination',
+      page: page,
+      pageSize: pageSize,
+      totalCount: totalCount,
+      onPageChange: 'App.setMixTankPage',
+      onPageSizeChange: 'App.setMixTankPageSize'
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+
+  /* =========================================================================
+     MIX TANK SPLIT DETAIL PANE CONTROLLER
+     ========================================================================= */
+
+  function clearMixTankDetailPane() {
+    const emptyEl = document.getElementById('mt-detail-empty');
+    const bodyEl = document.getElementById('mt-detail-body');
+    const printBtn = document.getElementById('btn-mt-detail-print');
+    const editBtn = document.getElementById('btn-mt-detail-edit');
+    const delBtn = document.getElementById('btn-mt-detail-delete');
+
+    if (emptyEl) emptyEl.style.display = 'block';
+    if (bodyEl) bodyEl.style.display = 'none';
+    if (printBtn) printBtn.style.setProperty('display', 'none', 'important');
+    if (editBtn) editBtn.style.setProperty('display', 'none', 'important');
+    if (delBtn) delBtn.style.setProperty('display', 'none', 'important');
+
+    const docBadge = document.getElementById('mt-detail-doc-badge');
+    const statusBadge = document.getElementById('mt-detail-status-badge');
+    if (docBadge) docBadge.innerText = '-';
+    if (statusBadge) {
+      statusBadge.innerText = '-';
+      statusBadge.className = 'badge';
+    }
+    const d15El = document.getElementById('mt-det-density-15');
+    const d30El = document.getElementById('mt-det-density-30');
+    const remEl = document.getElementById('mt-det-remark');
+    if (d15El) d15El.innerText = '-';
+    if (d30El) d30El.innerText = '-';
+    if (remEl) remEl.innerText = '-';
+
+    const arc = document.getElementById('mt-approve-reject-btn-container');
+    if (arc) arc.innerHTML = '';
+    const mtApprovalCard = document.getElementById('mt-detail-approval-card');
+    if (mtApprovalCard) mtApprovalCard.style.display = 'none';
+  }
+
+  async function loadMixTankDetailInPane(id) {
+    if (!id) return clearMixTankDetailPane();
+
+    try {
+      const rec = await window.DB.getMixTankDetail(id);
+      if (!rec) return clearMixTankDetailPane();
+      currentMixTankRecord = rec;
+
+      const emptyEl = document.getElementById('mt-detail-empty');
+      const bodyEl = document.getElementById('mt-detail-body');
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (bodyEl) bodyEl.style.display = 'block';
+
+      // Header Badges
+      const docBadge = document.getElementById('mt-detail-doc-badge');
+      if (docBadge) docBadge.innerText = rec.doc_no || '-';
+
+      const statusBadge = document.getElementById('mt-detail-status-badge');
+      if (statusBadge) {
+        let displayStatus = rec.status || 'Pending';
+        if (displayStatus === 'Pending QC') displayStatus = 'Pending';
+        else if (displayStatus === 'Pending Approval') displayStatus = 'Complete';
+        else if (displayStatus === 'Draft') displayStatus = 'Pending';
+
+        let badgeClass = 'pending';
+        if (displayStatus === 'Pending') badgeClass = 'pending';
+        else if (displayStatus === 'In Process') badgeClass = 'in-process';
+        else if (displayStatus === 'Complete') badgeClass = 'complete';
+        else if (displayStatus === 'Approved') badgeClass = 'approved';
+        else if (displayStatus === 'Rejected') badgeClass = 'rejected';
+
+        statusBadge.className = 'badge ' + badgeClass;
+        statusBadge.innerText = displayStatus;
+      }
+
+      // Top Action Buttons
+      const printBtn = document.getElementById('btn-mt-detail-print');
+      const editBtn = document.getElementById('btn-mt-detail-edit');
+      const delBtn = document.getElementById('btn-mt-detail-delete');
+
+      if (printBtn) printBtn.style.setProperty('display', 'inline-flex', 'important');
+
+      const isLocked = rec.status === 'Approved';
+      const currentUser = state.currentUser || {};
+      const userRole = (currentUser.role || '').toLowerCase();
+      const isRestrictedRole = (userRole === 'requester' || userRole === 'base_oil');
+      const canEdit = !isRestrictedRole && (userRole === 'admin' || userRole === 'lab') && !isLocked;
+      const canDelete = !isRestrictedRole && (userRole === 'admin') && !isLocked;
+
+      if (editBtn) editBtn.style.setProperty('display', canEdit ? 'inline-flex' : 'none', 'important');
+      if (delBtn) delBtn.style.setProperty('display', canDelete ? 'inline-flex' : 'none', 'important');
+
+      // Section 2: Volumes Table
+      const volumesTbody = document.getElementById('mt-det-volumes-tbody');
+      if (volumesTbody) {
+        const beforeQty = (rec.before_item && parseFloat(rec.before_item.quantity)) || 0;
+        const items = rec.top_up_items || [];
+        let topUpTotal = 0;
+        let dischargeTotal = 0;
+        items.forEach(t => {
+          const q = parseFloat(t.quantity) || 0;
+          if (t.type === 'DISCHARGE') {
+            dischargeTotal += q;
+          } else {
+            topUpTotal += q;
+          }
+        });
+        const afterQty = (rec.after_item && parseFloat(rec.after_item.quantity)) || (beforeQty + topUpTotal - dischargeTotal);
+
+        let rowsHtml = '';
+        
+        // BEFORE row
+        rowsHtml += `
+          <tr style="background: #fafafa;">
+            <td style="font-weight: 700; color: #475569;">BEFORE</td>
+            <td>${escapeHtml((rec.before_item && rec.before_item.item) || rec.product_name || '-')}</td>
+            <td>${escapeHtml((rec.before_item && rec.before_item.lot_no) || '-')}</td>
+            <td style="text-align: right; font-weight: 600;">${beforeQty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${escapeHtml((rec.before_item && rec.before_item.supplier) || '-')}</td>
+            <td>-</td>
+          </tr>`;
+
+        // TOP UP and DISCHARGE rows
+        items.forEach((item, idx) => {
+          const qty = parseFloat(item.quantity) || 0;
+          if (item.type === 'DISCHARGE') {
+            rowsHtml += `
+              <tr style="background: #fff7ed;">
+                <td style="font-weight: 700; color: #ea580c;">DISCHARGE (-)</td>
+                <td style="color: #9a3412; font-style: italic;">(จ่ายออก)</td>
+                <td>-</td>
+                <td style="text-align: right; font-weight: 700; color: #c2410c;">-${qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td>-</td>
+                <td>-</td>
+              </tr>`;
+          } else {
+            rowsHtml += `
+              <tr>
+                <td style="font-weight: 700; color: #0284c7;">TOP UP</td>
+                <td>${escapeHtml(item.item || rec.product_name || '-')}</td>
+                <td>${escapeHtml(item.lot_no || '-')}</td>
+                <td style="text-align: right; font-weight: 600; color: #0284c7;">+${qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td>${escapeHtml(item.supplier || '-')}</td>
+                <td>${escapeHtml(item.vehicle || '-')}</td>
+              </tr>`;
+          }
+        });
+
+        // AFTER row
+        rowsHtml += `
+          <tr style="background: #f0fdf4; font-weight: 700;">
+            <td style="color: #166534;">AFTER</td>
+            <td>${escapeHtml((rec.after_item && rec.after_item.item) || rec.product_name || '-')}</td>
+            <td style="color: #166534;">${escapeHtml((rec.after_item && rec.after_item.lot_no) || '-')}</td>
+            <td style="text-align: right; color: #166534; font-size: 14px;">${afterQty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${escapeHtml((rec.after_item && rec.after_item.supplier) || rec.customer || '-')}</td>
+            <td>-</td>
+          </tr>`;
+
+        volumesTbody.innerHTML = rowsHtml;
+      }
+
+      // Section 3: QC Results (Read-only view in Detail Pane)
+      const d15El = document.getElementById('mt-det-density-15');
+      const d30El = document.getElementById('mt-det-density-30');
+      const remEl = document.getElementById('mt-det-remark');
+
+      if (d15El) d15El.innerText = rec.density_15 || '-';
+      if (d30El) d30El.innerText = rec.density_30 || '-';
+      if (remEl) remEl.innerText = rec.remark || '-';
+
+      // Section 4: Document Approval Card & Top Action Buttons (Matched to requests-detail-pane)
+      const approveRejectContainer = document.getElementById('mt-approve-reject-btn-container');
+      const isCompleteStatus = (rec.status === 'Complete' || rec.status === 'Pending Approval');
+      const isApprovedStatus = (rec.status === 'Approved');
+      const isRejectedStatus = (rec.status === 'Rejected');
+
+      if (approveRejectContainer) {
+        if (isCompleteStatus && (currentUser.role === 'admin' || currentUser.role === 'lab')) {
+          approveRejectContainer.innerHTML = `
+            <button class="btn btn-sm" id="btn-mt-detail-approve" style="background-color:#16a34a; color:white; border:none;" onclick="App.approveMixTank()">
+              <i data-lucide="check-circle"></i> Approve
+            </button>
+            <button class="btn btn-sm" id="btn-mt-detail-reject" style="background-color:#dc2626; color:white; border:none;" onclick="App.rejectMixTankFromDetail()">
+              <i data-lucide="x-circle"></i> Reject
+            </button>
+          `;
+          if (window.lucide) window.lucide.createIcons();
+        } else {
+          approveRejectContainer.innerHTML = '';
+        }
+      }
+
+      const approvalCard = document.getElementById('mt-detail-approval-card');
+      if (approvalCard) {
+        const showApprovalCard = (currentUser.role === 'admin' || currentUser.role === 'lab' || isApprovedStatus || isRejectedStatus);
+        approvalCard.style.display = showApprovalCard ? 'block' : 'none';
+
+        const badge = document.getElementById('mt-approval-status-badge');
+        const reopenContainer = document.getElementById('mt-reopen-action-container');
+        const validationMsg = document.getElementById('mt-approval-validation-msg');
+        if (validationMsg) validationMsg.style.display = 'none';
+
+        if (isApprovedStatus) {
+          if (badge) { badge.className = 'badge badge-success'; badge.innerText = 'Approved'; }
+          const pendingState = document.getElementById('mt-approval-pending-state');
+          const doneState = document.getElementById('mt-approval-done-state');
+          if (pendingState) pendingState.style.display = 'none';
+          if (doneState) doneState.style.display = 'flex';
+
+          const actionLabel = document.getElementById('mt-approval-action-label');
+          const nameDisplay = document.getElementById('mt-approval-name-display');
+          const roleDisplay = document.getElementById('mt-approval-role-display');
+          const dateDisplay = document.getElementById('mt-approval-date-display');
+
+          if (actionLabel) actionLabel.innerText = 'Approved By';
+          if (nameDisplay) nameDisplay.innerText = rec.approved_by_name || '-';
+          if (roleDisplay) roleDisplay.innerText = 'LAB / QC';
+          if (dateDisplay) dateDisplay.innerText = rec.approved_at ? new Date(rec.approved_at).toLocaleString('th-TH') : '-';
+
+          if (reopenContainer) {
+            reopenContainer.style.display = (currentUser.role === 'admin' || currentUser.role === 'lab') ? 'flex' : 'none';
+          }
+        } else if (isRejectedStatus) {
+          if (badge) { badge.className = 'badge badge-danger'; badge.innerText = 'Rejected'; }
+          const pendingState = document.getElementById('mt-approval-pending-state');
+          const doneState = document.getElementById('mt-approval-done-state');
+          if (pendingState) pendingState.style.display = 'none';
+          if (doneState) doneState.style.display = 'flex';
+
+          const actionLabel = document.getElementById('mt-approval-action-label');
+          const nameDisplay = document.getElementById('mt-approval-name-display');
+          const roleDisplay = document.getElementById('mt-approval-role-display');
+          const dateDisplay = document.getElementById('mt-approval-date-display');
+
+          if (actionLabel) actionLabel.innerText = 'Rejected By';
+          if (nameDisplay) nameDisplay.innerText = rec.approved_by_name || '-';
+          if (roleDisplay) roleDisplay.innerText = 'LAB / QC';
+          if (dateDisplay) dateDisplay.innerText = rec.approved_at ? new Date(rec.approved_at).toLocaleString('th-TH') : '-';
+
+          if (reopenContainer) {
+            reopenContainer.style.display = (currentUser.role === 'admin' || currentUser.role === 'lab') ? 'flex' : 'none';
+          }
+        } else {
+          // Waiting for Approval
+          if (badge) { badge.className = 'badge pending'; badge.innerText = 'Waiting for Approval'; }
+          const pendingState = document.getElementById('mt-approval-pending-state');
+          const doneState = document.getElementById('mt-approval-done-state');
+          if (pendingState) pendingState.style.display = 'flex';
+          if (doneState) doneState.style.display = 'none';
+          if (reopenContainer) reopenContainer.style.display = 'none';
+        }
+      }
+
+      if (window.lucide) window.lucide.createIcons();
+    } catch (e) {
+      console.error('loadMixTankDetailInPane error:', e);
+    }
+  }
+
+  function renderMixTankDetailSignatures(rec) {
+    const boxPrep = document.getElementById('mt-det-sig-box-prep');
+    if (!boxPrep) return;
+    const currentUser = state.currentUser || {};
+    const role = currentUser.role || '';
+
+    // 1. PREPARED BY
+    const imgPrep = document.getElementById('mt-det-sig-img-prep');
+    const namePrep = document.getElementById('mt-det-sig-name-prep');
+    const datePrep = document.getElementById('mt-det-sig-date-prep');
+    const statusPrep = document.getElementById('mt-det-sig-status-prep');
+    const btnPrep = document.getElementById('mt-det-btn-sign-prep');
+
+    if (rec.prepared_at || rec.prepared_signature_url) {
+      if (boxPrep) boxPrep.classList.add('signed');
+      if (statusPrep) { statusPrep.className = 'badge badge-success'; statusPrep.innerText = 'ลงนามแล้ว'; }
+      if (imgPrep) imgPrep.innerHTML = rec.prepared_signature_url ? `<img src="${rec.prepared_signature_url}" alt="Prepared Signature" style="max-height:50px; max-width:140px; object-fit:contain;">` : '<span style="color:#166534; font-weight:700;">[ลงนามเรียบร้อย]</span>';
+      if (namePrep) namePrep.innerText = rec.prepared_by_name || '-';
+      if (datePrep) datePrep.innerText = new Date(rec.prepared_at).toLocaleString('th-TH');
+      if (btnPrep) btnPrep.style.display = 'none';
+    } else {
+      if (boxPrep) boxPrep.classList.remove('signed');
+      if (statusPrep) { statusPrep.className = 'badge'; statusPrep.innerText = 'รอดำเนินการ'; }
+      if (imgPrep) imgPrep.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้ลงนาม)</span>';
+      if (namePrep) namePrep.innerText = '-';
+      if (datePrep) datePrep.innerText = '-';
+      if (btnPrep) btnPrep.style.display = ['base_oil', 'requester', 'admin'].includes(role) ? 'block' : 'none';
+    }
+
+    // 2. TEST BY
+    const boxTest = document.getElementById('mt-det-sig-box-test');
+    const imgTest = document.getElementById('mt-det-sig-img-test');
+    const nameTest = document.getElementById('mt-det-sig-name-test');
+    const dateTest = document.getElementById('mt-det-sig-date-test');
+    const statusTest = document.getElementById('mt-det-sig-status-test');
+    const btnTest = document.getElementById('mt-det-btn-sign-test');
+
+    if (rec.tested_at || rec.tested_signature_url) {
+      if (boxTest) boxTest.classList.add('signed');
+      if (statusTest) { statusTest.className = 'badge badge-success'; statusTest.innerText = 'ทดสอบแล้ว'; }
+      if (imgTest) imgTest.innerHTML = rec.tested_signature_url ? `<img src="${rec.tested_signature_url}" alt="Tested Signature" style="max-height:50px; max-width:140px; object-fit:contain;">` : '<span style="color:#166534; font-weight:700;">[ลงนามเรียบร้อย]</span>';
+      if (nameTest) nameTest.innerText = rec.tested_by_name || '-';
+      if (dateTest) dateTest.innerText = new Date(rec.tested_at).toLocaleString('th-TH');
+      if (btnTest) btnTest.style.display = 'none';
+    } else {
+      if (boxTest) boxTest.classList.remove('signed');
+      if (statusTest) { statusTest.className = 'badge'; statusTest.innerText = 'รอดำเนินการ'; }
+      if (imgTest) imgTest.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้ลงนาม)</span>';
+      if (nameTest) nameTest.innerText = '-';
+      if (dateTest) dateTest.innerText = '-';
+      if (btnTest) btnTest.style.display = ['lab', 'admin'].includes(role) ? 'block' : 'none';
+    }
+
+    // 3. APPROVED BY
+    const boxAppr = document.getElementById('mt-det-sig-box-appr');
+    const imgAppr = document.getElementById('mt-det-sig-img-appr');
+    const nameAppr = document.getElementById('mt-det-sig-name-appr');
+    const dateAppr = document.getElementById('mt-det-sig-date-appr');
+    const statusAppr = document.getElementById('mt-det-sig-status-appr');
+    const btnAppr = document.getElementById('mt-det-btn-sign-appr');
+    const btnRej = document.getElementById('mt-det-btn-reject-appr');
+
+    if (rec.approved_at || rec.approved_signature_url) {
+      if (boxAppr) boxAppr.classList.add('signed');
+      if (statusAppr) { statusAppr.className = 'badge badge-success'; statusAppr.innerText = 'อนุมัติแล้ว'; }
+      if (imgAppr) imgAppr.innerHTML = rec.approved_signature_url ? `<img src="${rec.approved_signature_url}" alt="Approved Signature" style="max-height:50px; max-width:140px; object-fit:contain;">` : '<span style="color:#166534; font-weight:700;">[อนุมัติเรียบร้อย]</span>';
+      if (nameAppr) nameAppr.innerText = rec.approved_by_name || '-';
+      if (dateAppr) dateAppr.innerText = new Date(rec.approved_at).toLocaleString('th-TH');
+      if (btnAppr) btnAppr.style.display = 'none';
+      if (btnRej) btnRej.style.display = 'none';
+    } else if (rec.status === 'Rejected') {
+      if (boxAppr) boxAppr.classList.remove('signed');
+      if (statusAppr) { statusAppr.className = 'badge badge-danger'; statusAppr.innerText = 'ปฏิเสธ'; }
+      if (imgAppr) imgAppr.innerHTML = '<span style="color:#dc2626; font-weight:700;">[ปฏิเสธ/ส่งกลับ]</span>';
+      if (nameAppr) nameAppr.innerText = '-';
+      if (dateAppr) dateAppr.innerText = '-';
+      if (btnAppr) btnAppr.style.display = role === 'admin' ? 'block' : 'none';
+      if (btnRej) btnRej.style.display = 'none';
+    } else {
+      if (boxAppr) boxAppr.classList.remove('signed');
+      if (statusAppr) { statusAppr.className = 'badge'; statusAppr.innerText = 'รอดำเนินการ'; }
+      if (imgAppr) imgAppr.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้อนุมัติ)</span>';
+      if (nameAppr) nameAppr.innerText = '-';
+      if (dateAppr) dateAppr.innerText = '-';
+      if (btnAppr) btnAppr.style.display = role === 'admin' ? 'block' : 'none';
+      if (btnRej) btnRej.style.display = role === 'admin' ? 'block' : 'none';
+    }
+  }
+
+  async function saveMixTankQCFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    const density15 = document.getElementById('mt-det-density-15')?.value.trim();
+    const density30 = document.getElementById('mt-det-density-30')?.value.trim();
+    const remark = document.getElementById('mt-det-remark')?.value.trim();
+
+    showLoading();
+    try {
+      const updated = await window.DB.updateMixTankQC(currentMixTankRecord.id, {
+        density_15: density15 || null,
+        density_30: density30 || null,
+        remark: remark || null
+      });
+      currentMixTankRecord = updated;
+      showToast('บันทึกผลทดสอบ QC สำเร็จเรียบร้อยแล้ว', 'success');
+      loadMixTankList();
+    } catch (e) {
+      console.error('saveMixTankQCFromDetail error:', e);
+      showToast('เกิดข้อผิดพลาดในการบันทึกผล QC: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  async function signMixTankTierFromDetail(tier) {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    await signMixTankTier(tier);
+    loadMixTankDetailInPane(currentMixTankRecord.id);
+  }
+
+  async function rejectMixTankFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    await rejectMixTank();
+    loadMixTankDetailInPane(currentMixTankRecord.id);
+  }
+
+  function printMixTankCurrentFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    printMixTank(currentMixTankRecord.id);
+  }
+
+  function editCurrentMixTankFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    const role = (state.currentUser?.role || '').toLowerCase();
+    if (role === 'requester' || role === 'base_oil') {
+      showToast('คุณไม่มีสิทธิ์แก้ไขใบแจ้ง Mix Tank', 'warning');
+      return;
+    }
+    navigate('mix-tank-form', { id: currentMixTankRecord.id });
+  }
+
+  function deleteCurrentMixTankFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    const role = (state.currentUser?.role || '').toLowerCase();
+    if (role === 'requester' || role === 'base_oil') {
+      showToast('คุณไม่มีสิทธิ์ลบใบแจ้ง Mix Tank', 'warning');
+      return;
+    }
+    deleteMixTankRecord(currentMixTankRecord.id);
+  }
+
+  async function prepareMixTankForm(id, mode) {
+    if (id) {
+      const role = (state.currentUser?.role || '').toLowerCase();
+      if (role === 'requester' || role === 'base_oil') {
+        showToast('คุณไม่มีสิทธิ์แก้ไขใบแจ้ง Mix Tank ที่ส่งไปแล้ว', 'warning');
+        navigate('mix-tank');
+        return;
+      }
+    }
+    showLoading();
+    try {
+      if (id) {
+        currentMixTankRecord = await window.DB.getMixTankDetail(id);
+      } else {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        currentMixTankRecord = {
+          id: '',
+          doc_no: '',
+          to_dept: 'QC',
+          tank_name: '',
+          request_date: todayStr,
+          product_name: '',
+          status: 'Draft',
+          top_up_items: [{ item: '', lot_no: '', quantity: '', unit: 'MT', supplier: '', vehicle: '' }],
+          before_item: { item: '', lot_no: '', quantity: '', unit: 'MT', supplier: '' },
+          after_item: { item: '', lot_no: '', quantity: '', unit: 'MT', supplier: '' },
+          density_15: '',
+          density_30: '',
+          visc_40_time: '',
+          visc_40_const: '',
+          visc_40_result: '',
+          visc_100_time: '',
+          visc_100_const: '',
+          visc_100_result: '',
+          viscosity_index: '',
+          water_content: 'NIL',
+          remark: '',
+          prepared_by_name: state.currentUser ? state.currentUser.display_name : '',
+          prepared_by_id: state.currentUser ? state.currentUser.id : '',
+          prepared_signature_url: '',
+          prepared_at: null,
+          tested_by_name: '',
+          tested_by_id: '',
+          tested_signature_url: '',
+          tested_at: null,
+          approved_by_name: '',
+          approved_by_id: '',
+          approved_signature_url: '',
+          approved_at: null
+        };
+      }
+
+      populateMixTankFormUI(currentMixTankRecord);
+    } catch (e) {
+      console.error('prepareMixTankForm error:', e);
+      showToast('ไม่สามารถเปิดแบบฟอร์ม Mix Tank ได้: ' + e.message, 'error');
+      navigate('mix-tank');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function populateMixTankFormUI(rec) {
+    const isEdit = !!rec.id;
+    const heading = document.getElementById('mix-tank-form-heading');
+    if (heading) heading.innerText = isEdit ? 'แก้ไขใบแจ้งตรวจ Mix Tank' : 'สร้างใบแจ้งตรวจ Mix Tank';
+    
+        // Dynamic edit button text based on status
+        const editBtn = document.getElementById('btn-mix-save-edit');
+        if (editBtn) {
+          if (rec.status === 'Draft') {
+            editBtn.innerText = 'ส่ง';
+          } else {
+            editBtn.innerText = 'บันทึก';
+          }
+        }
+
+    // Toggle Action Buttons (Create vs Edit)
+    const createActions = document.getElementById('mt-form-actions-create');
+    const editActions = document.getElementById('mt-form-actions-edit');
+    if (createActions) createActions.style.display = isEdit ? 'none' : 'flex';
+    if (editActions) editActions.style.display = isEdit ? 'flex' : 'none';
+    
+    // Status Badge
+    const statusBadge = document.getElementById('mix-form-status-badge');
+    if (statusBadge) {
+      statusBadge.innerText = rec.status || 'Draft';
+      statusBadge.className = 'badge ' + (rec.status === 'Approved' ? 'badge-success' : rec.status === 'Rejected' ? 'badge-danger' : rec.status === 'Draft' ? 'badge-draft' : 'badge-pending');
+    }
+
+    // Print button visibility
+    const printBtn = document.getElementById('btn-mix-form-print');
+    if (printBtn) printBtn.style.setProperty('display', isEdit ? 'inline-flex' : 'none', 'important');
+    if (window.lucide) window.lucide.createIcons();
+
+    // Helper to safely set element value if element exists
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = (val !== undefined && val !== null) ? val : '';
+    };
+
+    // Header info
+    setVal('mt-doc-no', rec.doc_no);
+    setVal('mt-request-date', rec.request_date || new Date().toISOString().slice(0, 10));
+    setVal('mt-to-dept', rec.to_dept || 'QC');
+    setVal('mt-requester-name', isEdit ? (rec.created_by || rec.prepared_by_name || '-') : (state.currentUser?.display_name || ''));
+    setVal('mt-customer', rec.customer || '');
+    setVal('mt-tank-name', rec.tank_name);
+    setVal('mt-product-name', rec.product_name);
+
+    // Render TOP UP / DISCHARGE rows
+    const tbody = document.getElementById('mt-topup-tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
+      const items = (rec.top_up_items && rec.top_up_items.length > 0) ? rec.top_up_items : [{ item: '', lot_no: '', quantity: '', supplier: '', vehicle: '' }];
+      items.forEach(item => {
+        if (item.type === 'DISCHARGE') {
+          addMixTankDischargeRow(item);
+        } else {
+          addMixTankTopUpRow(item);
+        }
+      });
+    }
+
+    // BEFORE row
+    const before = rec.before_item || {};
+    setVal('mt-before-item', before.item || rec.product_name);
+    setVal('mt-before-lot', before.lot_no);
+    setVal('mt-before-qty', before.quantity);
+    setVal('mt-before-supplier', before.supplier);
+
+    // AFTER row
+    const after = rec.after_item || {};
+    setVal('mt-after-item', after.item || rec.product_name);
+    setVal('mt-after-lot', after.lot_no);
+    setVal('mt-after-qty', after.quantity);
+    setVal('mt-after-supplier', (after.supplier && after.supplier !== 'MIXED') ? after.supplier : (rec.customer || ''));
+
+    recalculateMixTankTotals();
+
+    // QC Results (Density 15°C & 30°C only)
+    setVal('mt-density-15', rec.density_15);
+    setVal('mt-density-30', rec.density_30);
+    setVal('mt-remark', rec.remark);
+
+    // QC Status dropdown
+    const statusSelect = document.getElementById('mt-form-status');
+    if (statusSelect) {
+      let curStatus = rec.status || 'Pending';
+      if (curStatus === 'Pending QC') curStatus = 'Pending';
+      else if (curStatus === 'Pending Approval') curStatus = 'Complete';
+      statusSelect.value = curStatus;
+    }
+
+    // Role-based visibility for QC card
+    const qcCard = document.getElementById('mt-form-qc-card');
+    const role = (state.currentUser && state.currentUser.role) || '';
+    const isLabOrAdmin = ['lab', 'admin'].includes(role);
+    if (qcCard) {
+      qcCard.style.display = isEdit ? 'block' : (isLabOrAdmin ? 'block' : 'none');
+    }
+
+    // Render 3 Signature Cards
+    renderSignatureCards(rec);
+
+    // Apply role-based field restrictions
+    applyMixTankRolePermissions(rec);
+  }
+
+  function addMixTankTopUpRow(item = {}) {
+    const tbody = document.getElementById('mt-topup-tbody');
+    if (!tbody) return;
+    const rowId = 'topup-row-' + Math.random().toString(36).substr(2, 9);
+    const tr = document.createElement('tr');
+    tr.id = rowId;
+    tr.className = 'topup-item-row';
+    tr.innerHTML = `
+      <td style="font-weight: 600; color: #0284c7;">TOP UP</td>
+      <td><input type="text" class="form-control form-control-sm tu-item" value="${escapeHtml(item.item || document.getElementById('mt-product-name')?.value || '')}" placeholder="ชื่อสินค้า" required></td>
+      <td><input type="text" class="form-control form-control-sm tu-lot" value="${escapeHtml(item.lot_no || '')}" placeholder="เช่น 261001" required></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm tu-qty" value="${escapeHtml(item.quantity || '')}" placeholder="เช่น 249.00" oninput="App.recalculateMixTankTotals()" style="font-weight: 600;" required></td>
+      <td><input type="text" class="form-control form-control-sm tu-supplier" value="${escapeHtml(item.supplier || '')}" placeholder="เช่น ESSO" required></td>
+      <td><input type="text" class="form-control form-control-sm tu-vehicle" value="${escapeHtml(item.vehicle || '')}" placeholder="ทะเบียนรถ/เรือ" required></td>
+      <td style="text-align: center;">
+        <button type="button" class="btn btn-danger btn-sm" onclick="App.removeMixTankTopUpRow('${rowId}')" style="padding: 2px 6px; font-size: 11px;">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    recalculateMixTankTotals();
+  }
+
+  function removeMixTankTopUpRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+    recalculateMixTankTotals();
+  }
+
+  function addMixTankDischargeRow(item = {}) {
+    const tbody = document.getElementById('mt-topup-tbody');
+    if (!tbody) return;
+    const rowId = 'discharge-row-' + Math.random().toString(36).substr(2, 9);
+    const tr = document.createElement('tr');
+    tr.id = rowId;
+    tr.className = 'discharge-item-row';
+    tr.style.background = '#fff7ed';
+    tr.innerHTML = `
+      <td style="font-weight: 700; color: #ea580c;">DISCHARGE (-)</td>
+      <td><input type="text" class="form-control form-control-sm dis-item" value="(จ่ายออก)" readonly style="background: #fff7ed; color: #9a3412; font-style: italic; border-color: #fed7aa;" title="จ่ายออกจากถังเดิม (ไม่ต้องกรอก)"></td>
+      <td><input type="text" class="form-control form-control-sm dis-lot" value="-" readonly style="background: #fff7ed; color: #9a3412; text-align: center; border-color: #fed7aa;" title="ไม่ต้องกรอก"></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm dis-qty" value="${escapeHtml(item.quantity || '')}" placeholder="เช่น 50.00" oninput="App.recalculateMixTankTotals()" style="font-weight: 700; color: #c2410c; background: #fff; border-color: #f97316;" required></td>
+      <td><input type="text" class="form-control form-control-sm dis-supplier" value="-" readonly style="background: #fff7ed; color: #9a3412; text-align: center; border-color: #fed7aa;" title="ไม่ต้องกรอก"></td>
+      <td><input type="text" class="form-control form-control-sm dis-vehicle" value="-" readonly style="background: #fff7ed; color: #9a3412; text-align: center; border-color: #fed7aa;" title="ไม่ต้องกรอก"></td>
+      <td style="text-align: center;">
+        <button type="button" class="btn btn-danger btn-sm" onclick="App.removeMixTankDischargeRow('${rowId}')" style="padding: 2px 6px; font-size: 11px;">✕</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    recalculateMixTankTotals();
+    setTimeout(() => {
+      tr.querySelector('.dis-qty')?.focus();
+    }, 50);
+  }
+
+  function removeMixTankDischargeRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+    recalculateMixTankTotals();
+  }
+
+  function recalculateMixTankTotals() {
+    const beforeQty = parseFloat(document.getElementById('mt-before-qty')?.value) || 0;
+    let topUpTotal = 0;
+    document.querySelectorAll('.topup-item-row').forEach(r => {
+      topUpTotal += parseFloat(r.querySelector('.tu-qty')?.value) || 0;
+    });
+    let dischargeTotal = 0;
+    document.querySelectorAll('.discharge-item-row').forEach(r => {
+      dischargeTotal += parseFloat(r.querySelector('.dis-qty')?.value) || 0;
+    });
+    const afterQty = beforeQty + topUpTotal - dischargeTotal;
+    const afterInput = document.getElementById('mt-after-qty');
+    if (afterInput) {
+      afterInput.value = (afterQty !== 0 || beforeQty > 0 || topUpTotal > 0 || dischargeTotal > 0) ? afterQty.toFixed(2) : '';
+      if (afterQty < 0) {
+        afterInput.style.color = '#dc2626';
+        afterInput.style.background = '#fee2e2';
+      } else {
+        afterInput.style.color = '#166534';
+        afterInput.style.background = '#dcfce7';
+      }
+    }
+  }
+
+  function recalculateViscosity(temp) {
+    return;
+    const timeVal = document.getElementById(`mt-visc${temp}-time`)?.value || '';
+    const constVal = parseFloat(document.getElementById(`mt-visc${temp}-const`)?.value) || 0;
+    const resInput = document.getElementById(`mt-visc${temp}-result`);
+    if (!resInput) return;
+
+    if (!timeVal || !constVal) return;
+
+    let seconds = 0;
+    if (timeVal.includes("'") || timeVal.includes(":")) {
+      const parts = timeVal.split(/[':]/);
+      if (parts.length === 3) {
+        seconds = (parseFloat(parts[0]) || 0) * 60 + (parseFloat(parts[1]) || 0) + (parseFloat(parts[2]) || 0) / 100;
+      } else if (parts.length === 2) {
+        seconds = (parseFloat(parts[0]) || 0) * 60 + (parseFloat(parts[1]) || 0);
+      }
+    } else {
+      seconds = parseFloat(timeVal) || 0;
+    }
+
+    if (seconds > 0 && constVal > 0) {
+      const result = seconds * constVal;
+      resInput.value = result.toFixed(2);
+    }
+  }
+
+  function calculateMixTankVI() {
+    return;
+    const v40 = parseFloat(document.getElementById('mt-visc40-result')?.value) || 0;
+    const v100 = parseFloat(document.getElementById('mt-visc100-result')?.value) || 0;
+    const viInput = document.getElementById('mt-vi-result');
+    if (!viInput) return;
+
+    if (v40 <= 0 || v100 <= 0) {
+      showToast('กรุณาระบุผลลัพธ์ Viscosity 40°C และ 100°C ก่อนคำนวณ VI', 'warning');
+      return;
+    }
+
+    let L, H;
+    if (v100 > 70) {
+      L = 1.0152 * Math.pow(v100, 2) + 28.24 * v100 - 286.3;
+      H = 0.5854 * Math.pow(v100, 2) + 15.00 * v100 - 94.65;
+    } else {
+      L = 0.8353 * Math.pow(v100, 2) + 14.67 * v100 - 216.0;
+      H = 0.1684 * Math.pow(v100, 2) + 11.85 * v100 - 97.0;
+      if (L < 0) L = 0.8353 * Math.pow(v100, 2) + 14.67 * v100;
+      if (H < 0) H = 0.1684 * Math.pow(v100, 2) + 11.85 * v100;
+    }
+
+    let vi = 0;
+    if (v40 <= H) {
+      const N = (Math.log10(H) - Math.log10(v40)) / Math.log10(v100);
+      vi = ((Math.pow(10, N) - 1) / 0.00715) + 100;
+    } else {
+      vi = ((L - v40) / (L - H)) * 100;
+    }
+
+    const roundedVI = Math.round(vi);
+    viInput.value = isNaN(roundedVI) || roundedVI < 0 ? 0 : roundedVI;
+    showToast(`คำนวณ Viscosity Index ได้: ${viInput.value}`, 'info');
+  }
+
+  function renderSignatureCards(rec) {
+    const boxPrep = document.getElementById('sig-box-prepared');
+    if (!boxPrep) return;
+    const currentUser = state.currentUser || {};
+    const role = currentUser.role || '';
+
+    // 1. PREPARED BY
+    const imgPrep = document.getElementById('sig-img-prep');
+    const namePrep = document.getElementById('sig-name-prep');
+    const datePrep = document.getElementById('sig-date-prep');
+    const statusPrep = document.getElementById('sig-status-prep');
+    const btnPrep = document.getElementById('btn-sign-prep');
+
+    if (rec.prepared_at) {
+      boxPrep.classList.add('signed');
+      statusPrep.className = 'badge badge-success';
+      statusPrep.innerText = 'ลงนามแล้ว';
+      imgPrep.innerHTML = rec.prepared_signature_url ? `<img src="${rec.prepared_signature_url}" alt="Prepared Signature">` : '<span style="color:#166534; font-weight:700;">[ลงนามเรียบร้อย]</span>';
+      namePrep.innerText = rec.prepared_by_name || '-';
+      datePrep.innerText = new Date(rec.prepared_at).toLocaleString('th-TH');
+      btnPrep.style.display = 'none';
+    } else {
+      boxPrep.classList.remove('signed');
+      statusPrep.className = 'badge';
+      statusPrep.innerText = 'รอดำเนินการ';
+      imgPrep.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้ลงนาม)</span>';
+      namePrep.innerText = '-';
+      datePrep.innerText = '-';
+      btnPrep.style.display = ['base_oil', 'requester', 'admin'].includes(role) ? 'block' : 'none';
+    }
+
+    // 2. TEST BY
+    const boxTest = document.getElementById('sig-box-tested');
+    const imgTest = document.getElementById('sig-img-test');
+    const nameTest = document.getElementById('sig-name-test');
+    const dateTest = document.getElementById('sig-date-test');
+    const statusTest = document.getElementById('sig-status-test');
+    const btnTest = document.getElementById('btn-sign-test');
+
+    if (rec.tested_at) {
+      boxTest.classList.add('signed');
+      statusTest.className = 'badge badge-success';
+      statusTest.innerText = 'ทดสอบแล้ว';
+      imgTest.innerHTML = rec.tested_signature_url ? `<img src="${rec.tested_signature_url}" alt="Tested Signature">` : '<span style="color:#166534; font-weight:700;">[ลงนามเรียบร้อย]</span>';
+      nameTest.innerText = rec.tested_by_name || '-';
+      dateTest.innerText = new Date(rec.tested_at).toLocaleString('th-TH');
+      btnTest.style.display = 'none';
+    } else {
+      boxTest.classList.remove('signed');
+      statusTest.className = 'badge';
+      statusTest.innerText = 'รอดำเนินการ';
+      imgTest.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้ลงนาม)</span>';
+      nameTest.innerText = '-';
+      dateTest.innerText = '-';
+      btnTest.style.display = ['lab', 'admin'].includes(role) ? 'block' : 'none';
+    }
+
+    // 3. APPROVED BY
+    const boxAppr = document.getElementById('sig-box-approved');
+    const imgAppr = document.getElementById('sig-img-appr');
+    const nameAppr = document.getElementById('sig-name-appr');
+    const dateAppr = document.getElementById('sig-date-appr');
+    const statusAppr = document.getElementById('sig-status-appr');
+    const btnAppr = document.getElementById('btn-sign-appr');
+    const btnRej = document.getElementById('btn-reject-appr');
+
+    if (rec.approved_at) {
+      boxAppr.classList.add('signed');
+      statusAppr.className = 'badge badge-success';
+      statusAppr.innerText = 'อนุมัติแล้ว';
+      imgAppr.innerHTML = rec.approved_signature_url ? `<img src="${rec.approved_signature_url}" alt="Approved Signature">` : '<span style="color:#166534; font-weight:700;">[อนุมัติเรียบร้อย]</span>';
+      nameAppr.innerText = rec.approved_by_name || '-';
+      dateAppr.innerText = new Date(rec.approved_at).toLocaleString('th-TH');
+      btnAppr.style.display = 'none';
+      btnRej.style.display = 'none';
+    } else if (rec.status === 'Rejected') {
+      boxAppr.classList.remove('signed');
+      statusAppr.className = 'badge badge-danger';
+      statusAppr.innerText = 'ปฏิเสธ';
+      imgAppr.innerHTML = '<span style="color:#dc2626; font-weight:700;">[ปฏิเสธ/ส่งกลับ]</span>';
+      nameAppr.innerText = '-';
+      dateAppr.innerText = '-';
+      btnAppr.style.display = role === 'admin' ? 'block' : 'none';
+      btnRej.style.display = 'none';
+    } else {
+      boxAppr.classList.remove('signed');
+      statusAppr.className = 'badge';
+      statusAppr.innerText = 'รอดำเนินการ';
+      imgAppr.innerHTML = '<span style="font-size: 11px; color: #94a3b8;">(ยังไม่ได้อนุมัติ)</span>';
+      nameAppr.innerText = '-';
+      dateAppr.innerText = '-';
+      btnAppr.style.display = role === 'admin' ? 'block' : 'none';
+      btnRej.style.display = role === 'admin' ? 'block' : 'none';
+    }
+  }
+
+  function applyMixTankRolePermissions(rec) {
+    const role = (state.currentUser && state.currentUser.role) || '';
+    const isApproved = rec.status === 'Approved';
+
+    const isLabOrAdmin = ['lab', 'admin'].includes(role);
+    const qcFields = ['mt-density-15', 'mt-density-30', 'mt-remark'];
+    qcFields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !isLabOrAdmin || isApproved;
+    });
+
+    const statusSelect = document.getElementById('mt-form-status');
+    if (statusSelect) {
+      statusSelect.disabled = !isLabOrAdmin || isApproved;
+    }
+
+    if (isApproved) {
+      const allInputs = document.querySelectorAll('#view-mix-tank-form input, #view-mix-tank-form select, #view-mix-tank-form button.btn-danger, #btn-add-topup, #btn-add-discharge, #btn-mix-save-draft, #btn-mix-submit, #btn-mix-save-edit');
+      allInputs.forEach(el => { el.disabled = true; });
+    }
+  }
+
+  async function saveMixTankForm(targetStatus) {
+    const tankName = document.getElementById('mt-tank-name')?.value.trim();
+    const requestDate = document.getElementById('mt-request-date')?.value;
+    const beforeItemVal = document.getElementById('mt-before-item')?.value.trim() || '';
+    const afterItemVal = document.getElementById('mt-after-item')?.value.trim() || '';
+    const productName = afterItemVal || beforeItemVal || document.getElementById('mt-product-name')?.value?.trim() || currentMixTankRecord?.product_name || '';
+
+    const isDraft = targetStatus === 'Draft';
+
+    if (!tankName) {
+      showToast('กรุณากรอกชื่อถังจัดเก็บ (TANK)', 'warning');
+      document.getElementById('mt-tank-name')?.focus();
+      return;
+    }
+
+    if (!requestDate) {
+      showToast('กรุณาระบุวันที่ส่งตรวจ (Date)', 'warning');
+      document.getElementById('mt-request-date')?.focus();
+      return;
+    }
+
+    // Strict validation for all required fields when submitting to QC or saving edit
+    if (!isDraft) {
+      const tuRows = document.querySelectorAll('.topup-item-row');
+      const disRows = document.querySelectorAll('.discharge-item-row');
+      if (tuRows.length === 0 && disRows.length === 0) {
+        showToast('กรุณาเพิ่มรายการเติมเพิ่ม (TOP UP) หรือจ่ายออก (DISCHARGE) อย่างน้อย 1 รายการ', 'warning');
+        return;
+      }
+
+      for (let i = 0; i < tuRows.length; i++) {
+        const r = tuRows[i];
+        const itemInput = r.querySelector('.tu-item');
+        const lotInput = r.querySelector('.tu-lot');
+        const qtyInput = r.querySelector('.tu-qty');
+        const supplierInput = r.querySelector('.tu-supplier');
+        const vehicleInput = r.querySelector('.tu-vehicle');
+
+        const item = itemInput?.value.trim();
+        const lot = lotInput?.value.trim();
+        const qtyVal = qtyInput?.value.trim();
+        const qty = parseFloat(qtyVal);
+        const supplier = supplierInput?.value.trim();
+        const vehicle = vehicleInput?.value.trim();
+
+        const rowLabel = tuRows.length > 1 ? ` (แถวที่ ${i + 1})` : '';
+        if (!item) {
+          showToast(`กรุณากรอก "วัตถุดิบ" ในรายการ TOP UP${rowLabel}`, 'warning');
+          itemInput?.focus();
+          return;
+        }
+        if (!lot) {
+          showToast(`กรุณากรอก "LOT NO." ในรายการ TOP UP${rowLabel}`, 'warning');
+          lotInput?.focus();
+          return;
+        }
+        if (!qtyVal || isNaN(qty) || qty <= 0) {
+          showToast(`กรุณากรอก "QUANTITY (MT)" ให้ถูกต้องในรายการ TOP UP${rowLabel}`, 'warning');
+          qtyInput?.focus();
+          return;
+        }
+        if (!supplier) {
+          showToast(`กรุณากรอก "ลูกค้า" ในรายการ TOP UP${rowLabel}`, 'warning');
+          supplierInput?.focus();
+          return;
+        }
+        if (!vehicle) {
+          showToast(`กรุณากรอก "ทะเบียนรถ/เรือ" ในรายการ TOP UP${rowLabel}`, 'warning');
+          vehicleInput?.focus();
+          return;
+        }
+      }
+
+      // DISCHARGE validation: ONLY quantity is required as explicitly specified
+      for (let i = 0; i < disRows.length; i++) {
+        const dr = disRows[i];
+        const qtyInput = dr.querySelector('.dis-qty');
+        const qtyVal = qtyInput?.value.trim();
+        const qty = parseFloat(qtyVal);
+        const rowLabel = disRows.length > 1 ? ` (แถวที่ ${i + 1})` : '';
+        if (!qtyVal || isNaN(qty) || qty <= 0) {
+          showToast(`กรุณากรอก "QUANTITY (MT)" ให้ถูกต้องในรายการจ่ายออก (DISCHARGE)${rowLabel}`, 'warning');
+          qtyInput?.focus();
+          return;
+        }
+      }
+
+      // Check BEFORE row
+      const beforeItemInput = document.getElementById('mt-before-item');
+      const beforeLotInput = document.getElementById('mt-before-lot');
+      const beforeQtyInput = document.getElementById('mt-before-qty');
+      const beforeSupplierInput = document.getElementById('mt-before-supplier');
+
+      const bItem = beforeItemInput?.value.trim();
+      const bLot = beforeLotInput?.value.trim();
+      const bQtyVal = beforeQtyInput?.value.trim();
+      const bQty = parseFloat(bQtyVal);
+      const bSupplier = beforeSupplierInput?.value.trim();
+
+      if (!bItem) {
+        showToast('กรุณากรอก "วัตถุดิบ" ในแถว BEFORE', 'warning');
+        beforeItemInput?.focus();
+        return;
+      }
+      if (!bLot) {
+        showToast('กรุณากรอก "LOT NO." ในแถว BEFORE', 'warning');
+        beforeLotInput?.focus();
+        return;
+      }
+      if (!bQtyVal || isNaN(bQty) || bQty < 0) {
+        showToast('กรุณากรอก "QUANTITY (MT)" ในแถว BEFORE', 'warning');
+        beforeQtyInput?.focus();
+        return;
+      }
+      if (!bSupplier) {
+        showToast('กรุณากรอก "ลูกค้า" ในแถว BEFORE', 'warning');
+        beforeSupplierInput?.focus();
+        return;
+      }
+
+      // Check AFTER row
+      const afterItemInput = document.getElementById('mt-after-item');
+      const afterLotInput = document.getElementById('mt-after-lot');
+      const afterSupplierInput = document.getElementById('mt-after-supplier');
+
+      const aItem = afterItemInput?.value.trim();
+      const aLot = afterLotInput?.value.trim();
+      const aSupplier = afterSupplierInput?.value.trim();
+
+      if (!aItem) {
+        showToast('กรุณากรอก "วัตถุดิบ" ในแถว AFTER', 'warning');
+        afterItemInput?.focus();
+        return;
+      }
+      if (!aLot) {
+        showToast('กรุณากรอก "LOT NO." ในแถว AFTER', 'warning');
+        afterLotInput?.focus();
+        return;
+      }
+      if (!aSupplier) {
+        showToast('กรุณากรอก "ลูกค้า" ในแถว AFTER', 'warning');
+        afterSupplierInput?.focus();
+        return;
+      }
+    }
+
+    showLoading();
+    try {
+      const topUpItems = [];
+      const allRows = document.querySelectorAll('#mt-topup-tbody tr');
+      allRows.forEach(r => {
+        if (r.classList.contains('discharge-item-row')) {
+          const qty = parseFloat(r.querySelector('.dis-qty')?.value) || 0;
+          if (qty > 0) {
+            topUpItems.push({
+              type: 'DISCHARGE',
+              item: '(จ่ายออก)',
+              lot_no: '-',
+              quantity: qty,
+              unit: 'MT',
+              supplier: '-',
+              vehicle: '-'
+            });
+          }
+        } else if (r.classList.contains('topup-item-row')) {
+          const item = r.querySelector('.tu-item')?.value.trim();
+          const lot = r.querySelector('.tu-lot')?.value.trim();
+          const qty = parseFloat(r.querySelector('.tu-qty')?.value) || 0;
+          const supplier = r.querySelector('.tu-supplier')?.value.trim();
+          const vehicle = r.querySelector('.tu-vehicle')?.value.trim();
+          if (item || lot || qty > 0) {
+            topUpItems.push({
+              type: 'TOP UP',
+              item,
+              lot_no: lot,
+              quantity: qty,
+              unit: 'MT',
+              supplier,
+              vehicle
+            });
+          }
+        }
+      });
+
+      const beforeItem = {
+        item: document.getElementById('mt-before-item')?.value.trim() || productName,
+        lot_no: document.getElementById('mt-before-lot')?.value.trim(),
+        quantity: parseFloat(document.getElementById('mt-before-qty')?.value) || 0,
+        unit: 'MT',
+        supplier: document.getElementById('mt-before-supplier')?.value.trim()
+      };
+
+      const afterItemName = document.getElementById('mt-after-item')?.value.trim() || '';
+      const afterLot = document.getElementById('mt-after-lot')?.value.trim() || '';
+      const afterSupplier = document.getElementById('mt-after-supplier')?.value.trim() || '';
+
+      const afterItem = {
+        item: afterItemName || productName,
+        lot_no: afterLot,
+        quantity: parseFloat(document.getElementById('mt-after-qty')?.value) || 0,
+        unit: 'MT',
+        supplier: afterSupplier || ''
+      };
+
+      const finalProductName = afterItem.item || productName;
+      const finalCustomer = afterSupplier || document.getElementById('mt-customer')?.value?.trim() || currentMixTankRecord?.customer || '';
+      const finalBatchNo = afterLot || currentMixTankRecord?.batch_number || undefined;
+
+      const payload = {
+        id: currentMixTankRecord?.id || undefined,
+        doc_no: document.getElementById('mt-doc-no')?.value.trim() || undefined,
+        to_dept: document.getElementById('mt-to-dept')?.value.trim() || 'QC',
+        prepared_by_name: document.getElementById('mt-requester-name')?.value.trim() || (state.currentUser ? state.currentUser.display_name : ''),
+        prepared_by_id: state.currentUser ? state.currentUser.id : (currentMixTankRecord?.prepared_by_id || undefined),
+        created_by: document.getElementById('mt-requester-name')?.value.trim() || (state.currentUser ? state.currentUser.display_name : ''),
+        created_by_id: state.currentUser ? state.currentUser.id : (currentMixTankRecord?.created_by_id || undefined),
+        customer: finalCustomer,
+        batch_number: finalBatchNo,
+        tank_name: tankName,
+        request_date: requestDate,
+        product_name: finalProductName,
+        status: targetStatus || currentMixTankRecord?.status || 'Draft',
+        top_up_items: topUpItems,
+        before_item: beforeItem,
+        after_item: afterItem,
+        density_15: document.getElementById('mt-density-15')?.value.trim() || null,
+        density_30: document.getElementById('mt-density-30')?.value.trim() || null,
+        remark: document.getElementById('mt-remark')?.value.trim() || null
+      };
+
+      const saved = await window.DB.saveMixTankRequest(payload);
+      currentMixTankRecord = saved;
+      // Reset filters so newly created record shows up in table
+      if (state.mixTankFilters) {
+        state.mixTankFilters.docNo = '';
+        state.mixTankFilters.tank = '';
+        state.mixTankFilters.product = '';
+        state.mixTankFilters.status = '';
+        state.mixTankFilters.startDate = '';
+        state.mixTankFilters.endDate = '';
+        state.mixTankFilters.page = 1;
+      }
+      showToast(targetStatus === 'Pending QC' ? 'ส่งตรวจห้องปฏิบัติการ QC สำเร็จแล้ว' : 'บันทึกข้อมูลเรียบร้อยแล้ว', 'success');
+      navigate('mix-tank');
+    } catch (e) {
+      console.error('saveMixTankForm error:', e);
+      showToast('เกิดข้อผิดพลาดในการบันทึก: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  async function saveMixTankEdit() {
+    const statusSelect = document.getElementById('mt-form-status');
+    let targetStatus = statusSelect ? statusSelect.value : (currentMixTankRecord?.status || 'Pending');
+    if (targetStatus === 'Pending') targetStatus = 'Pending QC';
+    else if (targetStatus === 'Complete') targetStatus = 'Pending Approval';
+    await saveMixTankForm(targetStatus);
+  }
+
+  let isApprovingMixTank = false;
+
+  async function approveMixTank() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) {
+      showToast('ไม่พบข้อมูลใบตรวจ Mix Tank', 'error');
+      return;
+    }
+    if (isApprovingMixTank) return;
+
+    // Check if QC results are present
+    const hasDensity = !!(currentMixTankRecord.density_15 || currentMixTankRecord.density_30);
+    if (!hasDensity && currentMixTankRecord.status !== 'Complete' && currentMixTankRecord.status !== 'Pending Approval') {
+      showToast('ไม่สามารถอนุมัติได้ เนื่องจากยังไม่มีผลการตรวจสอบ QC', 'warning');
+      const msgEl = document.getElementById('mt-approval-validation-msg');
+      if (msgEl) {
+        msgEl.innerText = 'ไม่สามารถอนุมัติได้ เนื่องจากยังไม่ได้บันทึกผลการทดสอบ QC';
+        msgEl.style.display = 'block';
+      }
+      return;
+    }
+
+    if (!confirm('ยืนยันการอนุมัติใบตรวจ Mix Tank นี้หรือไม่?\nหลังอนุมัติ จะไม่สามารถแก้ไขข้อมูลได้')) return;
+
+    isApprovingMixTank = true;
+    const btnTop = document.getElementById('btn-mt-detail-approve');
+    if (btnTop) { btnTop.disabled = true; btnTop.innerText = 'กำลังอนุมัติ...'; }
+
+    try {
+      const currentUser = state.currentUser || {};
+      let signatureUrl = '';
+      try {
+        signatureUrl = await window.DB.getUserSignature(currentUser.id);
+      } catch (e) {
+        console.warn('Could not fetch user signature for approval:', e);
+      }
+
+      await window.DB.signMixTank(currentMixTankRecord.id, 'approved', {
+        name: currentUser.display_name || 'Admin/Lab',
+        userId: currentUser.id || null,
+        signatureUrl: signatureUrl || ''
+      });
+
+      showToast('อนุมัติเอกสารสำเร็จ สถานะเปลี่ยนเป็น Approved', 'success');
+      await loadMixTankDetailInPane(currentMixTankRecord.id);
+      await loadMixTankList();
+    } catch (e) {
+      console.error('approveMixTank error:', e);
+      showToast('ไม่สามารถอนุมัติได้: ' + e.message, 'error');
+    } finally {
+      isApprovingMixTank = false;
+      if (btnTop) {
+        btnTop.disabled = false;
+        btnTop.innerHTML = '<i data-lucide="check-circle"></i> Approve';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  }
+
+  async function rejectMixTankFromDetail() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) {
+      showToast('ไม่พบข้อมูลใบตรวจ Mix Tank', 'error');
+      return;
+    }
+    if (isApprovingMixTank) return;
+
+    const reason = prompt('กรุณาระบุเหตุผลในการ Reject (หรือกดตกลงหากไม่ต้องการระบุ):', '');
+    if (reason === null) return; // User cancelled
+
+    if (!confirm('คุณต้องการ Reject ใบตรวจ Mix Tank นี้ใช่หรือไม่?')) return;
+
+    isApprovingMixTank = true;
+    const btnTop = document.getElementById('btn-mt-detail-reject');
+    if (btnTop) { btnTop.disabled = true; btnTop.innerText = 'กำลังปฏิเสธ...'; }
+
+    try {
+      const currentUser = state.currentUser || {};
+      await window.DB.signMixTank(currentMixTankRecord.id, 'rejected', {
+        name: currentUser.display_name || 'Admin/Lab',
+        userId: currentUser.id || null,
+        reason: reason || ''
+      });
+
+      showToast('Reject ใบตรวจ Mix Tank เรียบร้อยแล้ว', 'success');
+      await loadMixTankDetailInPane(currentMixTankRecord.id);
+      await loadMixTankList();
+    } catch (e) {
+      console.error('rejectMixTank error:', e);
+      showToast('ไม่สามารถ Reject ได้: ' + e.message, 'error');
+    } finally {
+      isApprovingMixTank = false;
+      if (btnTop) {
+        btnTop.disabled = false;
+        btnTop.innerHTML = '<i data-lucide="x-circle"></i> Reject';
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  }
+
+  async function reopenMixTank() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    if (isApprovingMixTank) return;
+
+    if (!confirm('ยืนยันการยกเลิกการอนุมัติ (Reopen) หรือไม่?\nสถานะจะกลับเป็น Complete และสามารถแก้ไขข้อมูลได้อีกครั้ง')) return;
+
+    isApprovingMixTank = true;
+    try {
+      await window.DB.reopenMixTank(currentMixTankRecord.id);
+      showToast('Reopen เอกสารสำเร็จ', 'success');
+      await loadMixTankDetailInPane(currentMixTankRecord.id);
+      await loadMixTankList();
+    } catch (e) {
+      console.error('reopenMixTank error:', e);
+      showToast('ไม่สามารถ Reopen ได้: ' + e.message, 'error');
+    } finally {
+      isApprovingMixTank = false;
+    }
+  }
+
+
+  async function signMixTankTier(tier) {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) {
+      showToast('กรุณาบันทึกข้อมูลแบบร่างก่อนลงนาม', 'warning');
+      return;
+    }
+
+    const currentUser = state.currentUser;
+    if (!currentUser) {
+      showToast('กรุณาเข้าสู่ระบบก่อนทำการลงนาม', 'warning');
+      return;
+    }
+
+    showLoading();
+    try {
+      let signatureUrl = '';
+      try {
+        // 1. Direct query user signature from user_signatures
+        signatureUrl = await window.DB.getUserSignature(currentUser.id);
+
+        // 2. Fallback to all signatures
+        if (!signatureUrl) {
+          const sigs = await window.DB.getSignatures();
+          const mySig = (sigs || []).find(s => s.id === currentUser.id || s.user_id === currentUser.id);
+          if (mySig && mySig.signature_url) {
+            signatureUrl = mySig.signature_url;
+          } else if (tier === 'tested' || tier === 'approved') {
+            // If current user is lab staff or admin, look for any available registered lab signature
+            const labSig = (sigs || []).find(s => s.signature_url && (s.role === 'lab' || s.role === 'admin'));
+            if (labSig) signatureUrl = labSig.signature_url;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not auto-fetch signature:', e);
+      }
+
+      if (!signatureUrl) {
+        showToast('ไม่พบลายเซ็นของคุณในระบบ กรุณาให้ Admin อัปโหลดลายเซ็นในระบบก่อน', 'warning');
+      }
+
+      const updated = await window.DB.signMixTank(currentMixTankRecord.id, tier, {
+        userId: currentUser.id,
+        name: currentUser.display_name,
+        signatureUrl: signatureUrl || ''
+      });
+      currentMixTankRecord = updated;
+      populateMixTankFormUI(updated);
+      showToast(`ลงนามรับรอง ${tier.toUpperCase()} สำเร็จ`, 'success');
+      loadMixTankList();
+    } catch (e) {
+      console.error('signMixTankTier error:', e);
+      showToast('เกิดข้อผิดพลาดในการลงนาม: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  async function rejectMixTank() {
+    if (!currentMixTankRecord || !currentMixTankRecord.id) return;
+    const reason = prompt('ระบุเหตุผลในการปฏิเสธ / สั่งแก้ไข:');
+    if (reason === null) return;
+
+    showLoading();
+    try {
+      const updated = await window.DB.signMixTank(currentMixTankRecord.id, 'rejected', { reason: reason });
+      currentMixTankRecord = updated;
+      populateMixTankFormUI(updated);
+      showToast('ส่งกลับ/ปฏิเสธใบตรวจเรียบร้อยแล้ว', 'info');
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  async function deleteMixTankRecord(id) {
+    if (!confirm('ยืนยันการลบใบตรวจ Mix Tank นี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+    showLoading();
+    try {
+      await window.DB.deleteMixTank(id);
+      showToast('ลบรายการสำเร็จแล้ว', 'success');
+      loadMixTankList();
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการลบ: ' + e.message, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  function printMixTankCurrent() {
+    if (currentMixTankRecord && currentMixTankRecord.id) {
+      printMixTank(currentMixTankRecord.id);
+    }
+  }
+
+  async function printMixTank(id) {
+    showToast('กำลังเตรียมเอกสาร FM-QC003 สำหรับการพิมพ์...', 'info');
+    try {
+      const rec = await window.DB.getMixTankDetail(id);
+      if (!rec) throw new Error('ไม่พบข้อมูลเอกสาร');
+
+      const formatDateOnly = (dStr) => {
+        if (!dStr) return '';
+        try {
+          const d = new Date(dStr);
+          if (isNaN(d.getTime())) return dStr;
+          return d.toLocaleDateString('th-TH');
+        } catch (e) {
+          return dStr;
+        }
+      };
+
+      const formatDateTime = (dStr) => {
+        if (!dStr) return '';
+        try {
+          const d = new Date(dStr);
+          if (isNaN(d.getTime())) return dStr;
+          const datePart = d.toLocaleDateString('th-TH');
+          const hours = String(d.getHours()).padStart(2, '0');
+          const minutes = String(d.getMinutes()).padStart(2, '0');
+          return `${datePart} เวลา ${hours}:${minutes} น.`;
+        } catch (e) {
+          return dStr;
+        }
+      };
+
+      const beforeQty = (rec.before_item && parseFloat(rec.before_item.quantity)) || 0;
+      const items = rec.top_up_items || [];
+      let topUpTotal = 0;
+      let dischargeTotal = 0;
+      items.forEach(t => {
+        const q = parseFloat(t.quantity) || 0;
+        if (t.type === 'DISCHARGE') {
+          dischargeTotal += q;
+        } else {
+          topUpTotal += q;
+        }
+      });
+      const afterQty = (rec.after_item && parseFloat(rec.after_item.quantity)) || (beforeQty + topUpTotal - dischargeTotal);
+
+      let topUpRowsHtml = '';
+      if (items.length > 0) {
+        topUpRowsHtml = items.map((t) => {
+          const isDischarge = t.type === 'DISCHARGE';
+          const qty = parseFloat(t.quantity) || 0;
+          if (isDischarge) {
+            return `
+              <tr>
+                <td style="border: 1px solid #000000; text-align: center; font-weight: 700; padding: 4px 6px;">DISCHARGE (-)</td>
+                <td style="border: 1px solid #000000; padding: 4px 6px; font-style: italic;">(จ่ายออก)</td>
+                <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px;">-</td>
+                <td style="border: 1px solid #000000; text-align: right; padding: 4px 6px; font-weight: 700;">-${qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px;">-</td>
+                <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px;">-</td>
+              </tr>
+            `;
+          } else {
+            return `
+              <tr>
+                <td style="border: 1px solid #000000; text-align: center; font-weight: 700; padding: 4px 6px;">TOP UP</td>
+                <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml(t.item || rec.product_name || '-')}</td>
+                <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px;">${escapeHtml(t.lot_no || '-')}</td>
+                <td style="border: 1px solid #000000; text-align: right; padding: 4px 6px; font-weight: 600;">+${qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml(t.supplier || '-')}</td>
+                <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml(t.vehicle || t.remark || '')}</td>
+              </tr>
+            `;
+          }
+        }).join('');
+      } else {
+        topUpRowsHtml = `
+          <tr>
+            <td style="border: 1px solid #000000; text-align: center; width: 85px; font-weight: 700;">TOP UP</td>
+            <td colspan="5" style="border: 1px solid #000000; text-align: center; color: #555555; padding: 6px; font-style: italic;">ไม่มีรายการเติมเพิ่ม / จ่ายออก</td>
+          </tr>
+        `;
+      }
+
+      const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MIX_TANK_${escapeHtml(rec.doc_no || 'REPORT')}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Sarabun', -apple-system, sans-serif;
+      font-size: 11.5px;
+      color: #000000;
+      margin: 0;
+      padding: 0;
+      line-height: 1.4;
+      background: #ffffff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .doc-container {
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* 1. Formal Document Header */
+    .iso-header-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+      margin-bottom: 6px;
+    }
+    .iso-header-table td {
+      border: 1px solid #000000;
+      padding: 6px 8px;
+    }
+
+    /* 2. Info Summary Table */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+      margin-bottom: 8px;
+    }
+    .info-table td {
+      padding: 4px 8px;
+      border: 1px solid #000000;
+      font-size: 11px;
+    }
+
+    /* Section Heading */
+    .section-heading {
+      font-size: 11px;
+      font-weight: 700;
+      color: #000000;
+      margin: 8px 0 4px 0;
+      text-transform: uppercase;
+    }
+
+    /* 3. Volume Table */
+    .volume-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+      border: 1px solid #000000;
+    }
+    .volume-table th, .volume-table td {
+      border: 1px solid #000000;
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+    .volume-table th {
+      background-color: #f2f2f2;
+      color: #000000;
+      font-weight: 700;
+      text-align: center;
+      font-size: 10.5px;
+    }
+
+    /* 4. QC Results Box */
+    .qc-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+      margin-bottom: 8px;
+    }
+    .qc-table td {
+      border: 1px solid #000000;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      vertical-align: middle;
+    }
+
+    /* 5. 2 Signature Boxes */
+    .sig-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000000;
+      margin-top: 10px;
+    }
+    .sig-table td {
+      width: 50%;
+      border: 1px solid #000000;
+      padding: 8px 12px;
+      vertical-align: top;
+      background: #ffffff;
+    }
+    .sig-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: #000000;
+      border-bottom: 1px solid #000000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .sig-content {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .sig-img {
+      max-height: 48px;
+      max-width: 150px;
+      object-fit: contain;
+    }
+    .sig-footer {
+      text-align: center;
+      border-top: 1px dotted #000000;
+      margin-top: 6px;
+      padding-top: 4px;
+      font-size: 10.5px;
+      color: #000000;
+    }
+  </style>
+</head>
+<body>
+  <div class="doc-container">
+
+    <!-- 1. Formal Document Header -->
+    <table class="iso-header-table">
+      <tr>
+        <td style="width: 35%; vertical-align: middle;">
+          <div style="font-size: 14px; font-weight: 800; color: #000000; line-height: 1.2;">บริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด</div>
+          <div style="font-size: 11px; font-weight: 700; color: #333333;">SFC EXCELLENCE CO., LTD.</div>
+        </td>
+        <td style="width: 40%; text-align: center; vertical-align: middle;">
+          <div style="font-size: 15px; font-weight: 800; color: #000000; line-height: 1.2;">MIXED STORAGE TANK</div>
+        </td>
+        <td style="width: 25%; vertical-align: middle; text-align: right;">
+          <div style="font-size: 11px; color: #000000; margin-bottom: 3px;"><strong>เลขที่เอกสาร:</strong> ${escapeHtml(rec.doc_no || '-')}</div>
+          <div style="font-size: 11px; color: #000000;"><strong>วันที่ส่งตรวจ:</strong> ${escapeHtml(formatDateOnly(rec.request_date) || '-')}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- 2. Tank & Product Information Summary Table -->
+    <table class="info-table">
+      <tr>
+        <td style="width: 25%; font-weight: 700;">ชื่อถังจัดเก็บ (TANK):</td>
+        <td style="width: 25%; font-weight: 800;">${escapeHtml(rec.tank_name || '-')}</td>
+        <td style="width: 25%; font-weight: 700;">ส่งถึงแผนก (TO DEPT):</td>
+        <td style="width: 25%;">${escapeHtml(rec.to_dept || 'QC')}</td>
+      </tr>
+      <tr>
+        <td style="font-weight: 700;">ผลิตภัณฑ์ (PRODUCT):</td>
+        <td>${escapeHtml(rec.product_name || (rec.after_item && rec.after_item.item) || '-')}</td>
+        <td style="font-weight: 700;">ลูกค้า (CUSTOMER):</td>
+        <td>${escapeHtml((rec.after_item && rec.after_item.supplier) || rec.customer || '-')}</td>
+      </tr>
+    </table>
+
+    <!-- 3. Volume Tracking Table -->
+    <div class="section-heading">1. ตารางบันทึกปริมาณเนื้อน้ำมัน (TANK VOLUME TRACKING)</div>
+    <table class="volume-table">
+      <thead>
+        <tr>
+          <th style="width: 85px;">ประเภท</th>
+          <th>วัตถุดิบ</th>
+          <th style="width: 110px;">LOT NO.</th>
+          <th style="width: 105px;">QUANTITY (MT)</th>
+          <th>ลูกค้า</th>
+          <th>ทะเบียนรถ/เรือ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- BEFORE Row -->
+        <tr>
+          <td style="border: 1px solid #000000; text-align: center; font-weight: 700;">BEFORE</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.before_item && rec.before_item.item) || rec.product_name || '-')}</td>
+          <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px;">${escapeHtml((rec.before_item && rec.before_item.lot_no) || '-')}</td>
+          <td style="border: 1px solid #000000; text-align: right; padding: 4px 6px; font-weight: 700;">${beforeQty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.before_item && rec.before_item.supplier) || '-')}</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.before_item && (rec.before_item.remark || rec.before_item.vehicle)) || '')}</td>
+        </tr>
+
+        <!-- TOP UP Rows -->
+        ${topUpRowsHtml}
+
+        <!-- AFTER Row -->
+        <tr style="font-weight: 700; background-color: #fafafa;">
+          <td style="border: 1px solid #000000; text-align: center;">AFTER</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.after_item && rec.after_item.item) || rec.product_name || '-')}</td>
+          <td style="border: 1px solid #000000; text-align: center; padding: 4px 6px; font-weight: 800;">${escapeHtml((rec.after_item && rec.after_item.lot_no) || '-')}</td>
+          <td style="border: 1px solid #000000; text-align: right; padding: 4px 6px; font-size: 12px; font-weight: 800;">${afterQty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.after_item && rec.after_item.supplier) || rec.customer || '-')}</td>
+          <td style="border: 1px solid #000000; padding: 4px 6px;">${escapeHtml((rec.after_item && (rec.after_item.remark || rec.after_item.vehicle)) || '')}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 4. Laboratory QC Results -->
+    <div class="section-heading">2. ผลการวิเคราะห์ทางห้องปฏิบัติการ (LABORATORY QC RESULTS)</div>
+    <table class="qc-table">
+      <tr>
+        <td style="width: 50%;">
+          <strong>Density 15°C :</strong> ${escapeHtml(rec.density_15 || '-')}
+        </td>
+        <td style="width: 50%;">
+          <strong>Density 30°C :</strong> ${escapeHtml(rec.density_30 || '-')}
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <strong>หมายเหตุ (Remark) :</strong> ${escapeHtml(rec.remark || '')}
+        </td>
+      </tr>
+    </table>
+
+    <!-- 5. 2 Signatures Table (Prepared By & Approved By, Date Only) -->
+    <div class="section-heading">3. การลงนามกำกับและอนุมัติเอกสาร (APPROVALS & SIGNATURES)</div>
+    <table class="sig-table">
+      <tr>
+        <!-- 1. PREPARED BY -->
+        <td>
+          <div class="sig-header">
+            1. ผู้แจ้งตรวจ (PREPARED BY)
+          </div>
+          <div class="sig-content">
+            ${rec.prepared_signature_url ? `<img src="${rec.prepared_signature_url}" class="sig-img" alt="Prepared Signature">` : (rec.prepared_by_name ? `<span style="font-weight: 700;">${escapeHtml(rec.prepared_by_name)}</span>` : '<span style="color:#888888; font-style:italic;">(ยังไม่ได้ลงนาม)</span>')}
+          </div>
+          <div class="sig-footer">
+            (${rec.prepared_by_name ? escapeHtml(rec.prepared_by_name) : '..........................................................'})<br>
+            <span>${(rec.created_at || rec.prepared_at) ? 'วันที่: ' + formatDateOnly(rec.created_at || rec.prepared_at) : 'วันที่ ...../...../..........'}</span>
+          </div>
+        </td>
+
+        <!-- 2. APPROVED BY -->
+        <td>
+          <div class="sig-header">
+            2. ผู้อนุมัติ (APPROVED BY)
+          </div>
+          <div class="sig-content">
+            ${rec.approved_signature_url ? `<img src="${rec.approved_signature_url}" class="sig-img" alt="Approved Signature">` : (rec.approved_by_name ? `<span style="font-weight: 700;">${escapeHtml(rec.approved_by_name)}</span>` : '<span style="color:#888888; font-style:italic;">(ยังไม่ได้อนุมัติ)</span>')}
+          </div>
+          <div class="sig-footer">
+            (${rec.approved_by_name ? escapeHtml(rec.approved_by_name) : '..........................................................'})<br>
+            <span>${rec.approved_at ? 'วันที่: ' + formatDateOnly(rec.approved_at) : 'วันที่ ...../...../..........'}</span>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+  </div>
+</body>
+</html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(printHtml);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(() => document.body.removeChild(iframe), 3000);
+      }, 600);
+    } catch (e) {
+      console.error('printMixTank error:', e);
+      showToast('เกิดข้อผิดพลาดในการเตรียมพิมพ์: ' + e.message, 'error');
+    }
+  }
+
   return {
     setRequestsPage,
     setRequestsPageSize,
@@ -5582,6 +7597,42 @@ const App = (function () {
     checkPushSubscriptionStatus,
     showNotesAlertModal,
     closeNotesAlertModal,
-    loadSettingsView
+    loadSettingsView,
+    loadMixTankList,
+    openMixTankFilterModal,
+    loadMixTankDetailInPane,
+    saveMixTankQCFromDetail,
+    signMixTankTierFromDetail,
+    rejectMixTankFromDetail,
+    printMixTankCurrentFromDetail,
+    editCurrentMixTankFromDetail,
+    deleteCurrentMixTankFromDetail,
+    closeMixTankFilterModal,
+    handleMixTankFilterSubmit,
+    resetMixTankFilters,
+    setMixTankPage,
+    setMixTankPageSize,
+    prepareMixTankForm,
+    addMixTankTopUpRow,
+    removeMixTankTopUpRow,
+    addMixTankDischargeRow,
+    removeMixTankDischargeRow,
+    recalculateMixTankTotals,
+    recalculateViscosity,
+    calculateMixTankVI,
+    saveMixTankForm,
+    saveMixTankEdit,
+    approveMixTank,
+    rejectMixTankFromDetail,
+    reopenMixTank,
+    signMixTankTier,
+    rejectMixTank,
+    deleteMixTankRecord,
+    printMixTank,
+    printMixTankCurrent,
+    openManualHistoricalModal,
+    closeManualHistoricalModal,
+    handleManualHistoricalSubmit
   };
 })();
+window.App = App;
