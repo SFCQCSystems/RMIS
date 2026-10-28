@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>คู่มือการใช้งานระบบ RMIS - SFC Excellence Co., Ltd.</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Leelawadee UI', Tahoma, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .cover-page {
+      height: 94vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 3px solid #0284c7;
+      padding: 50px 40px;
+      page-break-after: always;
+      background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 40%, #ffffff 100%);
+    }
+    .cover-top { text-align: center; }
+    .cover-logo-badge {
+      display: inline-block;
+      background: #0284c7;
+      color: white;
+      font-weight: 800;
+      font-size: 20pt;
+      padding: 10px 28px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      letter-spacing: 2px;
+    }
+    .cover-company { font-size: 16pt; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .cover-company-en { font-size: 12pt; font-weight: 600; color: #64748b; margin-bottom: 30px; }
+    .cover-middle { text-align: center; margin: 30px 0; }
+    .cover-title { font-size: 23pt; font-weight: 800; color: #0369a1; line-height: 1.35; margin-bottom: 12px; }
+    .cover-subtitle { font-size: 13pt; font-weight: 600; color: #475569; margin-bottom: 20px; }
+    .cover-divider { width: 120px; height: 4px; background: #0284c7; margin: 0 auto; border-radius: 2px; }
+    .cover-bottom {
+      border-top: 1px solid #cbd5e1;
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10pt;
+      color: #64748b;
+    }
+
+    h1 { display: none; }
+    h2 {
+      color: #0369a1;
+      font-size: 15pt;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e0f2fe;
+      page-break-before: always;
+      page-break-after: avoid;
+    }
+    h2:first-of-type { page-break-before: avoid; }
+    h3 {
+      color: #0f172a;
+      font-size: 12.5pt;
+      font-weight: 700;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      page-break-after: avoid;
+    }
+    h4 {
+      color: #334155;
+      font-size: 11pt;
+      font-weight: 700;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+    p { margin-top: 0; margin-bottom: 10px; }
+    ul, ol { margin-top: 0; margin-bottom: 12px; padding-left: 24px; }
+    li { margin-bottom: 4px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f9; color: #0f172a; font-weight: 700; }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    .img-figure {
+      margin: 14px 0 18px 0;
+      text-align: center;
+      page-break-inside: avoid;
+    }
+    .img-figure img {
+      max-width: 100%;
+      max-height: 440px;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .img-caption {
+      font-size: 9pt;
+      color: #64748b;
+      margin-top: 5px;
+      font-style: italic;
+    }
+
+    .callout-box {
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 12px 0;
+      font-size: 10pt;
+      page-break-inside: avoid;
+    }
+    .callout-box p:last-child { margin-bottom: 0; }
+
+    code {
+      font-family: Consolas, monospace;
+      background: #f1f5f9;
+      color: #0369a1;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 9.5pt;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="cover-page">
+    <div class="cover-top">
+      <div class="cover-logo-badge">RMIS</div>
+      <div class="cover-company">บริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด</div>
+      <div class="cover-company-en">SFC EXCELLENCE CO., LTD.</div>
+    </div>
+    <div class="cover-middle">
+      <div class="cover-title">คู่มือการใช้งานระบบบริหารจัดการ<br>ใบแจ้งตรวจสอบคุณภาพห้องปฏิบัติการ</div>
+      <div class="cover-subtitle">Raw Material Inspection System (RMIS)</div>
+      <div class="cover-divider"></div>
+      <p style="margin-top: 24px; font-size: 10.5pt; color: #64748b; line-height: 1.6;">
+        คู่มือการปฏิบัติงานสำหรับผู้ส่งตรวจ (Requester / Base Oil) และเจ้าหน้าที่ห้องปฏิบัติการ (LAB / QC)<br>
+        ครอบคลุมระบบงานส่งตรวจคุณภาพวัตถุดิบ, แบบร่าง, ระบบตรวจถังผสมน้ำมัน (MIXED STORAGE TANK)<br>
+        การคำนวณ Top Up / Discharge, การลงนามดิจิทัล 3 ระดับ และการสืบค้นประวัติย้อนหลัง (Material Audit)
+      </p>
+    </div>
+    <div class="cover-bottom">
+      <div><strong>หน่วยงาน:</strong> แผนกควบคุมคุณภาพ (QC Department)</div>
+      <div><strong>เวอร์ชันเอกสาร:</strong> ฉบับปรับปรุง ตุลาคม 2569</div>
+    </div>
+  </div>
+
+  <h1>คู่มือการใช้งานระบบบริหารจัดการใบแจ้งตรวจสอบคุณภาพ (RMIS)</h1>
+<p><strong>Raw Material Inspection System | บริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด (SFC EXCELLENCE CO., LTD.)</strong></p>
+<hr>
+<h2>สารบัญ (Table of Contents)</h2>
+<ol>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-1-%E0%B8%9A%E0%B8%97%E0%B8%99%E0%B8%B3%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%9A%E0%B8%97%E0%B8%9A%E0%B8%B2%E0%B8%97%E0%B8%9C%E0%B8%B9%E0%B9%89%E0%B9%83%E0%B8%8A%E0%B9%89%E0%B8%87%E0%B8%B2%E0%B8%99">บทนำและบทบาทผู้ใช้งาน (Introduction &amp; Roles)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-2-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%80%E0%B8%82%E0%B9%89%E0%B8%B2%E0%B8%AA%E0%B8%B9%E0%B9%88%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%81">การเข้าสู่ระบบและหน้าหลัก (Login &amp; Dashboard)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-3-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%AA%E0%B8%A3%E0%B9%89%E0%B8%B2%E0%B8%87%E0%B9%83%E0%B8%9A%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B8%AA%E0%B8%AD%E0%B8%9A%E0%B8%84%E0%B8%B8%E0%B8%93%E0%B8%A0%E0%B8%B2%E0%B8%9E">การสร้างใบแจ้งตรวจสอบคุณภาพ (Create Lab Inspection Request)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-4-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%84%E0%B9%89%E0%B8%99%E0%B8%AB%E0%B8%B2%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%95%E0%B8%B4%E0%B8%94%E0%B8%95%E0%B8%B2%E0%B8%A1%E0%B8%AA%E0%B8%96%E0%B8%B2%E0%B8%99%E0%B8%B0%E0%B9%83%E0%B8%9A%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87">การค้นหาและติดตามสถานะใบแจ้ง (Requests Tracking &amp; Filter)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-5-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%9A%E0%B8%9A%E0%B8%A3%E0%B9%88%E0%B8%B2%E0%B8%87">การจัดการแบบร่าง (Drafts Management)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-6-%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A%E0%B9%83%E0%B8%9A%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B8%96%E0%B8%B1%E0%B8%87%E0%B8%9C%E0%B8%AA%E0%B8%A1-mix-tank">ระบบใบตรวจถังผสม Mix Tank (MIXED STORAGE TANK)</a><ul>
+<li>6.1 <a href="#61-%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2%E0%B8%88%E0%B8%AD%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B9%81%E0%B8%9C%E0%B8%87%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%A5%E0%B8%B0%E0%B9%80%E0%B8%AD%E0%B8%B5%E0%B8%A2%E0%B8%94-split-screen-view">หน้าจอรายการและแผงรายละเอียด (Split-Screen View)</a></li>
+<li>6.2 <a href="#62-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%AA%E0%B8%A3%E0%B9%89%E0%B8%B2%E0%B8%87%E0%B9%83%E0%B8%9A%E0%B8%95%E0%B8%A3%E0%B8%A7%E0%B8%88%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%95%E0%B8%B2%E0%B8%A3%E0%B8%B2%E0%B8%87%E0%B8%9B%E0%B8%A3%E0%B8%B4%E0%B8%A1%E0%B8%B2%E0%B8%93%E0%B9%80%E0%B8%99%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%99%E0%B9%89%E0%B8%B3%E0%B8%A1%E0%B8%B1%E0%B8%99">การสร้างใบตรวจและตารางปริมาณเนื้อน้ำมัน (Volume Tracking)</a></li>
+<li>6.3 <a href="#63-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9A%E0%B8%B1%E0%B8%99%E0%B8%97%E0%B8%B6%E0%B8%81%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B9%88%E0%B8%B2%E0%B8%A2%E0%B8%AD%E0%B8%AD%E0%B8%81-discharge">การบันทึกรายการจ่ายออก (DISCHARGE)</a></li>
+<li>6.4 <a href="#64-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9A%E0%B8%B1%E0%B8%99%E0%B8%97%E0%B8%B6%E0%B8%81%E0%B8%9C%E0%B8%A5%E0%B8%A7%E0%B8%B4%E0%B9%80%E0%B8%84%E0%B8%A3%E0%B8%B2%E0%B8%B0%E0%B8%AB%E0%B9%8C-qc-%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%A5%E0%B8%87%E0%B8%99%E0%B8%B2%E0%B8%A1-3-%E0%B8%A3%E0%B8%B0%E0%B8%94%E0%B8%B1%E0%B8%9A">การบันทึกผลวิเคราะห์ QC และการลงนาม 3 ระดับ</a></li>
+<li>6.5 <a href="#65-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9E%E0%B8%B4%E0%B8%A1%E0%B8%9E%E0%B9%8C%E0%B9%80%E0%B8%AD%E0%B8%81%E0%B8%AA%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%B2%E0%B8%95%E0%B8%A3%E0%B8%90%E0%B8%B2%E0%B8%99%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3">การพิมพ์เอกสารมาตรฐานทางการ (Print MIXED STORAGE TANK PDF)</a></li>
+</ul>
+</li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-7-%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%A7%E0%B8%B1%E0%B8%95%E0%B8%B4%E0%B8%A7%E0%B8%B1%E0%B8%95%E0%B8%96%E0%B8%B8%E0%B8%94%E0%B8%B4%E0%B8%9A%E0%B8%A2%E0%B9%89%E0%B8%AD%E0%B8%99%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87">ระบบประวัติวัตถุดิบย้อนหลัง (Material Audit)</a><ul>
+<li>7.1 <a href="#71-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%AA%E0%B8%B7%E0%B8%9A%E0%B8%84%E0%B9%89%E0%B8%99%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%A7%E0%B8%B1%E0%B8%95%E0%B8%B4%E0%B8%9C%E0%B8%A5%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%97%E0%B8%94%E0%B8%AA%E0%B8%AD%E0%B8%9A">การสืบค้นประวัติผลการทดสอบ</a></li>
+<li>7.2 <a href="#72-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%99%E0%B8%B3%E0%B9%80%E0%B8%82%E0%B9%89%E0%B8%B2%E0%B9%84%E0%B8%9F%E0%B8%A5%E0%B9%8C-excel-%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%81%E0%B8%A3%E0%B8%AD%E0%B8%81%E0%B8%82%E0%B9%89%E0%B8%AD%E0%B8%A1%E0%B8%B9%E0%B8%A5%E0%B8%A2%E0%B9%89%E0%B8%AD%E0%B8%99%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87%E0%B9%80%E0%B8%AD%E0%B8%87">การนำเข้าไฟล์ Excel และการกรอกข้อมูลย้อนหลังเอง</a></li>
+</ul>
+</li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-8-%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%95%E0%B8%B1%E0%B9%89%E0%B8%87%E0%B8%84%E0%B9%88%E0%B8%B2%E0%B8%A3%E0%B8%B0%E0%B8%9A%E0%B8%9A%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%A5%E0%B8%B2%E0%B8%A2%E0%B9%80%E0%B8%8B%E0%B9%87%E0%B8%99%E0%B8%94%E0%B8%B4%E0%B8%88%E0%B8%B4%E0%B8%97%E0%B8%B1%E0%B8%A5">การตั้งค่าระบบและลายเซ็นดิจิทัล (Settings &amp; Signatures)</a></li>
+<li><a href="#%E0%B8%9A%E0%B8%97%E0%B8%97%E0%B8%B5%E0%B9%88-9-%E0%B8%84%E0%B8%B3%E0%B8%96%E0%B8%B2%E0%B8%A1%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%9E%E0%B8%9A%E0%B8%9A%E0%B9%88%E0%B8%AD%E0%B8%A2%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%81%E0%B9%89%E0%B8%9B%E0%B8%B1%E0%B8%8D%E0%B8%AB%E0%B8%B2">คำถามที่พบบ่อยและการแก้ปัญหา (FAQ &amp; Troubleshooting)</a></li>
+</ol>
+<hr>
+<h2>บทที่ 1: บทนำและบทบาทผู้ใช้งาน</h2>
+<p>ระบบ <strong>RMIS (Raw Material Inspection System)</strong> ออกแบบมาเพื่อเป็นศูนย์กลางดิจิทัลในการบันทึก ติดตาม และควบคุมคุณภาพของวัตถุดิบและถังจัดเก็บน้ำมัน โดยเชื่อมต่อระหว่างฝ่ายผลิต/คลังสินค้า (Requester / Base Oil) และฝ่ายควบคุมคุณภาพ (LAB / QC)</p>
+<pre><code class="language-mermaid">flowchart LR
+    A[&quot;ผู้ส่งตรวจ&lt;br/&gt;(Requester / Base Oil)&quot;] --&gt;|&quot;1. สร้างใบแจ้ง / Mix Tank&quot;| B[&quot;ระบบ RMIS Cloud&quot;]
+    B --&gt;|&quot;2. คิวงานห้องปฏิบัติการ&quot;| C[&quot;เจ้าหน้าที่ QC&lt;br/&gt;(Lab Staff)&quot;]
+    C --&gt;|&quot;3. กรอกผลตรวจ &amp; ลงนาม&quot;| D[&quot;หัวหน้างาน QC&lt;br/&gt;(Lab Admin)&quot;]
+    D --&gt;|&quot;4. อนุมัติ (Approve)&quot;| E[&quot;เอกสารสมบูรณ์&lt;br/&gt;(Print PDF / สติกเกอร์)&quot;]
+</code></pre>
+<h3>สิทธิ์ของผู้ใช้งานตามบทบาท (User Roles &amp; Permissions)</h3>
+<table>
+<thead>
+<tr>
+<th align="left">สิทธิ์ (Role)</th>
+<th align="left">สิทธิ์การเข้าถึงเมนูและการทำงาน</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>Requester (ผู้ส่งตรวจ)</strong></td>
+<td align="left">• สร้างใบแจ้งตรวจสอบคุณภาพ และบันทึกแบบร่าง (Drafts)<br>• สร้างใบตรวจถังผสมน้ำมัน (Mix Tank) พร้อมลงนาม Prepared By<br>• ติดตามสถานะงานตรวจ ค้นหาประวัติ และดูผลการทดสอบ</td>
+</tr>
+<tr>
+<td align="left"><strong>Base Oil (คลังน้ำมัน)</strong></td>
+<td align="left">• สร้างและจัดการใบแจ้งเฉพาะส่วนงาน Base Oil<br>• ตรวจสอบประวัติวัตถุดิบน้ำมันพื้นฐาน</td>
+</tr>
+<tr>
+<td align="left"><strong>Lab Staff (เจ้าหน้าที่แล็บ)</strong></td>
+<td align="left">• บันทึกผลการทดสอบทางห้องปฏิบัติการ (QC Results)<br>• ลงนามผู้ทดสอบ (Tested By)<br>• พิมพ์สติกเกอร์ผลการตรวจ (Pass / Hold / Pending)</td>
+</tr>
+<tr>
+<td align="left"><strong>Lab Admin (ผู้ดูแลระบบ QC)</strong></td>
+<td align="left">• อนุมัติใบงาน (Approved By) หรือปฏิเสธงาน (Reject)<br>• ปลดล็อกใบงานที่อนุมัติแล้ว (Reopen) เพื่อแก้ไข<br>• จัดการบัญชีผู้ใช้งาน และอัปโหลดลายเซ็นดิจิทัล<br>• นำเข้าข้อมูลประวัติวัตถุดิบย้อนหลัง (Excel และกรอกเอง)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>บทที่ 2: การเข้าสู่ระบบและหน้าหลัก</h2>
+<h3>2.1 หน้าจอเข้าสู่ระบบ (Login)</h3>
+<ol>
+<li>เปิดเว็บเบราว์เซอร์ (แนะนำ Google Chrome หรือ Microsoft Edge) เข้าสู่ที่อยู่ของระบบ RMIS</li>
+<li>กรอก <strong>ชื่อผู้ใช้งาน (Username)</strong> และ <strong>รหัสผ่าน (Password)</strong></li>
+<li>กดปุ่ม <strong><code>เข้าสู่ระบบ</code></strong></li>
+</ol>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/01_login_screen.png" alt="หน้าจอเข้าสู่ระบบ"><div class="img-caption">ภาพประกอบ: หน้าจอเข้าสู่ระบบ</div></div><hr>
+<h3>2.2 หน้าหลักแดชบอร์ด (Dashboard Overview)</h3>
+<p>เมื่อเข้าสู่ระบบสำเร็จ ระบบจะนำมายังหน้า Dashboard ซึ่งแสดงสรุปข้อมูลที่สำคัญแบบเรียลไทม์:</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/02_dashboard.png" alt="หน้าหลัก Dashboard"><div class="img-caption">ภาพประกอบ: หน้าหลัก Dashboard</div></div><ol>
+<li><strong>การ์ดสรุปสถานะงาน (Status Cards):</strong><ul>
+<li><strong>ทั้งหมด (Total):</strong> ยอดใบแจ้งส่งตรวจทั้งหมดในระบบ</li>
+<li><strong>รอดำเนินการ (Pending):</strong> ใบงานที่รอเจ้าหน้าที่ QC รับช่วงตรวจ</li>
+<li><strong>อยู่ระหว่างตรวจ (In Process):</strong> ใบงานที่กำลังดำเนินการทดสอบในห้องแล็บ</li>
+<li><strong>เสร็จสิ้น (Complete):</strong> ใบงานที่ทดสอบและอนุมัติผลเรียบร้อยแล้ว</li>
+<li><strong>ปฏิเสธ (Rejected):</strong> ใบงานที่ไม่ผ่านเกณฑ์หรือถูกส่งกลับแก้ไข</li>
+<li><strong>แบบร่าง (Drafts):</strong> ใบงานที่ยังไม่ได้กดส่งเข้าห้องแล็บ</li>
+</ul>
+</li>
+<li><strong>ตารางรายการล่าสุด (Recent Requests):</strong> แสดง 5 รายการล่าสุด สามารถคลิกที่แถวเพื่อเปิดดูรายละเอียดได้ทันที</li>
+<li><strong>ปุ่มสร้างใบแจ้งด่วน:</strong> ปุ่มลัดสีน้ำเงินมุมขวาบน สำหรับเปิดฟอร์มสร้างใบแจ้งตรวจใหม่ทันที</li>
+</ol>
+<hr>
+<h2>บทที่ 3: การสร้างใบแจ้งตรวจสอบคุณภาพ</h2>
+<p>ใช้สำหรับส่งตัวอย่างวัตถุดิบ สารเคมี หรือน้ำมัน เข้าทดสอบคุณภาพในห้องปฏิบัติการ</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/04_request_create_form.png" alt="แบบฟอร์มสร้างใบแจ้งตรวจสอบคุณภาพ"><div class="img-caption">ภาพประกอบ: แบบฟอร์มสร้างใบแจ้งตรวจสอบคุณภาพ</div></div><h3>ขั้นตอนการกรอกแบบฟอร์ม:</h3>
+<h4>ขั้นตอนที่ 1: ข้อมูลทั่วไปของเอกสาร (General Information)</h4>
+<ul>
+<li><strong>ลูกค้า (Customer Name):</strong> ระบุชื่อลูกค้าหรือผู้ส่งวัตถุดิบ</li>
+<li><strong>เลขที่ใบสั่งซื้อ (PO Number):</strong> ระบุเลขที่ PO ที่เกี่ยวข้อง</li>
+<li><strong>ทะเบียนรถ / เรือ (Vehicle / Vessel):</strong> ระบุหมายเลขทะเบียนยานพาหนะขนส่ง</li>
+<li><strong>หมายเลขซีล (Seal No.) &amp; หมายเลขตู้ (Container No.):</strong> กรอกรหัสซีลล็อกและเบอร์ตู้สินค้า</li>
+</ul>
+<h4>ขั้นตอนที่ 2: รายการตัวอย่างส่งตรวจ (Sample Items)</h4>
+<ul>
+<li><strong>ชื่อสินค้า / วัตถุดิบ (Product Name):</strong> เลือกหรือพิมพ์ชื่อวัตถุดิบ</li>
+<li><strong>LOT NO. / BATCH NO.:</strong> กรอกหมายเลขล็อตการผลิต</li>
+<li><strong>ปริมาณ (Quantity):</strong> ระบุจำนวนและเลือกหน่วยนับ (เช่น MT, ลิตร, ถัง)</li>
+<li><strong>รหัสวัตถุดิบ (RM No.):</strong> รหัสอ้างอิงวัตถุดิบภายใน</li>
+<li><em>ต้องการเพิ่มตัวอย่างในใบเดียวกัน:</em> กดปุ่ม <strong><code>+ เพิ่มรายการสินค้า</code></strong> เพื่อเพิ่มแถวใหม่ได้ไม่จำกัด</li>
+</ul>
+<h4>ขั้นตอนที่ 3: การบันทึกและส่งตรวจ</h4>
+<ul>
+<li>กด <strong><code>บันทึกแบบร่าง (Draft)</code></strong>: ข้อมูลจะถูกจัดเก็บไว้ในเมนู &quot;แบบร่าง&quot; โดยยังไม่ส่งเข้าคิวตรวจของแล็บ (สามารถกลับมาแก้ไขได้)</li>
+<li>กด <strong><code>ส่งตรวจสอบ (Submit)</code></strong>: ส่งใบแจ้งเข้าสู่ระบบคิวงานของห้องแล็บ QC ทันที สถานะจะเปลี่ยนเป็น <strong>Pending</strong></li>
+</ul>
+<hr>
+<h2>บทที่ 4: การค้นหาและติดตามสถานะใบแจ้ง</h2>
+<p>คลิกเมนู <strong><code>รายการใบแจ้ง (Requests)</code></strong> จากแถบด้านข้าง เพื่อดูและค้นหารายการทั้งหมด</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/03_request_list.png" alt="หน้ารายการใบแจ้งตรวจสอบคุณภาพ"><div class="img-caption">ภาพประกอบ: หน้ารายการใบแจ้งตรวจสอบคุณภาพ</div></div><h3>ฟังก์ชันการค้นหาและตัวกรอง (Advanced Filter)</h3>
+<p>กดปุ่ม <strong><code>ค้นหา / กรองข้อมูล</code></strong> เพื่อเปิดหน้าต่างค้นหาละเอียด:</p>
+<ul>
+<li>ค้นหาตามเลขที่ใบแจ้ง (Request No. / Year)</li>
+<li>ค้นหาตามชื่อลูกค้า หรือเลขที่ PO</li>
+<li>ค้นหาตามชื่อสินค้า หรือ LOT NO.</li>
+<li>กรองตามสถานะ: <code>Pending</code>, <code>In Process</code>, <code>Complete</code>, <code>Rejected</code></li>
+<li>กรองตามช่วงวันที่ส่งตรวจ (Start Date - End Date)</li>
+</ul>
+<hr>
+<h2>บทที่ 5: การจัดการแบบร่าง</h2>
+<p>คลิกเมนู <strong><code>แบบร่าง (Drafts)</code></strong> เพื่อดูรายการเอกสารที่ยังบันทึกค้างไว้</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/08_drafts_list.png" alt="หน้ารายการแบบร่าง"><div class="img-caption">ภาพประกอบ: หน้ารายการแบบร่าง</div></div><h3>การทำงานกับแบบร่าง:</h3>
+<ol>
+<li><strong>ปุ่มดำเนินการต่อ:</strong> เปิดแบบฟอร์มเพื่อกรอกข้อมูลต่อและกดส่งตรวจ</li>
+<li><strong>ปุ่มถังขยะ (ลบ):</strong> ลบแบบร่างที่ไม่ใช้งานออกจากระบบ</li>
+</ol>
+<hr>
+<h2>บทที่ 6: ระบบใบตรวจถังผสม Mix Tank (MIXED STORAGE TANK)</h2>
+<p>ระบบสำหรับบริหารจัดการงานตรวจสอบคุณภาพถังผสมน้ำมัน (Mixed Storage Tank) โดยเฉพาะ</p>
+<h3>6.1 หน้าจอรายการและแผงรายละเอียด (Split-Screen View)</h3>
+<p>หน้าจอแบ่งออกเป็น 2 ส่วนหลัก เพื่อให้ทำงานได้อย่างต่อเนื่องโดยไม่ต้องสลับหน้าจอไปมา:</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/05_mix_tank_split_view.png" alt="หน้าจอ Mix Tank แบบ Split-Screen"><div class="img-caption">ภาพประกอบ: หน้าจอ Mix Tank แบบ Split-Screen</div></div><ul>
+<li><strong>ตารางรายการด้านบน (Top Table):</strong> แสดงรายการใบตรวจ Mix Tank พร้อมแสดงสถานะ (Pending QC, Complete, Approved)</li>
+<li><strong>แถบกรอง (Filter):</strong> กรองตามเลขที่เอกสาร, ชื่อถัง (TANK), ชื่อผลิตภัณฑ์, หรือสถานะ</li>
+<li><strong>แผงรายละเอียดด้านล่าง (Bottom Pane):</strong> เมื่อคลิกเลือกรายการในตารางด้านบน ข้อมูลรายละเอียดทั้งหมดจะแสดงที่แผงด้านล่างทันที</li>
+</ul>
+<hr>
+<h3>6.2 การสร้างใบตรวจและตารางปริมาณเนื้อน้ำมัน</h3>
+<p>กดปุ่ม <strong><code>+ สร้างใบตรวจ Mix Tank</code></strong> เพื่อเปิดฟอร์มบันทึก:</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/06_mix_tank_create_form.png" alt="แบบฟอร์มสร้างใบตรวจ Mix Tank และตารางปริมาณน้ำมัน"><div class="img-caption">ภาพประกอบ: แบบฟอร์มสร้างใบตรวจ Mix Tank และตารางปริมาณน้ำมัน</div></div><h4>โครงสร้างตารางบันทึกปริมาณ (Tank Volume Tracking):</h4>
+<ol>
+<li><strong>แถว BEFORE (ยอดเดิมในถัง):</strong><ul>
+<li>กรอกชื่อวัตถุดิบเดิม, LOT NO., ปริมาณเดิมในถัง (MT), และชื่อลูกค้าเดิม</li>
+</ul>
+</li>
+<li><strong>แถว TOP UP (รายการเติมเพิ่ม):</strong><ul>
+<li>กดปุ่ม <strong><code>+ เพิ่มรายการเติมเพิ่ม (TOP UP)</code></strong></li>
+<li>กรอกวัตถุดิบใหม่, LOT NO., ปริมาณ (MT), ลูกค้า, และทะเบียนรถ/เรือที่นำมาส่ง (สามารถเพิ่มได้หลายรายการ)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3>6.3 การบันทึกรายการจ่ายออก (DISCHARGE)</h3>
+<p>ในกรณีที่มีการจ่ายน้ำมันออกจากถังผสมในรอบดังกล่าว:</p>
+<ol>
+<li>กดปุ่ม <strong><code>- เพิ่มรายการจ่ายออก (DISCHARGE)</code></strong> (ปุ่มขอบสีส้ม)</li>
+<li>แถวรายการ DISCHARGE จะปรากฏขึ้นเป็นแถบสีส้มอ่อน</li>
+<li><strong>ใส่เฉพาะปริมาณ (QUANTITY MT) เท่านั้น:</strong> ช่องวัตถุดิบ ลูกค้า และทะเบียน ระบบจะระบุเป็น <code>(จ่ายออก)</code> และ <code>-</code> แบบ Readonly ให้อัตโนมัติ <strong>ไม่ต้องเสียเวลากรอก</strong></li>
+<li><strong>สูตรการคำนวณอัตโนมัติของแถว AFTER:</strong>
+$$\text{AFTER (ยอดใหม่)} = \text{BEFORE (ยอดเดิม)} + \sum \text{TOP UP (เติมเพิ่ม)} - \sum \text{DISCHARGE (จ่ายออก)}$$
+ยอดคงเหลือใหม่จะคำนวณและอัปเดตแบบเรียลไทม์ทันทีที่พิมพ์ตัวเลข</li>
+</ol>
+<div class="callout-box" style="background:#fef2f2; border-left: 4px solid #ef4444; color:#991b1b;">
+<div class="callout-title" style="color:#991b1b; font-weight:700; margin-bottom:4px;">ข้อควรระวัง (Caution)</div>
+หากยอดจ่ายออกมากกว่ายอดที่มีในถังจนทำให้ยอด AFTER ติดลบ ช่อง AFTER จะเปลี่ยนเป็นแถบสีแดงเพื่อเตือน และระบบจะไม่อนุญาตให้กดส่งจนกว่าจะแก้ไขตัวเลขให้ถูกต้อง</div><hr>
+<h3>6.4 การบันทึกผลวิเคราะห์ QC และการลงนาม 3 ระดับ</h3>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/07_mix_tank_detail_signatures.png" alt="แผงรายละเอียดผลการทดสอบและการลงนาม"><div class="img-caption">ภาพประกอบ: แผงรายละเอียดผลการทดสอบและการลงนาม</div></div><h4>ขั้นตอนการลงนามดิจิทัล 3 ระดับ:</h4>
+<ol>
+<li><strong>PREPARED BY (ผู้จัดทำ):</strong> ผู้ส่งตรวจกดปุ่มลงนามยืนยันข้อมูลปริมาณและการผสม</li>
+<li><strong>TESTED BY (ผู้ทดสอบ):</strong> เจ้าหน้าที่ QC บันทึกผลวิเคราะห์ Density 15°C และ Density 30°C พร้อมกดปุ่มลงนาม</li>
+<li><strong>APPROVED BY (ผู้อนุมัติ):</strong> หัวหน้างานหรือผู้จัดการ QC ตรวจสอบความถูกต้อง แล้วกดปุ่มสีเขียว <strong><code>Approve</code></strong> ที่มุมขวาบนของแผงรายละเอียด<ul>
+<li><em>กรณีไม่ผ่านเกณฑ์:</em> กดปุ่มสีแดง <strong><code>Reject</code></strong> เพื่อส่งกลับแก้ไข</li>
+<li><em>กรณีเอกสารอนุมัติแล้ว:</em> เอกสารจะถูกล็อกเพื่อความปลอดภัย หากมีความจำเป็นต้องแก้ไข ผู้มีสิทธิ์ Admin สามารถกดปุ่ม <strong><code>Reopen</code></strong> เพื่อปลดล็อกได้</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3>6.5 การพิมพ์เอกสารมาตรฐานทางการ (Print MIXED STORAGE TANK PDF)</h3>
+<p>เมื่อคลิกปุ่ม <strong><code>พิมพ์เอกสาร (Print)</code></strong> ระบบจะสร้างเอกสารทางการรูปแบบ ISO ขาว-ดำ คมชัด พร้อมตราบริษัทและตารางบันทึกปริมาณครบถ้วน:</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/12_mix_tank_pdf_print.png" alt="ตัวอย่างพิมพ์เอกสารทางการ MIXED STORAGE TANK"><div class="img-caption">ภาพประกอบ: ตัวอย่างพิมพ์เอกสารทางการ MIXED STORAGE TANK</div></div><hr>
+<h2>บทที่ 7: ระบบประวัติวัตถุดิบย้อนหลัง</h2>
+<p>คลิกเมนู <strong><code>ประวัติวัตถุดิบย้อนหลัง (Material Audit)</code></strong> เพื่อสืบค้นข้อมูลประวัติย้อนกลับ (Traceability)</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/09_material_history_audit.png" alt="หน้าประวัติวัตถุดิบย้อนหลัง"><div class="img-caption">ภาพประกอบ: หน้าประวัติวัตถุดิบย้อนหลัง</div></div><h3>7.1 การสืบค้นประวัติผลการทดสอบ</h3>
+<ul>
+<li>ค้นหาได้จากชื่อวัตถุดิบ, LOT NO., RM NO., เลขที่ใบแจ้ง, หรือผลการตรวจ (<code>Pass</code>, <code>Hold</code>, <code>Fail</code>)</li>
+<li>แสดงตารางข้อมูลเปรียบเทียบผลตรวจย้อนหลังเพื่อใช้ในการตรวจ Audit</li>
+</ul>
+<h3>7.2 การนำเข้าไฟล์ Excel และการกรอกข้อมูลย้อนหลังเอง</h3>
+<p>ระบบรองรับการเพิ่มข้อมูลย้อนหลัง 2 ช่องทาง:</p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/10_manual_history_modal.png" alt="ป๊อปอัปเพิ่มข้อมูลย้อนหลังแบบกรอกเอง"><div class="img-caption">ภาพประกอบ: ป๊อปอัปเพิ่มข้อมูลย้อนหลังแบบกรอกเอง</div></div><ol>
+<li><strong>นำเข้าจากไฟล์ Excel:</strong> ใช้ปุ่มนำเข้าไฟล์ Excel สำหรับข้อมูลจำนวนมาก</li>
+<li><strong>เพิ่มข้อมูลย้อนหลัง (กรอกเอง):</strong> <ul>
+<li>กดปุ่ม <strong><code>+ เพิ่มข้อมูลย้อนหลัง (กรอกเอง)</code></strong></li>
+<li>กรอก วันที่รับเข้า, ชื่อสินค้า, LOT NO., ปริมาณ, รหัส RM, ผลตรวจ และผล Density</li>
+<li>ระบบมีระบบบังคับกรอกทุกช่องเพื่อป้องกันข้อมูลไม่ครบถ้วน จากนั้นกด <strong><code>บันทึกข้อมูลย้อนหลัง</code></strong></li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>บทที่ 8: การตั้งค่าระบบและลายเซ็นดิจิทัล</h2>
+<p>เฉพาะผู้ใช้งานระดับ <strong>Admin</strong> ที่สามารถเข้าถึงเมนู <strong>การตั้งค่า (Settings)</strong></p>
+<div class="img-figure"><img src="file:///C:/Users/thirathada.ha/.gemini/antigravity/brain/754291f6-46c0-4490-a7db-dae135187238/11_settings_and_signatures.png" alt="หน้าจอการตั้งค่าระบบและจัดการลายเซ็น"><div class="img-caption">ภาพประกอบ: หน้าจอการตั้งค่าระบบและจัดการลายเซ็น</div></div><h3>ฟังก์ชันหลักในการตั้งค่า:</h3>
+<ol>
+<li><strong>การจัดการลายเซ็นดิจิทัล (Signatures Management):</strong> อัปโหลดรูปลายเซ็นสำหรับผู้ใช้งานแต่ละท่าน ลายเซ็นจะถูกจัดเก็บในระบบคลาวด์และเรียกใช้โดยอัตโนมัติเมื่อกดลงนาม</li>
+<li><strong>การจัดการผู้ใช้งาน (User Management):</strong> สร้างบัญชีผู้ใช้งานใหม่ รีเซ็ตรหัสผ่าน และกำหนด Role ให้เหมาะสมกับตำแหน่งงาน</li>
+<li><strong>การตั้งค่าฐานข้อมูล (Database Config):</strong> ตรวจสอบสถานะการเชื่อมต่อ Cloud Database (Supabase)</li>
+</ol>
+<hr>
+<h2>บทที่ 9: คำถามที่พบบ่อยและการแก้ปัญหา</h2>
+<h3>Q1: หลังจากอัปเดตระบบแล้ว ทำไมหน้าจอในเครื่องยังไม่เปลี่ยน?</h3>
+<p><strong>วิธีแก้ไข:</strong></p>
+<ul>
+<li>กด <strong><code>Ctrl + F5</code></strong> (สำหรับคอมพิวเตอร์ Windows) หรือปิดแท็บแล้วเปิดใหม่ เพื่อสั่งให้บราวเซอร์ล้างแคชและโหลดสคริปต์เวอร์ชันล่าสุด</li>
+</ul>
+<h3>Q2: รายการ DISCHARGE ใน Mix Tank ต้องกรอก LOT NO. หรือทะเบียนรถหรือไม่?</h3>
+<p><strong>คำตอบ:</strong></p>
+<ul>
+<li><strong>ไม่ต้องกรอกครับ</strong> ตามมาตรฐานระบบ รายการจ่ายออก (DISCHARGE) เป็นการจ่ายน้ำมันออกจากถังเดิม ผู้ใช้ <strong>กรอกเฉพาะช่อง QUANTITY (MT) เพียงช่องเดียว</strong> เท่านั้น ช่องอื่นๆ ระบบจะล็อกและใส่สัญลักษณ์ <code>(จ่ายออก)</code> และ <code>-</code> ให้อัตโนมัติ</li>
+</ul>
+<h3>Q3: สามารถแก้ไขใบตรวจ Mix Tank ที่กด Approve ไปแล้วได้หรือไม่?</h3>
+<p><strong>วิธีแก้ไข:</strong></p>
+<ul>
+<li>เมื่อใบตรวจได้รับการอนุมัติแล้ว ข้อมูลจะถูกล็อกอัตโนมัติ</li>
+<li>หากจำเป็นต้องแก้ไข ให้ผู้มีสิทธิ์ระดับ <strong>Admin</strong> เข้าไปที่แผงรายละเอียดด้านล่าง แล้วกดปุ่ม <strong><code>Reopen (เปิดงานใหม่)</code></strong> เพื่อคืนสถานะให้สามารถแก้ไขได้</li>
+</ul>
+<hr>
+<p><em>เอกสารคู่มือการใช้งานระบบ RMIS - จัดทำและปรับปรุงล่าสุด: ตุลาคม 2569</em></p>
+
+</body>
+</html>

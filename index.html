@@ -1130,6 +1130,14 @@
       }
     }
 
+    /* Ensure Login Screen is always centered vertically & horizontally */
+    #login-screen:not([style*="display: none"]):not([style*="display:none"]) {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      min-height: 100vh !important;
+    }
+
   </style>
 </head>
 <body>
@@ -1578,7 +1586,7 @@
         <section id="view-request-form" class="page-view" style="display: none;">
           <div class="flex justify-between align-center mb-20">
             <h1 id="request-form-title" style="font-size: 24px; font-weight: 700;">สร้างใบแจ้งตรวจสอบ</h1>
-            <button class="btn btn-secondary" onclick="App.navigate('requests')">ย้อนกลับ</button>
+            <button class="btn btn-secondary" id="btn-request-form-back" onclick="App.handleRequestFormBack()">ย้อนกลับ</button>
           </div>
 
           <form id="request-main-form" onsubmit="App.handleRequestFormSubmit(event)">
@@ -1710,7 +1718,7 @@
                 </div>
               </div>
               <div class="card-footer" style="padding:20px 24px; border-top:1px solid var(--border-color); display:flex; justify-content:flex-end; gap:12px;">
-                <button type="button" class="btn btn-secondary" onclick="App.navigate('requests')">ยกเลิก</button>
+                <button type="button" class="btn btn-secondary" onclick="App.handleRequestFormCancel()">ยกเลิก</button>
                 <button type="submit" id="btn-submit-request" class="btn btn-primary">ส่ง</button>
               </div>
             </div>
@@ -3211,6 +3219,6 @@
 
   <script src="config.js?v=132"></script>
   <script src="dbService.js?v=149"></script>
-  <script src="app_v5.js?v=192"></script>
+  <script src="app_v5.js?v=197"></script>
 </body>
 </html>

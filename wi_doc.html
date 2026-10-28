@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>WI-QC-001: วิธีการปฏิบัติงาน เรื่อง การใช้งานระบบบริหารจัดการคำขอตรวจวิเคราะห์ห้องปฏิบัติการ (RMIS)</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 15mm 15mm 15mm 15mm;
+      @bottom-right {
+        content: counter(page) " / " counter(pages);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Leelawadee UI', Tahoma, sans-serif;
+      font-size: 10pt;
+      line-height: 1.5;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    /* ISO Header Table */
+    .iso-header-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+      border: 1.5px solid #0f172a;
+    }
+    .iso-header-table td {
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      vertical-align: middle;
+    }
+    .company-col {
+      width: 25%;
+      text-align: center;
+      background: #f8fafc;
+      font-weight: 800;
+    }
+    .company-title {
+      font-size: 13pt;
+      color: #0284c7;
+      margin: 0;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+    }
+    .company-sub {
+      font-size: 8pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .doc-title-col {
+      width: 50%;
+      text-align: center;
+    }
+    .doc-main-type {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 1px;
+    }
+    .doc-subject {
+      font-size: 10pt;
+      font-weight: 700;
+      color: #0369a1;
+      margin-top: 3px;
+    }
+    .meta-col {
+      width: 25%;
+      font-size: 8.5pt;
+      background: #f8fafc;
+    }
+    .meta-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .meta-item:last-child { margin-bottom: 0; }
+    .meta-label { font-weight: 700; color: #475569; }
+    .meta-val { font-weight: 600; color: #0f172a; }
+
+    /* Control table */
+    .control-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 22px;
+      border: 1px solid #cbd5e1;
+    }
+    .control-table th, .control-table td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 10px;
+      text-align: center;
+      font-size: 9pt;
+    }
+    .control-table th {
+      background: #f1f5f9;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    h2 {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0369a1;
+      border-bottom: 1.5px solid #0284c7;
+      padding-bottom: 4px;
+      margin-top: 18px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p { margin: 0 0 8px 0; }
+    ol, ul { margin: 0 0 10px 0; padding-left: 20px; }
+    li { margin-bottom: 4px; }
+
+    /* Standard content table */
+    .content-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 16px 0;
+      font-size: 9pt;
+      page-break-inside: avoid;
+    }
+    .content-table th, .content-table td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    .content-table th {
+      background: #0284c7;
+      color: #ffffff;
+      font-weight: 700;
+      text-align: center;
+    }
+    .content-table tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 700;
+    }
+    .badge-primary { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+    .badge-success { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+    .badge-warning { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+
+    .callout {
+      border-left: 4px solid #0284c7;
+      background: #f0f9ff;
+      padding: 8px 12px;
+      margin: 10px 0 14px 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 9pt;
+      page-break-inside: avoid;
+    }
+    .callout-title {
+      font-weight: 800;
+      color: #0369a1;
+      margin-bottom: 3px;
+    }
+
+    .flow-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 12px;
+      background: #fafafa;
+      margin: 12px 0 18px 0;
+      text-align: center;
+      page-break-inside: avoid;
+    }
+    .flow-step {
+      display: inline-block;
+      background: #ffffff;
+      border: 1.5px solid #0284c7;
+      border-radius: 6px;
+      padding: 6px 12px;
+      margin: 4px;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .flow-arrow {
+      display: inline-block;
+      font-size: 11pt;
+      font-weight: bold;
+      color: #0284c7;
+      margin: 0 4px;
+      vertical-align: middle;
+    }
+
+    .page-break { page-break-after: always; }
+
+    .footer-note {
+      margin-top: 25px;
+      text-align: center;
+      font-size: 8pt;
+      color: #64748b;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ISO HEADER BLOCK -->
+  <table class="iso-header-table">
+    <tr>
+      <td class="company-col">
+        <div class="company-title">SFC</div>
+        <div class="company-sub">SFC Excellence Co., Ltd.</div>
+      </td>
+      <td class="doc-title-col">
+        <div class="doc-main-type">วิธีการปฏิบัติงาน (WORK INSTRUCTION)</div>
+        <div class="doc-subject">ขั้นตอนการใช้งานระบบบริหารจัดการคำขอตรวจวิเคราะห์ห้องปฏิบัติการ (RMIS)</div>
+      </td>
+      <td class="meta-col">
+        <div class="meta-item"><span class="meta-label">รหัสเอกสาร:</span> <span class="meta-val">WI-QC-001</span></div>
+        <div class="meta-item"><span class="meta-label">แก้ไขครั้งที่:</span> <span class="meta-val">00</span></div>
+        <div class="meta-item"><span class="meta-label">วันที่มีผล:</span> <span class="meta-val">28/10/2026</span></div>
+        <div class="meta-item"><span class="meta-label">แผนก:</span> <span class="meta-val">QC / IT</span></div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- APPROVAL TABLE -->
+  <table class="control-table">
+    <tr>
+      <th style="width: 33.3%;">จัดทำโดย (Prepared By)</th>
+      <th style="width: 33.3%;">ทบทวนโดย (Reviewed By)</th>
+      <th style="width: 33.3%;">อนุมัติโดย (Approved By)</th>
+    </tr>
+    <tr>
+      <td style="padding: 14px 8px 10px 8px;">
+        <div style="color: #64748b; font-size: 8.5pt; margin-bottom: 8px;">ลงชื่อ ....................................................</div>
+        <div style="font-weight: 600; color: #334155; font-size: 8.5pt;">(....................................................)</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 3px;">ตำแหน่ง: System Developer / QC Staff</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 4px;">วันที่: ...... / ...... / ............</div>
+      </td>
+      <td style="padding: 14px 8px 10px 8px;">
+        <div style="color: #64748b; font-size: 8.5pt; margin-bottom: 8px;">ลงชื่อ ....................................................</div>
+        <div style="font-weight: 600; color: #334155; font-size: 8.5pt;">(....................................................)</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 3px;">ตำแหน่ง: QC Supervisor</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 4px;">วันที่: ...... / ...... / ............</div>
+      </td>
+      <td style="padding: 14px 8px 10px 8px;">
+        <div style="color: #64748b; font-size: 8.5pt; margin-bottom: 8px;">ลงชื่อ ....................................................</div>
+        <div style="font-weight: 600; color: #334155; font-size: 8.5pt;">(....................................................)</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 3px;">ตำแหน่ง: QA/QC Manager</div>
+        <div style="font-size: 8pt; color: #64748b; margin-top: 4px;">วันที่: ...... / ...... / ............</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- SECTION 1 & 2 -->
+  <h2>1. วัตถุประสงค์ (Purpose)</h2>
+  <ol>
+    <li>เพื่อกำหนดมาตรฐานและขั้นตอนการปฏิบัติงานในการใช้งานระบบสารสนเทศ <strong>RMIS (Raw Material & Mix Tank Inspection Management System)</strong> ให้พนักงานทุกฝ่ายปฏิบัติงานในทิศทางเดียวกัน</li>
+    <li>เพื่อให้การแจ้งส่งตัวอย่างตรวจวิเคราะห์วัตถุดิบรับเข้า (Raw Material) และการตรวจติดตามถังผสม (Mixed Storage Tank) มีความถูกต้อง รวดเร็ว ตรวจสอบย้อนกลับได้ครบถ้วน (Traceability) และโปร่งใสตามมาตรฐาน ISO 9001 / ISO 17025</li>
+    <li>เพื่อป้องกันการสูญหายของข้อมูลการทดสอบด้วยระบบบันทึกอัตโนมัติ (Auto-Save on Back) และลดการใช้กระดาษ (Paperless Process)</li>
+  </ol>
+
+  <h2>2. ขอบเขต (Scope)</h2>
+  <p>ครอบคลุมกระบวนการตั้งแต่การเปิดใบคำขอตรวจวิเคราะห์ตัวอย่างวัตถุดิบ, การบันทึกแบบร่าง, การตรวจวิเคราะห์ทางห้องปฏิบัติการ, การบันทึกปริมาณถังผสม (Top Up / Discharge), การลงลายเซ็นอนุมัติ 3 ระดับ ตลอดจนการพิมพ์สติกเกอร์ฉลากสินค้าและการสืบค้นประวัติย้อนกลับ</p>
+
+  <h2>3. คำจำกัดความ (Definitions)</h2>
+  <ul>
+    <li><strong>RMIS:</strong> ระบบบริหารจัดการคำขอตรวจวิเคราะห์ห้องปฏิบัติการ (Laboratory Request Management System)</li>
+    <li><strong>Requester:</strong> ผู้แจ้งขอตรวจวิเคราะห์ (เจ้าหน้าที่คลังสินค้า WRM หรือ ฝ่ายผลิต)</li>
+    <li><strong>QC Lab:</strong> นักวิเคราะห์หรือเจ้าหน้าที่ห้องปฏิบัติการควบคุมคุณภาพ</li>
+    <li><strong>In Process:</strong> สถานะตัวอย่างอยู่ระหว่างรอตรวจหรืออยู่ระหว่างทดสอบในห้องปฏิบัติการ</li>
+    <li><strong>Pass / Fail:</strong> ผลการทดสอบผ่านเกณฑ์มาตรฐาน / ไม่ผ่านเกณฑ์มาตรฐาน</li>
+    <li><strong>Mixed Storage Tank:</strong> เอกสารและระบบการตรวจวิเคราะห์คุณภาพประจำถังผสม</li>
+    <li><strong>Top Up / Discharge:</strong> การเติมวัตถุดิบลงถังผสม / การสูบจ่ายผลิตภัณฑ์ออกจากถังผสม</li>
+    <li><strong>3-Tier Signatures:</strong> การลงนามดิจิทัล 3 ระดับ (ผู้ตรวจสอบ -> ผู้รับรอง -> ผู้อนุมัติปล่อยผ่าน)</li>
+    <li><strong>Auto-Save on Back:</strong> ระบบบันทึกข้อมูลอัตโนมัติทันทีที่กดย้อนกลับ โดยไม่ต้องกดปุ่มบันทึกด้านล่าง</li>
+  </ul>
+
+  <h2>4. ตารางกำหนดหน้าที่และความรับผิดชอบ (RACI Matrix)</h2>
+  <table class="content-table">
+    <thead>
+      <tr>
+        <th style="width: 45%;">กิจกรรม / ขั้นตอนการทำงาน</th>
+        <th style="width: 11%;">Requester</th>
+        <th style="width: 11%;">QC Lab</th>
+        <th style="width: 11%;">Base Oil</th>
+        <th style="width: 11%;">QC Manager</th>
+        <th style="width: 11%;">Admin</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1. เปิดใบแจ้งตรวจวิเคราะห์วัตถุดิบ / แบบร่าง</td>
+        <td style="text-align:center;"><strong>R / A</strong></td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">C</td>
+      </tr>
+      <tr>
+        <td>2. ตรวจรับตัวอย่างและบันทึกผลแล็บ (Den@15C, Den@30C, Pass/Fail)</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;"><strong>R / A</strong></td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">C</td>
+      </tr>
+      <tr>
+        <td>3. บันทึกและตรวจติดตามถังผสม (Mix Tank Top Up / Discharge)</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;"><strong>R</strong></td>
+        <td style="text-align:center;"><strong>R</strong></td>
+        <td style="text-align:center;">A</td>
+        <td style="text-align:center;">C</td>
+      </tr>
+      <tr>
+        <td>4. การลงนามอิเล็กทรอนิกส์ 3 ระดับและการอนุมัติปล่อยผ่าน</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;"><strong>R (ขั้น 1)</strong></td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;"><strong>R / A (ขั้น 3)</strong></td>
+        <td style="text-align:center;">A</td>
+      </tr>
+      <tr>
+        <td>5. การพิมพ์สติกเกอร์รับรองผล (QC Label Printing)</td>
+        <td style="text-align:center;"><strong>R</strong></td>
+        <td style="text-align:center;"><strong>R</strong></td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">I</td>
+        <td style="text-align:center;">C</td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="font-size: 8pt; color: #64748b; margin-top: -8px; margin-bottom: 15px;">
+    * <strong>R</strong> = Responsible (ผู้ลงมือปฏิบัติ), <strong>A</strong> = Accountable (ผู้รับผิดชอบผลงาน/อนุมัติ), <strong>C</strong> = Consulted (ผู้ให้คำปรึกษา), <strong>I</strong> = Informed (ผู้รับทราบ)
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 5 & 6 -->
+  <h2>5. แผนผังกระบวนการทำงานหลัก (Process Flowchart)</h2>
+  <div class="flow-box">
+    <div>
+      <span class="flow-step">1. เข้าสู่ระบบ RMIS</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">2. สร้างใบแจ้ง / แบบร่าง</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">3. ส่งคำขอตรวจแล็บ</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step">4. แล็บรับตัวอย่างจริง</span>
+    </div>
+    <div style="margin-top: 10px;">
+      <span class="flow-arrow">&darr;</span>
+    </div>
+    <div style="margin-top: 10px;">
+      <span class="flow-step" style="border-color:#16a34a; background:#f0fdf4;">8. พิมพ์สติกเกอร์ / ปล่อยผ่าน</span>
+      <span class="flow-arrow">&larr;</span>
+      <span class="flow-step" style="border-color:#0284c7;">7. ลงนามอนุมัติ 3 ระดับ</span>
+      <span class="flow-arrow">&larr;</span>
+      <span class="flow-step">6. ตรวจถัง Mix Tank</span>
+      <span class="flow-arrow">&larr;</span>
+      <span class="flow-step">5. ลงผล Den & Pass/Fail</span>
+    </div>
+  </div>
+
+  <h2>6. ขั้นตอนการปฏิบัติงานโดยละเอียด (Detailed Procedures)</h2>
+
+  <h3>6.1 การเข้าสู่ระบบและการตรวจสอบสิทธิ์ (System Login & Role Verification)</h3>
+  <ol>
+    <li>เปิดเว็บบราวเซอร์ Google Chrome หรือ Microsoft Edge และเข้าสู่ URL ระบบ RMIS</li>
+    <li>กรอก <strong>Username</strong> และ <strong>Password</strong> ประจำตัวของตนเอง แล้วกดปุ่ม <strong>"เข้าสู่ระบบ"</strong></li>
+    <li>ตรวจสอบสิทธิ์และบทบาทของตนเองที่แถบด้านข้าง (Sidebar) ให้ถูกต้องตามหน้าที่รับผิดชอบ</li>
+  </ol>
+
+  <h3>6.2 การเปิดใบคำขอแจ้งตรวจวิเคราะห์วัตถุดิบ (Creating Request & Drafts)</h3>
+  <ol>
+    <li>ไปที่เมนู <strong>"สร้างใบแจ้งตรวจสอบ"</strong></li>
+    <li>กรอกข้อมูลทั่วไป:
+      <ul>
+        <li><strong>ชื่อลูกค้า (Customer Name)</strong> <em>(จำเป็นต้องระบุ)</em></li>
+        <li><strong>PO Number</strong> <em>(ถ้ามี)</em></li>
+        <li><strong>ทะเบียนรถ (Car Plate)</strong>, <strong>หมายเลขซีล (Seal No.)</strong>, <strong>หมายเลขตู้ (Container No.)</strong></li>
+        <li><strong>หมายเหตุ (Notes)</strong> <em>(หากมีข้อกำหนดพิเศษ)</em></li>
+      </ul>
+    </li>
+    <li>ในตารางรายการสินค้า: กรอก <strong>ชื่อสินค้า (Product Name)</strong>, <strong>Batch Number</strong>, และ <strong>ปริมาณ (Quantity)</strong> เช่น `10X1000L.` หรือ `18,000 KG.`</li>
+    <li>หากมีหลายรายการสินค้าในรอบส่งเดียวกัน ให้กดปุ่ม <strong>"+ เพิ่มรายการสินค้า"</strong></li>
+    <li><strong>การบันทึกข้อมูล:</strong>
+      <ul>
+        <li><strong>ส่งใบแจ้งทันที:</strong> กดปุ่ม <strong>"ส่ง"</strong> ด้านล่าง -> ระบบส่งข้อมูลไปยังห้องแล็บพร้อมเสียงเตือน Realtime Chime</li>
+        <li><strong>ระบบบันทึกอัตโนมัติ (Auto-Save on Back):</strong> หากผู้ใช้กรอกข้อมูลหรือแก้ไข แล้วกดปุ่ม <strong>"ย้อนกลับ"</strong> ที่มุมบนขวา ระบบจะทำการตรวจจับและบันทึกข้อมูลลงฐานข้อมูลโดยอัตโนมัติทันที พร้อมแสดงข้อความแจ้งเตือน <code>"บันทึกข้อมูลอัตโนมัติเรียบร้อยแล้ว"</code></li>
+        <li><strong>บันทึกแบบร่าง:</strong> กดปุ่ม <strong>"ร่าง"</strong> เพื่อเก็บไว้ในเมนูแบบร่างสำหรับแก้ไขต่อในภายหลัง</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">&#128161; คุณสมบัติใหม่: ระบบบันทึกอัตโนมัติเมื่อกดย้อนกลับ (Auto-Save on Back)</div>
+    ระบบมีอัลกอริทึมตรวจสอบความเปลี่ยนแปลงของข้อมูล (Dirty Checking) หากมีการแก้ไขค่า Density, RM No., ผลตรวจ หรือข้อมูลสินค้า เมื่อกดปุ่ม <strong>"ย้อนกลับ"</strong> ระบบจะเซฟข้อมูลอัตโนมัติทันที ป้องกันข้อมูลสูญหาย 100% โดยที่ผู้ใช้ไม่ต้องเลื่อนลงไปกดปุ่มบันทึกด้านล่าง
+  </div>
+
+  <h3>6.3 การบันทึกผลวิเคราะห์ทางห้องปฏิบัติการ (QC Lab Testing & Recording)</h3>
+  <ol>
+    <li>เจ้าหน้าที่แล็บตรวจรับตัวอย่างจริง และเปิดใบแจ้งตรวจสอบที่สถานะเป็น <code>Pending</code></li>
+    <li>กดปุ่ม <strong>"แก้ไข"</strong> เพื่อลงผลการวิเคราะห์:
+      <ul>
+        <li>ระบุรหัส <strong>RM No.</strong> ของวัตถุดิบ</li>
+        <li>กรอกค่าความหนาแน่น <strong>Den@15C</strong> และ <strong>Den@30C</strong></li>
+        <li>ระบุผลการทดสอบ: <code>Pass</code> (ผ่านเกณฑ์), <code>Fail</code> (ไม่ผ่าน), หรือ <code>In Process</code> (อยู่ระหว่างทดสอบ)</li>
+      </ul>
+    </li>
+    <li>เมื่อผลตรวจผ่านเกณฑ์ครบทุกรายการ จึงจะสามารถปรับสถานะภาพรวมเป็น <strong>"Complete"</strong> ได้</li>
+    <li>กดย้อนกลับ (เพื่อเซฟอัตโนมัติ) หรือกดปุ่ม <strong>"บันทึก"</strong></li>
+  </ol>
+
+  <div class="page-break"></div>
+
+  <h3>6.4 การจัดการเอกสารการตรวจวิเคราะห์ประจำถังผสม (Mixed Storage Tank)</h3>
+  <ol>
+    <li>ไปที่เมนู <strong>"ใบตรวจ Mix Tank"</strong> แล้วกดปุ่ม <strong>"+ สร้างใบตรวจ Mix Tank"</strong></li>
+    <li>ระบุชื่อถังจัดเก็บ เช่น <code>T-01</code>, <code>T-02</code>, <code>MIX-A</code> พร้อมระบุวันที่และเวลา</li>
+    <li>บันทึกสมดุลปริมาณถังผสม (Volume Tracking):
+      <ul>
+        <li><strong>BEFORE BALANCE:</strong> ปริมาณคงเหลือก่อนหน้า</li>
+        <li><strong>TOP UP:</strong> ระบุวัตถุดิบที่เติม, Lot No., ปริมาณ (KG/L), Supplier, และทะเบียนรถ</li>
+        <li><strong>DISCHARGE:</strong> ระบุปริมาณที่สูบจ่ายออก และเลขที่เอกสารสูบจ่าย</li>
+        <li>ระบบจะคำนวณ <strong>AFTER BALANCE</strong> โดยอัตโนมัติ:
+          <div style="text-align: center; margin: 4px 0; font-weight: bold; color: #0369a1;">
+            ปริมาณคงเหลือสุทธิ (After) = ปริมาณก่อนหน้า (Before) + ยอดเติม (Top Up) - ยอดจ่าย (Discharge)
+          </div>
+        </li>
+      </ul>
+    </li>
+    <li>บันทึกผลตรวจทางกายภาพและเคมี: Density, Temperature, Appearance, Color</li>
+  </ol>
+
+  <h3>6.5 การตรวจสอบและลงนามดิจิทัล 3 ระดับ (3-Tier Digital Signatures)</h3>
+  <table class="content-table">
+    <thead>
+      <tr>
+        <th style="width: 18%;">ระดับการลงนาม</th>
+        <th style="width: 25%;">ตำแหน่งรับผิดชอบ</th>
+        <th style="width: 57%;">หน้าที่และการตรวจสอบ</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>ระดับที่ 1: ผู้ตรวจวิเคราะห์</strong></td>
+        <td>QC Lab Analyst</td>
+        <td>ตรวจสอบการคำนวณปริมาณ และผลการตรวจวัดคุณสมบัติทางกายภาพ/เคมี</td>
+      </tr>
+      <tr>
+        <td><strong>ระดับที่ 2: ผู้ตรวจสอบ</strong></td>
+        <td>QC Supervisor</td>
+        <td>ทบทวนความถูกต้องของข้อมูลเทียบกับ Spec มาตรฐานของบริษัท</td>
+      </tr>
+      <tr>
+        <td><strong>ระดับที่ 3: ผู้อนุมัติปล่อยผ่าน</strong></td>
+        <td>QA/QC Manager</td>
+        <td>พิจารณาอนุมัติขั้นสุดท้ายเพื่อปล่อยผลิตภัณฑ์ (Approved) ให้ใช้งานได้</td>
+      </tr>
+    </tbody>
+  </table>
+  <ol>
+    <li>ผู้มีหน้าที่รับผิดชอบในแต่ละระดับกดปุ่ม <strong>"ลงลายเซ็น"</strong></li>
+    <li>ระบบจะดึงภาพลายเซ็นอิเล็กทรอนิกส์จริง พร้อมระบุชื่อ-นามสกุล และเวลาที่เซ็นจาก TimeSync ของเซิร์ฟเวอร์โดยอัตโนมัติ</li>
+  </ol>
+
+  <h3>6.6 การพิมพ์รายงานผลและการพิมพ์สติกเกอร์ (Print Report & QC Stickers)</h3>
+  <ol>
+    <li><strong>การพิมพ์รายงานเอกสารการตรวจวิเคราะห์ประจำถังผสม:</strong> กดปุ่ม <strong>"พิมพ์เอกสาร / Print"</strong> เพื่อออกรายงานขนาด A4 ที่มีลายเซ็นครบถ้วน 3 ฝ่าย</li>
+    <li><strong>การพิมพ์สติกเกอร์รับรองผล (QC Label):</strong> ในหน้ารายละเอียดใบแจ้งคำขอ ให้กดปุ่ม <strong>"พิมพ์สติกเกอร์"</strong> เพื่อสั่งพิมพ์ฉลากออกทางเครื่องพิมพ์สติกเกอร์ความร้อนสำหรับนำไปติดที่ถังหรือบรรจุภัณฑ์</li>
+  </ol>
+
+  <h2>7. ข้อควรระวังและการควบคุมความเสี่ยง (Precautions & Risk Controls)</h2>
+  <table class="content-table">
+    <thead>
+      <tr>
+        <th style="width: 30%;">ความเสี่ยง / ข้อควรระวัง</th>
+        <th style="width: 70%;">มาตรการควบคุมและวิธีปฏิบัติที่ถูกต้อง</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>ข้อมูลสูญหายขณะออกจากหน้าจอ</strong></td>
+        <td>ระบบมี <strong>Auto-Save on Back</strong> เมื่อกดย้อนกลับ ระบบจะบันทึกข้อมูลให้อัตโนมัติทันที ป้องกันการปิดหน้าต่างโดยไม่ตั้งใจ</td>
+      </tr>
+      <tr>
+        <td><strong>การปรับสถานะ Complete ผิดพลาด</strong></td>
+        <td>ระบบล็อกไม่อนุญาตให้เปลี่ยนสถานะเป็น Complete หากยังมีรายการวัตถุดิบค้างสถานะ <code>In Process</code> อยู่</td>
+      </tr>
+      <tr>
+        <td><strong>เลขที่ใบแจ้งซ้ำกันในรอบปี</strong></td>
+        <td>ระบบควบคุมไม่ให้เลขที่ใบแจ้ง (Request No) ซ้ำกันในรอบปี ค.ศ. เดียวกัน แม้จะใช้สิทธิ์ Admin แก้ไขตัวเลข</td>
+      </tr>
+      <tr>
+        <td><strong>เครือข่ายอินเทอร์เน็ตโรงงานขัดข้อง</strong></td>
+        <td>ระบบทำงานแบบ <strong>Progressive Web App (PWA)</strong> มี Service Worker ช่วยแคชหน้าจอ ทำงานแบบ Offline ได้อย่างต่อเนื่อง</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>8. เอกสารอ้างอิงและบันทึกคุณภาพ (Related Documents & Quality Records)</h2>
+  <ol>
+    <li>เอกสารคำขอตรวจวิเคราะห์คุณภาพทางห้องปฏิบัติการ (Laboratory Request Record)</li>
+    <li>เอกสารการตรวจวิเคราะห์ประจำถังผสม (Mixed Storage Tank Inspection Record)</li>
+    <li>สติกเกอร์รับรองผลการตรวจวิเคราะห์คุณภาพ (QC Approved Label)</li>
+    <li>คู่มือการใช้งานระบบ RMIS ฉบับสมบูรณ์ (RMIS User Manual)</li>
+  </ol>
+
+  <div class="footer-note">
+    เอกสารฉบับนี้เป็นทรัพย์สินทางปัญญาของ บริษัท เอสเอฟซี เอ็กเซลเลนซ์ จำกัด (SFC Excellence Co., Ltd.)<br>
+    ห้ามทำซ้ำ ดัดแปลง หรือเปิดเผยต่อบุคคลภายนอกโดยไม่ได้รับอนุญาตเป็นลายลักษณ์อักษร
+  </div>
+
+</body>
+</html>

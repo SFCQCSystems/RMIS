@@ -377,7 +377,7 @@ const App = (function () {
     state.currentView = viewName;
     const viewEl = document.getElementById(VIEWS[actualViewName]);
     if (viewEl) {
-      if (VIEWS[actualViewName] === 'view-requests' || VIEWS[actualViewName] === 'view-mix-tank') {
+      if (VIEWS[actualViewName] === 'view-requests' || VIEWS[actualViewName] === 'view-mix-tank' || VIEWS[actualViewName] === 'login-screen') {
         viewEl.style.display = 'flex';
       } else {
         viewEl.style.display = 'block';
@@ -792,7 +792,9 @@ const App = (function () {
   // --- 2. REQUESTS LIST LOADER & FILTERS ---
   async function loadRequestsList() {
     const listBody = document.getElementById('requests-list-tbody');
-    showLoading();
+    if (listBody) {
+      listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:36px;"><div style="display:inline-flex; align-items:center; gap:10px;"><div class="spinner" style="width:20px; height:20px; border-width:2px;"></div> <span>กำลังโหลดข้อมูล...</span></div></td></tr>`;
+    }
 
     try {
       const rawRes = await window.DB.getRequests(state.filters);
@@ -806,7 +808,6 @@ const App = (function () {
       if (requests.length === 0) {
         listBody.innerHTML = getEmptyStateHtml('ไม่พบรายการใบแจ้งตรวจสอบที่ตรงกับเงื่อนไขการค้นหา');
         renderPaginationControls({ containerId: 'requests-pagination', page: 1, pageSize, totalCount: 0, onPageChange: 'App.setRequestsPage', onPageSizeChange: 'App.setRequestsPageSize' });
-        hideLoading();
         return;
       }
 
@@ -869,9 +870,9 @@ const App = (function () {
       if (window.lucide) window.lucide.createIcons();
     } catch (e) {
       console.error(e);
-      listBody.innerHTML = getEmptyStateHtml(`เกิดข้อผิดพลาดในการดึงข้อมูล: ${e.message}`);
-    } finally {
-      hideLoading();
+      if (listBody) {
+        listBody.innerHTML = getEmptyStateHtml(`เกิดข้อผิดพลาดในการดึงข้อมูล: ${e.message}`);
+      }
     }
   }
 
@@ -913,7 +914,9 @@ const App = (function () {
   // --- 2.5 DRAFTS LIST LOADER ---
   async function loadDraftsList() {
     const listBody = document.getElementById('drafts-list-tbody');
-    showLoading();
+    if (listBody) {
+      listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:36px;"><div style="display:inline-flex; align-items:center; gap:10px;"><div class="spinner" style="width:20px; height:20px; border-width:2px;"></div> <span>กำลังโหลดรายการแบบร่าง...</span></div></td></tr>`;
+    }
 
     try {
       const filters = { isDraft: true };
@@ -941,7 +944,6 @@ const App = (function () {
 
       if (requests.length === 0) {
         listBody.innerHTML = getEmptyStateHtml('ไม่พบรายการแบบร่างที่ตรงกับเงื่อนไข');
-        hideLoading();
         return;
       }
 
@@ -979,13 +981,13 @@ const App = (function () {
         `;
         listBody.appendChild(tr);
       });
-      hideLoading();
 
     } catch (e) {
       console.error(e);
-      listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-danger); padding:30px;">ไม่สามารถโหลดข้อมูลแบบร่างได้: ${escapeHtml(e.message)}</td></tr>`;
+      if (listBody) {
+        listBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-danger); padding:30px;">ไม่สามารถโหลดข้อมูลแบบร่างได้: ${escapeHtml(e.message)}</td></tr>`;
+      }
       showToast('ไม่สามารถดึงข้อมูลรายการแบบร่างได้: ' + e.message, 'error');
-      hideLoading();
     }
   }
 
@@ -1609,6 +1611,274 @@ const App = (function () {
     } finally {
       isSaving = false;
       showLoadingButton(btn, false, 'ร่าง');
+    }
+  }
+
+  function checkRequestFormDirty() {
+    if (!state.editingRecord) {
+      const customer = (document.getElementById('form-customer')?.value || '').trim();
+      const car = (document.getElementById('form-car-plate')?.value || '').trim();
+      const notes = (document.getElementById('form-notes')?.value || '').trim();
+      const po = (document.getElementById('form-po-number')?.value || '').trim();
+      const rows = document.querySelectorAll('#form-items-tbody tr');
+      let hasItems = false;
+      for (let r of rows) {
+        if ((r.querySelector('.item-form-name')?.value || '').trim() ||
+            (r.querySelector('.item-form-batch')?.value || '').trim() ||
+            (r.querySelector('.item-form-qty')?.value || '').trim()) {
+          hasItems = true;
+          break;
+        }
+      }
+      return !!(customer || car || notes || po || hasItems);
+    }
+
+    const r = state.editingRecord;
+    const normalize = v => (v === null || v === undefined) ? '' : String(v).trim();
+
+    const customer = normalize(document.getElementById('form-customer')?.value);
+    if (customer !== normalize(r.customer_name)) return true;
+
+    const po = normalize(document.getElementById('form-po-number')?.value);
+    if (po !== normalize(r.po_number)) return true;
+
+    const car = normalize(document.getElementById('form-car-plate')?.value);
+    if (car !== normalize(r.car_plate)) return true;
+
+    const seal = normalize(document.getElementById('form-seal-no')?.value);
+    if (seal !== normalize(r.seal_no)) return true;
+
+    const container = normalize(document.getElementById('form-container-no')?.value);
+    if (container !== normalize(r.container_no)) return true;
+
+    const notes = normalize(document.getElementById('form-notes')?.value);
+    if (notes !== normalize(r.notes)) return true;
+
+    const comments = normalize(document.getElementById('form-lab-comments')?.value);
+    if (comments !== normalize(r.lab_comments)) return true;
+
+    const baseOil = !!document.getElementById('form-need-base-oil')?.checked;
+    if (baseOil !== !!r.need_base_oil_view) return true;
+
+    const statusVal = normalize(document.getElementById('form-status')?.value);
+    if (statusVal && statusVal !== normalize(r.status)) return true;
+
+    const reqNo = normalize(document.getElementById('form-request-no')?.value);
+    if (reqNo && reqNo !== normalize(r.request_no)) return true;
+
+    const reqYear = normalize(document.getElementById('form-request-year')?.value);
+    if (reqYear && reqYear !== normalize(r.request_year)) return true;
+
+    const reqDate = normalize(document.getElementById('form-request-date')?.value);
+    if (reqDate && reqDate !== normalize(r.request_date)) return true;
+
+    const reqTime = normalize(document.getElementById('form-request-time')?.value);
+    const origTime = normalize(r.request_time ? r.request_time.slice(0, 5) : '');
+    if (reqTime && reqTime !== origTime) return true;
+
+    const itemRows = document.querySelectorAll('#form-items-tbody tr');
+    const origItems = r.items || [];
+    
+    const activeRows = [];
+    for (let row of itemRows) {
+      const pName = normalize(row.querySelector('.item-form-name')?.value);
+      const pBatch = normalize(row.querySelector('.item-form-batch')?.value);
+      const pQty = normalize(row.querySelector('.item-form-qty')?.value);
+      const pRm = normalize(row.querySelector('.item-form-rm')?.value);
+      const pDen15 = normalize(row.querySelector('.item-form-density15c')?.value);
+      const pDen30 = normalize(row.querySelector('.item-form-density30c')?.value);
+      const pComm = normalize(row.querySelector('.item-form-comment')?.value);
+      if (pName || pBatch || pQty || pRm || pDen15 || pDen30 || pComm) {
+        activeRows.push(row);
+      }
+    }
+
+    if (activeRows.length !== origItems.length) return true;
+
+    for (let i = 0; i < activeRows.length; i++) {
+      const row = activeRows[i];
+      const orig = origItems[i] || {};
+      if (normalize(row.querySelector('.item-form-name')?.value) !== normalize(orig.product_name)) return true;
+      if (normalize(row.querySelector('.item-form-batch')?.value) !== normalize(orig.batch_number)) return true;
+      if (normalize(row.querySelector('.item-form-qty')?.value) !== normalize(orig.quantity)) return true;
+      if (normalize(row.querySelector('.item-form-rm')?.value) !== normalize(orig.rm_no)) return true;
+      if (normalize(row.querySelector('.item-form-result')?.value || 'In Process') !== normalize(orig.test_result || 'In Process')) return true;
+      if (normalize(row.querySelector('.item-form-comment')?.value) !== normalize(orig.item_comment)) return true;
+      if (normalize(row.querySelector('.item-form-density15c')?.value) !== normalize(orig.density_15c)) return true;
+      if (normalize(row.querySelector('.item-form-density30c')?.value) !== normalize(orig.density_30c)) return true;
+    }
+
+    return false;
+  }
+
+  async function handleRequestFormBack() {
+    if (isSaving) return;
+
+    const backBtn = document.getElementById('btn-request-form-back') || document.querySelector('#view-request-form .btn-secondary');
+
+    // Case 1: Create Mode (creating a new request)
+    if (!state.currentRequestId) {
+      const isDirty = checkRequestFormDirty();
+      if (isDirty) {
+        try {
+          if (backBtn) showLoadingButton(backBtn, true, 'กำลังร่าง...');
+          await saveDraft();
+        } catch (e) {
+          console.error('Error auto-saving new draft on back:', e);
+          navigate('requests');
+        } finally {
+          if (backBtn) showLoadingButton(backBtn, false, 'ย้อนกลับ');
+        }
+      } else {
+        navigate('requests');
+      }
+      return;
+    }
+
+    // Case 2: Edit Mode (editing an existing request)
+    const isDirty = checkRequestFormDirty();
+    if (!isDirty) {
+      if (state.editingRecord?.status === 'Draft') {
+        navigate('drafts');
+      } else {
+        navigate('request-detail', { id: state.currentRequestId });
+      }
+      return;
+    }
+
+    try {
+      if (backBtn) showLoadingButton(backBtn, true, 'กำลังบันทึก...');
+      isSaving = true;
+
+      const customerName = document.getElementById('form-customer')?.value.trim() || (state.editingRecord?.customer_name || '-');
+      const carPlate = document.getElementById('form-car-plate')?.value.trim() || '';
+      const sealNo = document.getElementById('form-seal-no')?.value.trim() || '';
+      const containerNo = document.getElementById('form-container-no')?.value.trim() || '';
+      const notes = document.getElementById('form-notes')?.value.trim() || '';
+      const labComments = document.getElementById('form-lab-comments')?.value.trim() || '';
+      const poNumber = document.getElementById('form-po-number')?.value.trim() || '';
+      const needBaseOilCheck = document.getElementById('form-need-base-oil');
+      const statusSelect = document.getElementById('form-status');
+
+      const itemRows = document.querySelectorAll('#form-items-tbody tr');
+      const itemsData = [];
+
+      for (let i = 0; i < itemRows.length; i++) {
+        const row = itemRows[i];
+        const pName = row.querySelector('.item-form-name')?.value.trim() || '';
+        const pBatch = row.querySelector('.item-form-batch')?.value.trim() || '';
+        const pQty = row.querySelector('.item-form-qty')?.value.trim() || '';
+        const idVal = row.querySelector('.item-form-id')?.value;
+        const rmInput = row.querySelector('.item-form-rm');
+        const resultSelect = row.querySelector('.item-form-result');
+        const commentInput = row.querySelector('.item-form-comment');
+        const den15Input = row.querySelector('.item-form-density15c');
+        const den30Input = row.querySelector('.item-form-density30c');
+
+        const pRm = rmInput ? rmInput.value.trim() : '';
+        const pResult = resultSelect ? resultSelect.value : 'In Process';
+        const pComment = commentInput ? commentInput.value.trim() : '';
+        const pDen15 = den15Input ? den15Input.value.trim() : '';
+        const pDen30 = den30Input ? den30Input.value.trim() : '';
+
+        if (!pName && !pBatch && !pQty && !pRm && !pDen15 && !pDen30 && !pComment) {
+          continue;
+        }
+
+        const origItem = state.editingRecord?.items?.[i] || {};
+        itemsData.push({
+          id: idVal || origItem.id || undefined,
+          product_name: pName || origItem.product_name || '-',
+          batch_number: pBatch || origItem.batch_number || '-',
+          quantity: pQty || origItem.quantity || '-',
+          rm_no: pRm !== undefined ? pRm : (origItem.rm_no || ''),
+          test_result: pResult || origItem.test_result || 'In Process',
+          item_comment: pComment !== undefined ? pComment : (origItem.item_comment || ''),
+          density_15c: pDen15,
+          density_30c: pDen30
+        });
+      }
+
+      if (itemsData.length === 0 && state.editingRecord?.items?.length) {
+        state.editingRecord.items.forEach(it => itemsData.push({ ...it }));
+      }
+
+      const requestDate = document.getElementById('form-request-date')?.value || state.editingRecord?.request_date || (window.TimeSync ? window.TimeSync.getBangkokDateTime().dateStr : new Date().toISOString().slice(0, 10));
+      const requestTime = document.getElementById('form-request-time')?.value || state.editingRecord?.request_time || (window.TimeSync ? window.TimeSync.getBangkokDateTime().timeStr : new Date().toTimeString().slice(0, 5));
+
+      const requestData = {
+        customer_name: customerName,
+        po_number: poNumber,
+        need_base_oil_view: needBaseOilCheck ? needBaseOilCheck.checked : false,
+        car_plate: carPlate,
+        seal_no: sealNo,
+        container_no: containerNo,
+        notes: notes,
+        lab_comments: labComments,
+        request_date: requestDate,
+        request_time: requestTime
+      };
+
+      if (statusSelect && statusSelect.value) {
+        requestData.status = statusSelect.value;
+      } else if (state.editingRecord?.status) {
+        requestData.status = state.editingRecord.status;
+      }
+
+      if (requestData.status === 'Complete') {
+        const hasInProcessItem = itemsData.some(item => !item.test_result || item.test_result.trim() === 'In Process');
+        if (hasInProcessItem) {
+          showToast('ไม่สามารถบันทึกเป็น Complete ได้ เนื่องจากยังมีรายการ In Process (คงสถานะเดิมไว้)', 'warning');
+          requestData.status = (state.editingRecord?.status !== 'Complete') ? state.editingRecord.status : 'In Process';
+          if (statusSelect) statusSelect.value = requestData.status;
+        }
+      }
+
+      const isAdmin = state.currentUser?.role === 'admin';
+      const isLab = state.currentUser?.role === 'lab';
+      const isAdminOrLab = isAdmin || isLab;
+      const formReqNo = document.getElementById('form-request-no');
+      const formReqYear = document.getElementById('form-request-year');
+      if (isAdminOrLab && formReqNo && formReqYear && formReqNo.value) {
+        requestData.request_no = formReqNo.value;
+        requestData.request_year = formReqYear.value;
+      }
+
+      if (state.editingRecord?.status === 'Draft') {
+        requestData.status = 'Draft';
+        await window.DB.updateDraft(state.currentRequestId, requestData, itemsData);
+        showToast('บันทึกแบบร่างอัตโนมัติเรียบร้อยแล้ว', 'success');
+        navigate('drafts');
+      } else {
+        const updated = await window.DB.updateRequest(state.currentRequestId, requestData, itemsData);
+        if (currentFulfillingEditRequestId) {
+          const oldData = state.editingRecord ? { request: state.editingRecord, items: state.editingRecord.items } : null;
+          const newData = { request: requestData, items: itemsData };
+          await window.DB.updateEditRequestStatus(currentFulfillingEditRequestId, 'Completed', state.currentUser.id, oldData, newData);
+          currentFulfillingEditRequestId = null;
+        }
+        showToast('บันทึกข้อมูลอัตโนมัติเรียบร้อยแล้ว', 'success');
+        loadRequestsList();
+        navigate('request-detail', { id: updated.id });
+      }
+    } catch (err) {
+      console.error('Error auto-saving on back:', err);
+      showToast('ไม่สามารถบันทึกอัตโนมัติได้: ' + err.message, 'error');
+    } finally {
+      isSaving = false;
+      if (backBtn) showLoadingButton(backBtn, false, 'ย้อนกลับ');
+    }
+  }
+
+  function handleRequestFormCancel() {
+    if (state.currentRequestId) {
+      if (state.editingRecord?.status === 'Draft') {
+        navigate('drafts');
+      } else {
+        navigate('request-detail', { id: state.currentRequestId });
+      }
+    } else {
+      navigate('requests');
     }
   }
 
@@ -5595,7 +5865,11 @@ const App = (function () {
   }
 
   async function loadMixTankList() {
-    showLoading();
+    const tbody = document.getElementById('mix-tank-list-tbody');
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:36px;"><div style="display:inline-flex; align-items:center; gap:10px;"><div class="spinner" style="width:20px; height:20px; border-width:2px;"></div> <span>กำลังโหลดรายการ Mix Tank...</span></div></td></tr>`;
+    }
+
     try {
       const records = await window.DB.getMixTankRequests();
       updateMixTankBadge(records);
@@ -5626,9 +5900,9 @@ const App = (function () {
           : paginated[0].id;
         
         setTimeout(() => {
-          const tbody = document.getElementById('mix-tank-list-tbody');
-          if (tbody) {
-            const rows = tbody.querySelectorAll('tr');
+          const curTbody = document.getElementById('mix-tank-list-tbody');
+          if (curTbody) {
+            const rows = curTbody.querySelectorAll('tr');
             rows.forEach(row => {
               if (row.innerHTML.includes(targetId) || (targetId === paginated[0].id && row === rows[0])) {
                 row.classList.add('selected-row');
@@ -5642,9 +5916,10 @@ const App = (function () {
       }
     } catch (e) {
       console.error('loadMixTankList error:', e);
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-danger); padding:30px;">ไม่สามารถโหลดรายการได้: ${escapeHtml(e.message)}</td></tr>`;
+      }
       showToast('ไม่สามารถโหลดรายการใบตรวจ Mix Tank ได้: ' + e.message, 'error');
-    } finally {
-      hideLoading();
     }
   }
 
@@ -7050,7 +7325,7 @@ const App = (function () {
   }
 
   async function printMixTank(id) {
-    showToast('กำลังเตรียมเอกสาร FM-QC003 สำหรับการพิมพ์...', 'info');
+    showToast('กำลังเตรียมเอกสาร MIXED STORAGE TANK สำหรับการพิมพ์...', 'info');
     try {
       const rec = await window.DB.getMixTankDetail(id);
       if (!rec) throw new Error('ไม่พบข้อมูลเอกสาร');
@@ -7448,6 +7723,8 @@ const App = (function () {
     removeFormItemRow,
     editCurrentRequest,
     handleRequestFormSubmit,
+    handleRequestFormBack,
+    handleRequestFormCancel,
     testNotificationSound,
     toggleNotificationPanel: (e) => NotificationService.togglePanel(e),
     markAllNotificationsAsRead: () => NotificationService.markAllAsRead(),
