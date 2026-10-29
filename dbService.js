@@ -2750,8 +2750,10 @@
         actioned_by,
         actioned_at,
         created_at,
+        old_data,
+        new_data,
         requests (
-          request_no, customer_name, request_date, status,
+          request_no, customer_name, po_number, car_plate, seal_no, container_no, notes, request_date, status,
           request_items ( * )
         ),
         requester:profiles!edit_requests_requester_id_fkey ( display_name ),

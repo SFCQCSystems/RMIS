@@ -265,16 +265,14 @@ const App = (function () {
     let actualViewName = viewName;
     if (viewName === 'request-detail') {
       actualViewName = 'requests'; // Act as if navigating to requests list
-      setTimeout(() => {
-        const detailPane = document.getElementById('requests-detail-pane');
-        if (detailPane) {
-          detailPane.style.display = 'flex';
-          // Ensure it scrolls into view on mobile
-          if (window.innerWidth < 768) {
-              detailPane.scrollIntoView({ behavior: 'smooth' });
-          }
+      const detailPane = document.getElementById('requests-detail-pane');
+      if (detailPane) {
+        detailPane.style.display = 'flex';
+        // Ensure it scrolls into view on mobile
+        if (window.innerWidth < 768) {
+            detailPane.scrollIntoView({ behavior: 'smooth' });
         }
-      }, 50);
+      }
     } else if (viewName === 'requests') {
       // Show detail pane initially but keep it empty
       const detailPane = document.getElementById('requests-detail-pane');
@@ -609,9 +607,11 @@ const App = (function () {
     const dashCreateBtnNode = document.getElementById('btn-dashboard-create-request');
     const detailModifyBtnNode = document.getElementById('btn-detail-modify');
     const detailRemoveBtnNode = document.getElementById('btn-detail-remove');
+    const historyAddManualBtnNode = document.getElementById('btn-history-add-manual');
 
-    if (createBtnNode) createBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
-    if (dashCreateBtnNode) dashCreateBtnNode.style.display = !isBaseOil ? 'inline-flex' : 'none';
+    if (createBtnNode) createBtnNode.style.setProperty('display', !isBaseOil ? 'inline-flex' : 'none', 'important');
+    if (dashCreateBtnNode) dashCreateBtnNode.style.setProperty('display', !isBaseOil ? 'inline-flex' : 'none', 'important');
+    if (historyAddManualBtnNode) historyAddManualBtnNode.style.setProperty('display', (isUserAdmin || isUserLab) ? 'inline-flex' : 'none', 'important');
     if (detailModifyBtnNode) detailModifyBtnNode.style.setProperty('display', 'none', 'important');
     if (detailRemoveBtnNode) detailRemoveBtnNode.style.setProperty('display', 'none', 'important');
     
@@ -1019,7 +1019,20 @@ const App = (function () {
     tbody.innerHTML = '';
     state.activeRequestItems = [];
 
+    const fulfillBanner = document.getElementById('edit-request-fulfill-banner');
+    if (fulfillBanner) {
+      fulfillBanner.style.display = 'none';
+      fulfillBanner.innerHTML = '';
+    }
+    const thEditReason = document.getElementById('th-form-edit-reason');
+    if (thEditReason) {
+      thEditReason.style.display = 'none';
+    }
+
     const isEditMode = requestId !== null;
+    if (!isEditMode) {
+      currentFulfillingEditRequestId = null;
+    }
     state.currentRequestId = requestId;
     formIdInput.value = requestId || '';
 
@@ -1123,8 +1136,84 @@ const App = (function () {
           adminNoBlock.style.display = 'none';
         }
 
+        // Check for active pending Edit Request for this request so Lab sees per-item requested changes
+        let activeEditReq = null;
+        const itemReasonMap = {};
+        if (isAdminOrLab) {
+          try {
+            if (!editRequestsData || editRequestsData.length === 0) {
+              editRequestsData = (await window.DB.fetchEditRequests()) || [];
+            }
+            if (currentFulfillingEditRequestId) {
+              activeEditReq = editRequestsData.find(er => er.id === currentFulfillingEditRequestId && er.request_id === requestId);
+            }
+            if (!activeEditReq) {
+              activeEditReq = editRequestsData.find(er => er.request_id === requestId && er.status === 'Pending');
+              if (activeEditReq) {
+                currentFulfillingEditRequestId = activeEditReq.id;
+              }
+            }
+          } catch (errEr) {
+            console.warn('Could not load pending edit requests:', errEr);
+          }
+        }
+
+        if (activeEditReq) {
+          if (thEditReason) thEditReason.style.display = 'table-cell';
+          const rawReason = (activeEditReq.reason || '').trim();
+          const lines = rawReason.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          let matchedAnyLine = false;
+          const unmatchedLines = [];
+
+          lines.forEach(line => {
+            const m = line.match(/^\[รายการที่\s*(\d+)(?::\s*([^\]]*))?\]\s*(.+)$/);
+            if (m) {
+              const idx = parseInt(m[1], 10) - 1;
+              if (idx >= 0) {
+                itemReasonMap[idx] = m[3].trim();
+                matchedAnyLine = true;
+              }
+            } else {
+              unmatchedLines.push(line);
+            }
+          });
+
+          // Fallback for older single-string edit requests: if only 1 item or unmatched text
+          if (!matchedAnyLine && rawReason && details.items && details.items.length > 0) {
+            if (details.items.length === 1) {
+              itemReasonMap[0] = rawReason;
+            } else {
+              // Check if any item product_name is mentioned, otherwise show on banner and first row
+              let matchedByName = false;
+              details.items.forEach((it, idx) => {
+                if (it.product_name && rawReason.toLowerCase().includes(it.product_name.toLowerCase())) {
+                  itemReasonMap[idx] = rawReason;
+                  matchedByName = true;
+                }
+              });
+              if (!matchedByName) {
+                itemReasonMap[0] = rawReason;
+              }
+            }
+          }
+
+          if (fulfillBanner) {
+            const reqBy = activeEditReq.requester?.display_name || 'ผู้แจ้ง';
+            const noteText = (activeEditReq.note || '').trim();
+            const summaryLinesHtml = lines.map(l => `<div style="margin-top:3px;">• ${escapeHtml(l)}</div>`).join('');
+            fulfillBanner.innerHTML = `
+              <div style="background:#fffbeb; border:1px solid #f59e0b; border-left:5px solid #f59e0b; border-radius:8px; padding:12px 16px; color:#92400e; font-size:13.5px;">
+                <div style="font-weight:700; color:#b45309; margin-bottom:4px;">📌 คำขอแก้ไขข้อมูลจาก: ${escapeHtml(reqBy)}</div>
+                <div>${summaryLinesHtml || escapeHtml(rawReason)}</div>
+                ${noteText ? `<div style="margin-top:6px; color:#78350f; font-weight:600;">💬 หมายเหตุเพิ่มเติม: ${escapeHtml(noteText)}</div>` : ''}
+              </div>
+            `;
+            fulfillBanner.style.display = 'block';
+          }
+        }
+
         // Add item rows
-        details.items.forEach(item => addFormItemRow(item));
+        details.items.forEach((item, idx) => addFormItemRow(item, itemReasonMap[idx] || '', !!activeEditReq));
 
         // Show notes alert popup in edit mode if request has notes
         const hasNote = details.notes && details.notes.trim() && details.notes.trim() !== '-' && details.notes.trim() !== 'ไม่มีหมายเหตุ';
@@ -1265,11 +1354,14 @@ const App = (function () {
     }
   }
 
-  function addFormItemRow(item = {}) {
+  function addFormItemRow(item = {}, itemEditReason = '', showEditReasonCol = false) {
     const tbody = document.getElementById('form-items-tbody');
     const rowId = 'item-row-' + Math.random().toString(36).slice(2, 9);
     const tr = document.createElement('tr');
     tr.id = rowId;
+    if (itemEditReason) {
+      tr.style.backgroundColor = '#fffdf5';
+    }
 
     const isAdmin = state.currentUser.role === 'admin';
     const isLab = state.currentUser.role === 'lab';
@@ -1295,6 +1387,8 @@ const App = (function () {
     const showDelete = !disableInputs;
     const needBaseOilCheck = document.getElementById('form-need-base-oil');
     const isBaseOilChecked = needBaseOilCheck ? needBaseOilCheck.checked : false;
+    const thEditReason = document.getElementById('th-form-edit-reason');
+    const isEditReasonColVisible = showEditReasonCol || (thEditReason && thEditReason.style.display !== 'none');
 
     tr.innerHTML = `
       <td>
@@ -1306,6 +1400,12 @@ const App = (function () {
       </td>
       <td>
         <input type="text" class="item-form-qty" required placeholder="เช่น 10 Drums หรือ 5000L" value="${escapeHtml(qty)}" ${disableInputs ? 'disabled readonly style="background-color:#f1f5f9; cursor:not-allowed;"' : ''}>
+      </td>
+      <td class="td-form-edit-reason" style="display:${isEditReasonColVisible ? 'table-cell' : 'none'}; background:${itemEditReason ? '#fffbeb' : 'transparent'}; vertical-align:middle;">
+        ${itemEditReason
+          ? `<div style="padding:6px 10px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#b45309; font-size:13px; font-weight:600; line-height:1.35;">📌 ${escapeHtml(itemEditReason)}</div>`
+          : `<span style="color:#94a3b8; font-size:12px;">-</span>`
+        }
       </td>
       <td class="admin-lab-field" style="display:${isAdminOrLab ? 'table-cell' : 'none'};">
         <input type="text" class="item-form-rm" placeholder="เช่น RM-HYD-01" value="${escapeHtml(rm)}" ${isRequester ? 'disabled readonly' : ''}>
@@ -2320,6 +2420,11 @@ const App = (function () {
 
   // --- 5. MATERIAL HISTORY AUDIT LOADER (ADMIN ONLY) ---
   async function loadMaterialHistory() {
+    const historyAddManualBtnNode = document.getElementById('btn-history-add-manual');
+    if (historyAddManualBtnNode) {
+      const canAddManual = state.currentUser && ['admin', 'lab'].includes((state.currentUser.role || '').toLowerCase());
+      historyAddManualBtnNode.style.setProperty('display', canAddManual ? 'inline-flex' : 'none', 'important');
+    }
     const listBody = document.getElementById('history-list-tbody');
     // Pre-populate input values with filters state
     document.getElementById('hist-product').value = state.historyFilters.productName;
@@ -2824,8 +2929,8 @@ const App = (function () {
     if (!currentPwd || !newPwd || !confirmPwd) {
       return showErr('กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง');
     }
-    if (newPwd.length < 4) {
-      return showErr('รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร');
+    if (newPwd.length < 6) {
+      return showErr('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
     }
     if (newPwd !== confirmPwd) {
       return showErr('รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน');
@@ -4001,8 +4106,8 @@ const App = (function () {
 
     container.appendChild(toast);
 
-    // Fade in
-    setTimeout(() => toast.classList.add('show'), 50);
+    // Show immediately without artificial 50ms delay
+    requestAnimationFrame(() => toast.classList.add('show'));
 
     // Fade out and remove
     const duration = options.duration || 4000;
@@ -5506,6 +5611,114 @@ const App = (function () {
     }
   }
 
+  function formatEditRequestDiffHtml(er) {
+    const req = er.requests || {};
+    const oldData = er.old_data || null;
+    const newData = er.new_data || null;
+
+    // Extract requested item indices from reason if formatted as [รายการที่ X: ...]
+    const requestedIndices = new Set();
+    (er.reason || '').split(/\r?\n/).forEach(line => {
+      const m = line.trim().match(/^\[รายการที่\s*(\d+)/);
+      if (m) requestedIndices.add(parseInt(m[1], 10) - 1);
+    });
+
+    if (er.status === 'Pending') {
+      const items = (oldData && Array.isArray(oldData.items)) ? oldData.items : (req.request_items || []);
+      if (!items || items.length === 0) return '<span style="color:#94a3b8;">-</span>';
+      const lines = [];
+      items.forEach((it, idx) => {
+        const pName = String(it.product_name || '');
+        const mentionedInReason = requestedIndices.size === 0 && pName && (er.reason || '').toLowerCase().includes(pName.toLowerCase());
+        if (requestedIndices.has(idx) || mentionedInReason || (requestedIndices.size === 0 && items.length === 1)) {
+          const p = escapeHtml(pName || '-');
+          const b = escapeHtml(it.batch_number || it.batch_no || '-');
+          const q = escapeHtml(it.quantity || '-');
+          lines.push(`<div style="margin-bottom:3px;"><span style="color:#64748b; font-weight:600;">ก่อนแก้ (${p}):</span> Batch: <b>${b}</b> | Qty: <b>${q}</b></div>`);
+        }
+      });
+      return lines.join('') || '<span style="color:#94a3b8;">-</span>';
+    }
+
+    // Completed / Approved status: compare oldData vs newData (or current req)
+    if (!oldData) {
+      return '<span style="color:#94a3b8; font-size:12px;">-</span>';
+    }
+
+    const oldReq = oldData.request || {};
+    const newReq = (newData && newData.request) ? newData.request : req;
+    const oldItems = Array.isArray(oldData.items) ? oldData.items : [];
+    const newItems = (newData && Array.isArray(newData.items)) ? newData.items : (req.request_items || []);
+
+    const diffs = [];
+
+    // Header field comparisons
+    const headerFields = [
+      { key: 'customer_name', label: 'Supplier' },
+      { key: 'po_number', label: 'PO' },
+      { key: 'car_plate', label: 'ทะเบียนรถ' },
+      { key: 'seal_no', label: 'Seal' },
+      { key: 'container_no', label: 'Container' },
+      { key: 'notes', label: 'หมายเหตุ' },
+      { key: 'lab_comments', label: 'Lab Comment' }
+    ];
+    headerFields.forEach(hf => {
+      const oVal = String(oldReq[hf.key] ?? '').trim();
+      const nVal = String(newReq[hf.key] ?? '').trim();
+      if (oVal !== nVal && (oVal || nVal)) {
+        diffs.push(`<div><b>${hf.label}:</b> <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oVal || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nVal || '-')}</span></div>`);
+      }
+    });
+
+    // Item field comparisons (only show items that actually changed!)
+    const maxLen = Math.max(oldItems.length, newItems.length);
+    for (let i = 0; i < maxLen; i++) {
+      const oIt = oldItems[i];
+      const nIt = (oIt && oIt.id ? newItems.find(x => String(x.id) === String(oIt.id)) : null) || newItems[i];
+      if (oIt && nIt) {
+        const itemChanges = [];
+        const oName = String(oIt.product_name || '').trim();
+        const nName = String(nIt.product_name || '').trim();
+        if (oName !== nName) {
+          itemChanges.push(`ชื่อสินค้า: <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oName || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nName || '-')}</span>`);
+        }
+        const oBatch = String(oIt.batch_number || oIt.batch_no || '').trim();
+        const nBatch = String(nIt.batch_number || nIt.batch_no || '').trim();
+        if (oBatch !== nBatch) {
+          itemChanges.push(`Batch: <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oBatch || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nBatch || '-')}</span>`);
+        }
+        const oQty = String(oIt.quantity || '').trim();
+        const nQty = String(nIt.quantity || '').trim();
+        if (oQty !== nQty) {
+          itemChanges.push(`Qty: <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oQty || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nQty || '-')}</span>`);
+        }
+        const oComment = String(oIt.item_comment || '').trim();
+        const nComment = String(nIt.item_comment || '').trim();
+        if (oComment !== nComment) {
+          itemChanges.push(`คอมเมนต์: <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oComment || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nComment || '-')}</span>`);
+        }
+        const oRm = String(oIt.rm_no || '').trim();
+        const nRm = String(nIt.rm_no || '').trim();
+        if (oRm !== nRm) {
+          itemChanges.push(`RM No.: <span style="color:#dc2626; text-decoration:line-through;">${escapeHtml(oRm || '-')}</span> ➔ <span style="color:#16a34a; font-weight:700;">${escapeHtml(nRm || '-')}</span>`);
+        }
+        if (itemChanges.length > 0) {
+          diffs.push(`<div style="margin-bottom:4px;"><span style="color:#0f172a; font-weight:600;">รายการที่ ${i + 1} (${escapeHtml(nName || oName)}):</span><br>${itemChanges.join(' | ')}</div>`);
+        }
+      } else if (oIt && !nIt) {
+        diffs.push(`<div><span style="color:#dc2626;">ลบรายการที่ ${i + 1}: ${escapeHtml(oIt.product_name || '-')}</span></div>`);
+      } else if (!oIt && nIt) {
+        diffs.push(`<div><span style="color:#16a34a;">เพิ่มรายการที่ ${i + 1}: ${escapeHtml(nIt.product_name || '-')}</span></div>`);
+      }
+    }
+
+    if (diffs.length === 0) {
+      return '<span style="color:#94a3b8; font-size:12px;">-</span>';
+    }
+
+    return diffs.join('');
+  }
+
   function renderEditRequestsTable() {
     const tbody = document.getElementById('edit-requests-tbody');
     if (!tbody) return;
@@ -5545,7 +5758,7 @@ const App = (function () {
     }
     
     if (filteredData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่มีข้อมูลคำขอแก้ไข</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:var(--text-muted); padding:30px;">ไม่มีข้อมูลคำขอแก้ไข</td></tr>';
       return;
     }
     
@@ -5553,7 +5766,19 @@ const App = (function () {
       const tr = document.createElement('tr');
       const req = er.requests || {};
       const customerName = req.customer_name || '-';
-      const productName = (req.request_items && req.request_items.length > 0) ? req.request_items.map(i => i.product_name).join(', ') : '-';
+      const allProducts = (req.request_items && req.request_items.length > 0)
+        ? req.request_items.map(i => i.product_name).filter(Boolean)
+        : [];
+      const fullProductText = allProducts.length > 0 ? allProducts.join(', ') : '-';
+      let productSummaryHtml = '-';
+      if (allProducts.length === 1) {
+        productSummaryHtml = escapeHtml(allProducts[0]);
+      } else if (allProducts.length === 2) {
+        productSummaryHtml = `${escapeHtml(allProducts[0])}, ${escapeHtml(allProducts[1])}`;
+      } else if (allProducts.length > 2) {
+        const extraCount = allProducts.length - 1;
+        productSummaryHtml = `${escapeHtml(allProducts[0])} <span style="display:inline-block; background:#e2e8f0; color:#475569; font-size:11px; font-weight:600; padding:1px 6px; border-radius:10px; margin-left:4px; white-space:nowrap;">+${extraCount} รายการ</span>`;
+      }
       
       let statusBadge = '<span class="badge pending" style="background:#f59e0b; color:white; padding:4px 8px; border-radius:12px; font-size:12px;">รอดำเนินการ</span>';
       if (er.status === 'Approved' || er.status === 'Completed') {
@@ -5571,13 +5796,21 @@ const App = (function () {
         actionHtml += `<button class="btn btn-sm" style="background:#ef4444;color:white;margin-left:5px;" onclick="App.deleteEditRequest('${er.id}')">ลบ</button>`;
       }
       
+      const formattedReasonHtml = (er.reason || '')
+        .split(/\r?\n/)
+        .map(line => escapeHtml(line.trim()))
+        .filter(Boolean)
+        .join('<br>');
+      const diffHtml = formatEditRequestDiffHtml(er);
+
       tr.innerHTML = `
         <td>${createdDate}</td>
         <td style="font-weight:600;">${req.request_no || '-'}</td>
         <td>${customerName}</td>
-        <td>${productName}</td>
+        <td style="max-width:170px; white-space:normal;" title="${escapeHtml(fullProductText)}">${productSummaryHtml}</td>
         <td>${er.requester?.display_name || '-'}</td>
-        <td style="max-width:200px; white-space:normal;">${er.reason} <br><small style="color:gray">${er.note || ''}</small></td>
+        <td style="max-width:240px; white-space:normal; line-height:1.45;">${formattedReasonHtml} ${er.note ? `<br><small style="color:gray">หมายเหตุ: ${escapeHtml(er.note)}</small>` : ''}</td>
+        <td style="max-width:280px; white-space:normal; line-height:1.45; font-size:12.5px;">${diffHtml}</td>
         <td>${statusBadge}</td>
         <td>${actionedDate}</td>
         <td>${er.actioned_user?.display_name || '-'}</td>
@@ -5683,27 +5916,30 @@ const App = (function () {
         if (document.getElementById('edit-req-date')) document.getElementById('edit-req-date').textContent = match.request_date ? new Date(match.request_date).toLocaleDateString('th-TH') : '-';
         if (document.getElementById('edit-req-status')) document.getElementById('edit-req-status').textContent = match.status || '-';
         
-        // Render items table matching user design
+        // Render items table with 4th column for per-item edit reason
         const tbody = document.getElementById('edit-req-items-tbody');
         if (tbody) {
           tbody.innerHTML = '';
           const itemsArr = match.request_items || match.items || [];
           if (itemsArr.length > 0) {
-            itemsArr.forEach(item => {
+            itemsArr.forEach((item, idx) => {
               const tr = document.createElement('tr');
               tr.style.borderBottom = '1px solid #f1f5f9';
               const pName = item.product_name || '-';
               const bNo = item.batch_number || item.batch_no || '-';
               const qty = item.quantity || '-';
               tr.innerHTML = `
-                <td style="padding:12px 16px; font-weight:600; color:#0f172a;">${escapeHtml(pName)}</td>
-                <td style="padding:12px 16px; color:#334155;">${escapeHtml(bNo)}</td>
-                <td style="padding:12px 16px; color:#334155;">${escapeHtml(qty)}</td>
+                <td style="padding:10px 14px; font-weight:600; color:#0f172a; vertical-align:middle;">${escapeHtml(pName)}</td>
+                <td style="padding:10px 14px; color:#334155; vertical-align:middle;">${escapeHtml(bNo)}</td>
+                <td style="padding:10px 14px; color:#334155; vertical-align:middle;">${escapeHtml(qty)}</td>
+                <td style="padding:8px 12px; vertical-align:middle;">
+                  <input type="text" class="form-control edit-req-item-reason" data-item-index="${idx}" data-product-name="${escapeHtml(pName)}" placeholder="ระบุสิ่งที่ต้องการให้แก้ไข..." style="height:36px; font-size:13px; padding:6px 10px; width:100%;">
+                </td>
               `;
               tbody.appendChild(tr);
             });
           } else {
-            tbody.innerHTML = '<tr><td colspan="3" style="padding:14px; text-align:center; color:#94a3b8;">ไม่มีรายการสินค้า</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="padding:14px; text-align:center; color:#94a3b8;">ไม่มีรายการสินค้า</td></tr>';
           }
         }
 
@@ -5726,18 +5962,52 @@ const App = (function () {
       return;
     }
     const reqId = state.currentEditTargetRequest.id;
-    const reason = document.getElementById('edit-req-reason').value;
-    const note = document.getElementById('edit-req-note').value;
-    
-    if (!reqId || !reason) return;
+    const reasonInputs = Array.from(document.querySelectorAll('#edit-req-items-tbody .edit-req-item-reason'));
+    const itemReasons = [];
+    reasonInputs.forEach((inp, idx) => {
+      const val = (inp.value || '').trim();
+      if (val) {
+        const pName = inp.getAttribute('data-product-name') || `รายการที่ ${idx + 1}`;
+        itemReasons.push(`[รายการที่ ${idx + 1}: ${pName}] ${val}`);
+      }
+    });
+    const note = (document.getElementById('edit-req-note')?.value || '').trim();
+    const fallbackReason = (document.getElementById('edit-req-reason')?.value || '').trim();
+    const reason = itemReasons.length > 0 ? itemReasons.join('\n') : (fallbackReason || note);
+
+    if (!reqId || !reason) {
+      showToast('กรุณาระบุสิ่งที่ต้องการแก้ไขในตารางอย่างน้อย 1 รายการ (หรือระบุในช่องหมายเหตุเพิ่มเติม)', 'warning');
+      return;
+    }
     
     try {
       showLoadingButton(e.submitter, true, 'กำลังส่ง...');
+      const targetReq = state.currentEditTargetRequest || {};
+      const snapshotOldData = {
+        request: {
+          request_no: targetReq.request_no || '',
+          customer_name: targetReq.customer_name || '',
+          po_number: targetReq.po_number || '',
+          car_plate: targetReq.car_plate || '',
+          seal_no: targetReq.seal_no || '',
+          container_no: targetReq.container_no || '',
+          notes: targetReq.notes || ''
+        },
+        items: (targetReq.request_items || targetReq.items || []).map(it => ({
+          id: it.id,
+          product_name: it.product_name || '',
+          batch_number: it.batch_number || it.batch_no || '',
+          quantity: it.quantity || '',
+          rm_no: it.rm_no || '',
+          test_result: it.test_result || ''
+        }))
+      };
       await window.DB.createEditRequest({
         request_id: reqId,
         requester_id: state.currentUser.id,
         reason: reason,
-        note: note
+        note: note,
+        old_data: snapshotOldData
       });
       closeCreateEditRequestModal();
       showToast('ส่งคำขอแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
@@ -5899,18 +6169,16 @@ const App = (function () {
           ? currentMixTankRecord.id
           : paginated[0].id;
         
-        setTimeout(() => {
-          const curTbody = document.getElementById('mix-tank-list-tbody');
-          if (curTbody) {
-            const rows = curTbody.querySelectorAll('tr');
-            rows.forEach(row => {
-              if (row.innerHTML.includes(targetId) || (targetId === paginated[0].id && row === rows[0])) {
-                row.classList.add('selected-row');
-              }
-            });
-          }
-          loadMixTankDetailInPane(targetId);
-        }, 50);
+        const curTbody = document.getElementById('mix-tank-list-tbody');
+        if (curTbody) {
+          const rows = curTbody.querySelectorAll('tr');
+          rows.forEach(row => {
+            if (row.innerHTML.includes(targetId) || (targetId === paginated[0].id && row === rows[0])) {
+              row.classList.add('selected-row');
+            }
+          });
+        }
+        loadMixTankDetailInPane(targetId);
       } else {
         clearMixTankDetailPane();
       }
@@ -6635,9 +6903,7 @@ const App = (function () {
     `;
     tbody.appendChild(tr);
     recalculateMixTankTotals();
-    setTimeout(() => {
-      tr.querySelector('.dis-qty')?.focus();
-    }, 50);
+    tr.querySelector('.dis-qty')?.focus();
   }
 
   function removeMixTankDischargeRow(rowId) {
@@ -7325,9 +7591,10 @@ const App = (function () {
   }
 
   async function printMixTank(id) {
-    showToast('กำลังเตรียมเอกสาร MIXED STORAGE TANK สำหรับการพิมพ์...', 'info');
     try {
-      const rec = await window.DB.getMixTankDetail(id);
+      const rec = (currentMixTankRecord && String(currentMixTankRecord.id) === String(id))
+        ? currentMixTankRecord
+        : await window.DB.getMixTankDetail(id);
       if (!rec) throw new Error('ไม่พบข้อมูลเอกสาร');
 
       const formatDateOnly = (dStr) => {
@@ -7699,7 +7966,7 @@ const App = (function () {
         iframe.contentWindow.focus();
         iframe.contentWindow.print();
         setTimeout(() => document.body.removeChild(iframe), 3000);
-      }, 600);
+      }, 100);
     } catch (e) {
       console.error('printMixTank error:', e);
       showToast('เกิดข้อผิดพลาดในการเตรียมพิมพ์: ' + e.message, 'error');

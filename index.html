@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบแจ้งตรวจสอบคุณภาพวัตถุดิบ (RMIS)</title>
   <meta name="description" content="Raw Material Inspection System - ระบบจัดการใบแจ้งตรวจสอบห้องปฏิบัติการ สำหรับบริษัท เอสเอฟซี เอกเซลเล้นซ์ จำกัด">
-  <link rel="stylesheet" href="style_v2.css?v=8">
+  <link rel="stylesheet" href="style_v2.css?v=9">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
   <link rel="icon" href="icons/icon-192.png">
@@ -105,7 +105,6 @@
     }
     .notif-panel.open {
       display: block;
-      animation: notifSlideDown 0.2s ease-out;
     }
     .notif-item {
       padding: 10px 14px;
@@ -594,7 +593,6 @@
     .item-form-result {
       border-radius: 6px;
       font-weight: 500;
-      transition: background-color 0.2s, color 0.2s, border-color 0.2s;
     }
     .item-form-result[data-result="In Process"] {
       background-color: #ffffff;
@@ -1641,18 +1639,21 @@
                   <button type="button" class="btn btn-secondary btn-sm" id="btn-add-item" style="border-color:var(--primary-color); color:var(--primary-color);" onclick="App.addFormItemRow()">+ เพิ่มรายการสินค้า</button>
                 </div>
                 
+                <div id="edit-request-fulfill-banner" style="display:none; margin-bottom:14px;"></div>
+
                 <div class="table-responsive" style="margin-bottom:20px;">
                   <table class="item-table">
                     <thead>
                       <tr>
-                        <th style="width:25%;">ชื่อสินค้า <span style="color:red;">*</span></th>
-                        <th style="width:20%;">Batch Number <span style="color:red;">*</span></th>
-                        <th style="width:15%;">Quantity <span style="color:red;">*</span></th>
+                        <th style="width:22%;">ชื่อสินค้า <span style="color:red;">*</span></th>
+                        <th style="width:18%;">Batch Number <span style="color:red;">*</span></th>
+                        <th style="width:13%;">Quantity <span style="color:red;">*</span></th>
+                        <th id="th-form-edit-reason" style="width:18%; display:none; background:#fffbeb !important; color:#b45309 !important;">📌 สิ่งที่ขอแก้ไข</th>
                         <th style="width:10%;" class="admin-lab-field">RM No.</th>
                         <th style="width:10%;" class="admin-lab-field">ผลทดสอบ</th>
                         <th style="width:10%;" class="admin-lab-field base-oil-field" style="display:none;">Den@15C</th>
                         <th style="width:10%;" class="admin-lab-field base-oil-field" style="display:none;">Den@30C</th>
-                        <th style="width:15%;" class="admin-lab-field">คอมเมนต์</th>
+                        <th style="width:14%;" class="admin-lab-field">คอมเมนต์</th>
                         <th style="width:5%; text-align:center;">ลบ</th>
                       </tr>
                     </thead>
@@ -1731,9 +1732,9 @@
         <section id="view-history" class="page-view" style="display: none;">
           <div class="flex justify-between align-center mb-20">
             <h1>ระบบค้นหาประวัติวัตถุดิบย้อนหลัง (Material Audit)</h1>
-            <button class="btn btn-primary btn-sm" onclick="App.openManualHistoricalModal()" style="display: inline-flex; align-items: center;">
+            <button id="btn-history-add-manual" class="btn btn-primary btn-sm" onclick="App.openManualHistoricalModal()" style="display: none !important; align-items: center;">
               <i data-lucide="plus-circle" style="margin-right:6px; width:16px; height:16px;"></i>
-              + เพิ่มข้อมูลย้อนหลัง
+              เพิ่มข้อมูลย้อนหลัง
             </button>
           </div>
 
@@ -1847,7 +1848,8 @@
                       <th onclick="App.sortEditRequests('supplier_name')" style="cursor:pointer;">Supplier ↕</th>
                       <th onclick="App.sortEditRequests('product_name')" style="cursor:pointer;">Product ↕</th>
                       <th onclick="App.sortEditRequests('requester_name')" style="cursor:pointer;">ผู้ส่งคำขอ ↕</th>
-                      <th>เหตุผล</th>
+                      <th>เหตุผล / สิ่งที่ขอแก้ไข</th>
+                      <th>ข้อมูลก่อนแก้ ➔ หลังแก้</th>
                       <th onclick="App.sortEditRequests('status')" style="cursor:pointer;">สถานะ ↕</th>
                       <th>วันที่ดำเนินการ</th>
                       <th>ผู้ดำเนินการ</th>
@@ -2679,7 +2681,7 @@
        MODAL: CREATE EDIT REQUEST
        ========================================================================= -->
   <div class="modal-overlay" id="modal-create-edit-request">
-    <div class="modal-container" style="max-width:600px;">
+    <div class="modal-container" style="max-width:780px;">
       <div class="modal-header">
         <h3 class="modal-title">สร้างคำขอแก้ไขข้อมูล</h3>
         <button class="btn-close" onclick="App.closeCreateEditRequestModal()">&times;</button>
@@ -2690,7 +2692,7 @@
             <label>ค้นหาเลขที่ใบแจ้งตรวจสอบ <span style="color:red;">*</span></label>
             <div style="display:flex; gap:10px;">
               <input type="text" id="edit-req-search-input" class="form-control" placeholder="ระบุเลขที่ใบแจ้ง (เช่น 2767)" onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.searchEditRequest(); }" style="margin-bottom:0;">
-              <button type="button" class="btn btn-primary" onclick="App.searchEditRequest()" style="white-space:nowrap;">ค้นหา</button>
+              <button type="button" class="btn btn-primary" onclick="App.searchEditRequest()" style="white-space:nowrap; width:auto;">ค้นหา</button>
             </div>
             <div id="edit-req-search-error" style="color:var(--text-danger); font-size:13px; margin-top:5px; display:none;">ไม่พบข้อมูลใบแจ้งนี้</div>
           </div>
@@ -2712,14 +2714,15 @@
               </div>
             </div>
 
-            <!-- Items Table matching user design -->
+            <!-- Items Table with 4th column after Quantity -->
             <div style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:15px; background:#ffffff;">
               <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                 <thead>
                   <tr style="background:#f8fafc; border-bottom:1px solid #e2e8f0; color:#475569;">
-                    <th style="padding:12px 16px; font-weight:600;">ชื่อสินค้า</th>
-                    <th style="padding:12px 16px; font-weight:600;">Batch Number</th>
-                    <th style="padding:12px 16px; font-weight:600;">Quantity (จำนวน)</th>
+                    <th style="padding:12px 14px; font-weight:600; width:24%;">ชื่อสินค้า</th>
+                    <th style="padding:12px 14px; font-weight:600; width:20%;">Batch Number</th>
+                    <th style="padding:12px 14px; font-weight:600; width:18%;">Quantity (จำนวน)</th>
+                    <th style="padding:12px 14px; font-weight:600; width:38%;">เหตุผล / สิ่งที่ขอแก้ไข <span style="color:red;">*</span></th>
                   </tr>
                 </thead>
                 <tbody id="edit-req-items-tbody">
@@ -2728,15 +2731,12 @@
               </table>
             </div>
 
-          <div class="form-group">
-            <label>เหตุผลในการขอแก้ไข <span style="color:red;">*</span></label>
-            <textarea id="edit-req-reason" class="form-control" rows="3" required placeholder="ระบุสิ่งที่ต้องการให้แก้ไข..."></textarea>
-          </div>
-          
-          <div class="form-group">
-            <label>หมายเหตุเพิ่มเติม (ถ้ามี)</label>
-            <input type="text" id="edit-req-note" class="form-control" placeholder="ข้อความเพิ่มเติม...">
-          </div>
+            <input type="hidden" id="edit-req-reason" value="">
+            
+            <div class="form-group" style="margin-bottom:0;">
+              <label>หมายเหตุเพิ่มเติม (ถ้ามี)</label>
+              <input type="text" id="edit-req-note" class="form-control" placeholder="ระบุหมายเหตุเพิ่มเติม หรือกรณีขอแก้ไขข้อมูลส่วนหัวใบแจ้ง...">
+            </div>
           </div> <!-- End edit-req-details-container -->
         </div>
         <div class="modal-footer">
@@ -3162,7 +3162,7 @@
           <div class="form-group" style="margin-bottom:16px;">
             <label for="own-pwd-new" style="display:block;margin-bottom:6px;font-weight:600;">รหัสผ่านใหม่</label>
             <div style="position:relative;">
-              <input type="password" id="own-pwd-new" class="form-control" placeholder="อย่างน้อย 4 ตัวอักษร" required minlength="4" autocomplete="new-password" style="width:100%;padding-right:44px;">
+              <input type="password" id="own-pwd-new" class="form-control" placeholder="อย่างน้อย 6 ตัวอักษร" required minlength="6" autocomplete="new-password" style="width:100%;padding-right:44px;">
               <button type="button" tabindex="-1" onclick="App.togglePwdVisibility('own-pwd-new', this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;">&#128065;</button>
             </div>
           </div>
@@ -3218,7 +3218,7 @@
   </script>
 
   <script src="config.js?v=132"></script>
-  <script src="dbService.js?v=149"></script>
-  <script src="app_v5.js?v=197"></script>
+  <script src="dbService.js?v=150"></script>
+  <script src="app_v5.js?v=206"></script>
 </body>
 </html>
